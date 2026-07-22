@@ -1,0 +1,24 @@
+[package]
+name = "moj-sint"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+description = "Headless real-time synthesizer core for SHR-DAW"
+repository = "https://github.com/PaolaShultz/moj-sint"
+
+[lib]
+name = "moj_sint"
+
+[[bin]]
+name = "moj-sint"
+path = "src/main.rs"
+
+[dependencies]
+hound = "3.5"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+toml = "0.9"
+
+[dev-dependencies]
+tempfile = "3"
