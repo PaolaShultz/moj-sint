@@ -419,4 +419,22 @@ mod tests {
         assert!(metrics.dc.abs() < 0.005, "dc={}", metrics.dc);
         assert!(metrics.peak <= 0.98, "peak={}", metrics.peak);
     }
+
+    #[test]
+    fn integer_swarm_keeps_a_measurable_base_note_under_machine_roughness() {
+        let result = render_and_measure(
+            ResearchFamily::IntegerSwarm,
+            ResearchRenderSpec {
+                sample_rate: 48_000,
+                note: 60,
+                seconds: 0.75,
+            },
+        )
+        .unwrap();
+        assert!(
+            result.metrics.fundamental_db > -36.0,
+            "fundamental_db={}",
+            result.metrics.fundamental_db
+        );
+    }
 }

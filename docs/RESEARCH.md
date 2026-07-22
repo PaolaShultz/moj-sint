@@ -560,6 +560,79 @@ thin square, constant lockup, accidental DC, or sample-rate-dependent overflow.
 All widths, masks, shifts, rotates, carry rules, and integer-to-float conversion
 must be explicit and tested.
 
+### 2026-07-23 five-family listening-gate implementation
+
+The first gate implements exactly one fixed representative per family in the
+standalone `dsp::research` path. None is routed through `Engine`, presets, or
+stable macros:
+
+- nonlinear PM uses a table carrier, a three-times-ratio symmetric cubic-shaped
+  modulator, and a bounded phase index;
+- excited comb uses one pitch-locked and two dispersed fractional feedback
+  delays, a deterministic one-period noise burst, in-loop damping, feedback
+  below unity, and a prepared 10 Hz output DC blocker;
+- spatial micro-delay uses a seven-partial-or-smaller band-limited buzz, four
+  unequal 0.67-5.27 ms paths, continuous complementary triangle movement, and
+  a centered direct anchor;
+- spectral traversal uses sixteen or fewer recursive sinusoidal partials, four
+  original amplitude frames, exact rotation preparation, a slow triangular
+  path through the frames, and a 45%-of-sample-rate partial guard; and
+- integer swarm uses 24 independently seeded `u16` machines with explicit
+  8/10/12/16-bit masks, masked wrapping addition, width-limited rotate, carry
+  and borrow injection, authored bit taps, a phase-bit pitch anchor, one
+  integer-to-float boundary, and a prepared 8 Hz DC blocker.
+
+All five sample paths are deterministic, finite, bounded, resettable, scalar,
+and allocation-free in tests. No per-sample trigonometric setup, file access,
+logging, locks, processes, or clocks occur there. Delay arrays and integer
+state are fixed per source so later per-voice ownership remains possible, but
+the prototypes are not production voices and establish no voice-count budget.
+
+The disposable release batch contains 15 stereo 32-bit-float, 48 kHz WAVs:
+one file for each family at MIDI 36, 60, and 84. All target RMS values are
+0.060000 except excited-comb note 84 at 0.059116 under the common 0.979 peak
+ceiling. Peak spans 0.085294-0.979000 and maximum absolute DC is 0.000229049.
+Every row is finite and the reported fundamental remains within 30 dB of its
+strongest measured harmonic. The integer pitch anchor moved its fitted
+fundamental from roughly -67 to -71 dB in the rejected intermediate revision
+to -31.401/-30.336/-29.558 dB in the retained batch.
+
+For the spatial candidate, left/right correlation is 0.597967-0.954738,
+side-to-mid energy is 0.031823-0.266645, mono-fold RMS is
+0.053312-0.059068, and maximum adjacent-sample jump is 0.003811-0.063270
+across the three notes. These measurements reject polarity inversion, silent
+mono, static mono output, and discontinuous movement. They do not establish a
+spatial effect on headphones or speakers; only the user can perform and accept
+that listening pass.
+
+The conservative eight-times-rate comparison removes DC, box-decimates the
+high-rate reference, fits one gain, and reports all remaining difference as
+`alias_error_db`. Nonlinear PM measures -34.819/-22.898/-11.814 dB and spectral
+traversal -37.807/-25.722/-13.860 dB at notes 36/60/84. The integer swarm
+measures only -0.658/-0.399/-0.707 dB. That severe residual is retained as a
+negative engineering result: explicit small-register increment quantization
+and state cycles change substantially with sample rate, so this representative
+is not alias-clean or sample-rate-invariant. It remains in the listening gate
+because controlled register-boundary behavior is the family hypothesis, not
+because the measurement passed a quality threshold.
+
+Base phase periods for the recorded integer widths are 128-256 samples at 8
+bits, 512-1024 at 10 bits, 2048-4096 at 12 bits, and 65536 at 16 bits for the
+three notes. Tests also cover zero-increment lockup reporting, distinct
+width-dependent sequences, transition activity, deterministic replay, DC,
+finite conversion, and allocation. Periods are engineering descriptions, not
+musical variations.
+
+Two fresh release-mode generations produced byte-identical WAVs and reports
+apart from the explicitly volatile workstation timing file. The SHA-256 of the
+sorted per-file hash manifest is
+`820f8a46f5fa8bcf39c9884b5b986196809b4cccfb7f3b328e4e67916798f572`.
+The ignored batch is under `artifacts/five-family-listening-gate/`; it is
+disposable after the user's verdict. No result is preserved elsewhere, no
+family or macro is accepted as useful, and no Raspberry Pi, callback, latency,
+polyphony, headphone, speaker, mono-listening, or sound-quality claim follows
+from this workstation evidence.
+
 ## Real-time I/O and platform
 
 - JACK project, [API overview](https://jackaudio.org/api/) and

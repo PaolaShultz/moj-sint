@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-07-22, Europe/Zagreb.
+Last updated: 2026-07-23, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -121,6 +121,10 @@ At this checkpoint:
   cargo-deny are installed.
 - The live JACK/ALSA host is not implemented and no audio service or hardware
   was touched.
+- The approved five-family comparison is implemented as isolated disposable
+  offline research code. Its 15-file batch is under ignored
+  `artifacts/five-family-listening-gate/` and now awaits human listening; no
+  family is selected and none is routed into `Engine` or stable macros.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -818,3 +822,48 @@ All cost evidence in this checkpoint comes from the scalar x86_64 workstation.
 It is not Raspberry Pi callback, latency, safe-polyphony, or sound-quality
 evidence. No JACK/ALSA host, SHR-DAW change, hardware connection, SIMD path, or
 Pi claim was added.
+
+## Five-family listening-gate checkpoint
+
+Completed on 2026-07-23 and left open for human listening:
+
+- researched nonlinear PM, excited combs, precedence/micro-delay perception,
+  spectral traversal, and small-register sound machines from primary or
+  authoritative sources, preserving authorship, publication details, direct
+  URLs, supported claims, and licensing boundaries in `docs/RESEARCH.md`;
+- defined a distinct perceptual hypothesis and audible failure condition for
+  each family before implementation;
+- added an isolated `dsp::research` source boundary and `five-family-lab`
+  offline binary without changing the production `Engine`, presets, controller
+  routes, JACK/ALSA work, or SHR-DAW;
+- implemented one fixed scalar representative per family with per-source state,
+  deterministic reset, finite/bounded output, and allocation-free sample paths;
+- generated exactly 15 stereo 32-bit-float 48 kHz files for MIDI 36/60/84,
+  matched to RMS 0.06 except the crest-limited high comb at 0.059116, with peak
+  0.085294-0.979000 and maximum absolute DC 0.000229049;
+- measured harmonic distributions, fitted fundamental/pitch retention,
+  left/right correlation, side-to-mid energy, mono fold-down, adjacent-sample
+  continuity, deterministic hashes, integer phase periods, conservative 8x
+  alias/error residuals, and volatile scalar workstation cost;
+- corrected two issues found by release evidence: approximate spectral rotation
+  coefficients caused long-render pitch drift, and the high comb retained too
+  much DC; exact prepared rotations and a prepared 10 Hz comb DC blocker now
+  have focused regressions;
+- retained the integer swarm's -0.658/-0.399/-0.707 dB high-rate residual as a
+  documented negative result showing strong register-quantization and
+  sample-rate dependence rather than calling it alias-clean; and
+- produced byte-identical release WAVs and deterministic reports in two fresh
+  directories, excluding only the explicitly volatile workstation timing file;
+  the sorted per-file hash manifest has SHA-256
+  `820f8a46f5fa8bcf39c9884b5b986196809b4cccfb7f3b328e4e67916798f572`; and
+- passed fresh `cargo fmt --check`, all-target/all-feature tests (61 library,
+  one five-family CLI, and six existing CLI tests), Clippy with warnings denied,
+  release build, `cargo audit` over 35 crate dependencies, `cargo deny check`,
+  AArch64 compile check, and `git diff --check`. `cargo deny` retains only the
+  accepted `winnow` 0.7/1.0 duplicate warning inside `toml`.
+
+The user must now listen before any family is selected, integrated, expanded,
+or mapped to a stable control. The spatial candidate has not been accepted on
+headphones, speakers, or mono; automated metrics cannot make that decision.
+After the verdict, record accepted/rejected conclusions and delete the ignored
+batch unless the user explicitly asks to preserve one exact result.

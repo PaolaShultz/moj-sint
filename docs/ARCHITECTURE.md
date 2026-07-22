@@ -60,7 +60,21 @@ direct disposable lab generator, but it is no longer in the voice render path.
   of alias energy and amplitude/phase deviation after DC removal and fitted
   gain, not a perceptual score.
 - `offline`: deterministic note rendering and stereo float WAV output.
+- `dsp::research`: five disposable, monophonic, allocation-free scalar source
+  states used only by the five-family listening gate. They are not variants of
+  the production voice and are not reachable from `Engine` or presets.
+- `research`: non-real-time rendering, loudness matching, spectral and spatial
+  measurements, conservative high-rate residual comparison, and deterministic
+  hashing for the disposable sources.
 - `main`: non-real-time `validate` and `render` commands.
+
+The separate `five-family-lab` binary renders those research sources into an
+explicit output directory. Its mechanisms are nonlinear PM, excited comb,
+four-path spatial micro-delay, authored additive spectral traversal, and a
+24-machine fixed-width integer swarm. Construction prepares phase rotations,
+filter coefficients, delay bounds, and fixed state; every sample path is
+allocation-free and bounded. The binary performs file I/O and timing outside
+the sample path and is not a live host.
 
 ## Deliberate deferrals
 

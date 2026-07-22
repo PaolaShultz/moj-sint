@@ -591,7 +591,13 @@ impl IntegerSwarm {
         for machine in &mut self.machines {
             let word = machine.sample_word();
             let mask = width_mask(machine.width);
-            let normalized = 2.0 * f32::from(word) / f32::from(mask) - 1.0;
+            let state_component = 2.0 * f32::from(word) / f32::from(mask) - 1.0;
+            let phase_component = if machine.phase & (1 << (machine.width - 1)) == 0 {
+                -1.0
+            } else {
+                1.0
+            };
+            let normalized = 0.62 * phase_component + 0.38 * state_component;
             let weight = match machine.width {
                 16 => 1.0,
                 12 => 0.72,
