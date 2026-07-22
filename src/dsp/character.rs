@@ -18,14 +18,15 @@ pub struct CharacterError;
 
 #[derive(Clone, Copy, Debug)]
 pub struct CharacterLayer {
-    method: CharacterMethod,
+    waveshaper: CharacterWaveshaper,
     lowpass: [f32; 4],
     lowpass_coefficient: f32,
-    previous_branch: f32,
-    previous_driven: f32,
     previous_generated: f32,
     dc_output: f32,
     dc_coefficient: f32,
+    return_highpass_lowpass: [f32; 2],
+    return_highpass_coefficient: f32,
+    sample_rate: f32,
 }
 
 impl CharacterLayer {
@@ -36,16 +37,28 @@ impl CharacterLayer {
         let cutoff_hz = 6_000.0_f32.min(0.2 * sample_rate);
         let lowpass_coefficient = 1.0 - (-TAU * cutoff_hz / sample_rate).exp();
         let dc_coefficient = (-TAU * 10.0 / sample_rate).exp();
+        let return_highpass_coefficient = 1.0 - (-TAU * 20.0 / sample_rate).exp();
         Ok(Self {
-            method,
+            waveshaper: CharacterWaveshaper::new(method),
             lowpass: [0.0; 4],
             lowpass_coefficient,
-            previous_branch: 0.0,
-            previous_driven: 0.0,
             previous_generated: 0.0,
             dc_output: 0.0,
             dc_coefficient,
+            return_highpass_lowpass: [0.0; 2],
+            return_highpass_coefficient,
+            sample_rate,
         })
+    }
+
+    pub fn set_frequency(&mut self, frequency_hz: f32) {
+        let frequency_hz = if frequency_hz.is_finite() {
+            frequency_hz.clamp(0.0, 0.5 * self.sample_rate)
+        } else {
+            0.0
+        };
+        let cutoff_hz = (2.5 * frequency_hz).clamp(20.0, 6_000.0_f32.min(0.2 * self.sample_rate));
+        self.return_highpass_coefficient = 1.0 - (-TAU * cutoff_hz / self.sample_rate).exp();
     }
 
     #[inline]
@@ -59,7 +72,49 @@ impl CharacterLayer {
             branch = *state;
         }
 
-        let drive = 1.0 + 3.0 * edge;
+        let generated = self.waveshaper.sample(branch, edge);
+
+        self.dc_output = generated - self.previous_generated + self.dc_coefficient * self.dc_output;
+        self.previous_generated = generated;
+        let mut character = self.dc_output;
+        for lowpass in &mut self.return_highpass_lowpass {
+            *lowpass += self.return_highpass_coefficient * (character - *lowpass);
+            character -= *lowpass;
+        }
+        let intensity = 1.0 - (1.0 - edge) * (1.0 - edge) * (1.0 - edge);
+        let output = dry - 1.2 * couple * intensity * character;
+        if output.is_finite() { output } else { 0.0 }
+    }
+
+    pub fn reset(&mut self) {
+        self.lowpass = [0.0; 4];
+        self.waveshaper.reset();
+        self.previous_generated = 0.0;
+        self.dc_output = 0.0;
+        self.return_highpass_lowpass = [0.0; 2];
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct CharacterWaveshaper {
+    method: CharacterMethod,
+    previous_branch: f32,
+    previous_driven: f32,
+}
+
+impl CharacterWaveshaper {
+    pub(crate) const fn new(method: CharacterMethod) -> Self {
+        Self {
+            method,
+            previous_branch: 0.0,
+            previous_driven: 0.0,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn sample(&mut self, branch: f32, edge: f32) -> f32 {
+        let edge = finite_clamped(edge, 0.0, 1.0);
+        let drive = 1.0 + edge * edge;
         let driven = drive * branch;
         let generated = match self.method {
             CharacterMethod::Direct => soft_clip(driven) / drive - branch,
@@ -83,20 +138,12 @@ impl CharacterLayer {
         };
         self.previous_branch = branch;
         self.previous_driven = driven;
-
-        self.dc_output = generated - self.previous_generated + self.dc_coefficient * self.dc_output;
-        self.previous_generated = generated;
-        let intensity = 1.0 - (1.0 - edge) * (1.0 - edge) * (1.0 - edge);
-        let output = dry + 1.3 * couple * intensity * self.dc_output;
-        if output.is_finite() { output } else { 0.0 }
+        generated
     }
 
-    pub fn reset(&mut self) {
-        self.lowpass = [0.0; 4];
+    pub(crate) fn reset(&mut self) {
         self.previous_branch = 0.0;
         self.previous_driven = 0.0;
-        self.previous_generated = 0.0;
-        self.dc_output = 0.0;
     }
 }
 
@@ -219,5 +266,35 @@ mod tests {
                 std::hint::black_box(sum);
             });
         }
+    }
+
+    #[test]
+    fn note_tracked_return_keeps_the_dry_fundamental_and_adds_a_third() {
+        let sample_rate = 48_000.0;
+        let frequency = 440.0;
+        let mut layer = CharacterLayer::new(sample_rate, CharacterMethod::Direct).unwrap();
+        layer.set_frequency(frequency);
+        let mut fundamental_sine = 0.0_f64;
+        let mut fundamental_cosine = 0.0_f64;
+        let mut third_sine = 0.0_f64;
+        let mut third_cosine = 0.0_f64;
+        let sample_count = 48_000;
+        for index in 0..sample_count + 4_800 {
+            let phase =
+                std::f64::consts::TAU * frequency as f64 * index as f64 / sample_rate as f64;
+            let dry = (0.8 * phase.sin()) as f32;
+            let output = layer.sample(dry, 1.0, 1.0);
+            if index >= 4_800 {
+                fundamental_sine += f64::from(output) * phase.sin();
+                fundamental_cosine += f64::from(output) * phase.cos();
+                third_sine += f64::from(output) * (3.0 * phase).sin();
+                third_cosine += f64::from(output) * (3.0 * phase).cos();
+            }
+        }
+        let scale = 2.0 / sample_count as f64;
+        let fundamental = scale * fundamental_sine.hypot(fundamental_cosine);
+        let third = scale * third_sine.hypot(third_cosine);
+        assert!(fundamental > 0.7, "fundamental={fundamental} third={third}");
+        assert!(third > 0.05, "fundamental={fundamental} third={third}");
     }
 }

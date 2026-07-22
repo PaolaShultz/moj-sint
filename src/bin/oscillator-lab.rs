@@ -1,10 +1,13 @@
 use moj_sint::analysis::{
-    AnalysisSpec, WaveformMetrics, measure_candidate, measure_harmonic_system,
+    AnalysisSpec, CharacterAnalysisSpec, CharacterMetrics, WaveformMetrics, measure_candidate,
+    measure_character_intermodulation, measure_character_method, measure_harmonic_distribution,
+    measure_harmonic_system,
 };
 use moj_sint::control::Normalized;
+use moj_sint::dsp::character::{CharacterLayer, CharacterMethod};
 use moj_sint::dsp::harmonic_selector::ThreePhaseBank;
 use moj_sint::dsp::oscillator::{BandlimitedOscillator, OscillatorMethod};
-use moj_sint::engine::ENGINE_OSCILLATOR_METHOD;
+use moj_sint::engine::{ENGINE_CHARACTER_METHOD, ENGINE_OSCILLATOR_METHOD};
 use moj_sint::offline::{RenderSpec, render_note};
 use moj_sint::preset::Preset;
 use std::fs::{self, File};
@@ -55,12 +58,292 @@ fn main() -> ExitCode {
                 }
             }
         }
+        [command, output] if command == "character" => {
+            match render_character_evidence(Path::new(output)) {
+                Ok(()) => {
+                    println!("wrote parallel-character evidence to {output}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         _ => {
             eprintln!(
-                "Usage:\n  oscillator-lab compare <output-directory>\n  oscillator-lab render <output-directory>\n  oscillator-lab system <output-directory>"
+                "Usage:\n  oscillator-lab compare <output-directory>\n  oscillator-lab render <output-directory>\n  oscillator-lab system <output-directory>\n  oscillator-lab character <output-directory>"
             );
             ExitCode::FAILURE
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CharacterComparisonRow {
+    method: CharacterMethod,
+    note: u8,
+    condition: &'static str,
+    metrics: CharacterMetrics,
+}
+
+fn render_character_evidence(output_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(output_directory)?;
+    let rows = character_comparison_rows()?;
+    let selection = select_character_method(&rows).ok_or_else(|| {
+        let summaries: Vec<_> = CharacterMethod::ALL
+            .into_iter()
+            .map(|method| {
+                let worst = |condition: &str| {
+                    rows.iter()
+                        .filter(|row| row.method == method && row.condition == condition)
+                        .map(|row| row.metrics.alias_error_db)
+                        .fold(f64::NEG_INFINITY, f64::max)
+                };
+                format!(
+                    "{} moderate={:.3} dB strong={:.3} dB",
+                    character_method_name(method),
+                    worst("moderate"),
+                    worst("strong")
+                )
+            })
+            .collect();
+        format!(
+            "no character method met the declared alias-error thresholds: {}",
+            summaries.join(", ")
+        )
+    })?;
+    if selection != ENGINE_CHARACTER_METHOD {
+        return Err(format!(
+            "evidence selects {}, but engine declares {}",
+            character_method_name(selection),
+            character_method_name(ENGINE_CHARACTER_METHOD)
+        )
+        .into());
+    }
+    write_character_alias_comparison(
+        &output_directory.join("alias-comparison.tsv"),
+        &rows,
+        selection,
+    )?;
+    write_character_intermodulation(&output_directory.join("intermodulation.tsv"))?;
+    render_character_listening_gate(output_directory)?;
+    write_character_cost(&output_directory.join("workstation-cost.txt"), selection)?;
+    let mut readme = BufWriter::new(File::create(output_directory.join("README.md"))?);
+    writeln!(readme, "# Parallel character listening gate\n")?;
+    writeln!(
+        readme,
+        "Nine loudness-matched dry/moderate/strong files cover MIDI notes 36, 60, and 84. The user listening verdict is open.\n"
+    )?;
+    writeln!(
+        readme,
+        "The selected production method is `{}`. Workstation timing is scalar development evidence only, not Raspberry Pi evidence.",
+        character_method_name(selection)
+    )?;
+    Ok(())
+}
+
+fn character_comparison_rows() -> Result<Vec<CharacterComparisonRow>, Box<dyn std::error::Error>> {
+    let mut rows = Vec::with_capacity(24);
+    for method in CharacterMethod::ALL {
+        for note in [36_u8, 60, 84, 96] {
+            for (condition, edge, couple) in [("moderate", 0.6_f32, 0.6_f32), ("strong", 1.0, 1.0)]
+            {
+                let metrics = measure_character_method(
+                    method,
+                    CharacterAnalysisSpec {
+                        sample_rate: SAMPLE_RATE,
+                        frequency_hz: midi_frequency(note),
+                        edge,
+                        couple,
+                        sample_count: 16_384,
+                    },
+                )?;
+                rows.push(CharacterComparisonRow {
+                    method,
+                    note,
+                    condition,
+                    metrics,
+                });
+            }
+        }
+    }
+    Ok(rows)
+}
+
+fn select_character_method(rows: &[CharacterComparisonRow]) -> Option<CharacterMethod> {
+    let worst = |method: CharacterMethod, condition: &str| {
+        rows.iter()
+            .filter(|row| row.method == method && row.condition == condition)
+            .map(|row| row.metrics.alias_error_db)
+            .fold(f64::NEG_INFINITY, f64::max)
+    };
+    let overall = |method| worst(method, "moderate").max(worst(method, "strong"));
+    let best_worst = CharacterMethod::ALL
+        .into_iter()
+        .map(overall)
+        .fold(f64::INFINITY, f64::min);
+    CharacterMethod::ALL.into_iter().find(|method| {
+        worst(*method, "moderate") <= -60.0
+            && worst(*method, "strong") <= -50.0
+            && overall(*method) <= best_worst + 3.0
+    })
+}
+
+fn write_character_alias_comparison(
+    path: &Path,
+    rows: &[CharacterComparisonRow],
+    selection: CharacterMethod,
+) -> std::io::Result<()> {
+    let mut output = BufWriter::new(File::create(path)?);
+    writeln!(
+        output,
+        "method\tnote\tcondition\talias_error_db\tpeak\trms\tdc\tfundamental_db\tthird_db\tpitch_retained\tfinite\tselected"
+    )?;
+    for row in rows {
+        writeln!(
+            output,
+            "{}\t{}\t{}\t{:.3}\t{:.6}\t{:.6}\t{:.9}\t{:.3}\t{:.3}\t{}\t{}\t{}",
+            character_method_name(row.method),
+            row.note,
+            row.condition,
+            row.metrics.alias_error_db,
+            row.metrics.peak,
+            row.metrics.rms,
+            row.metrics.dc,
+            row.metrics.fundamental_db,
+            row.metrics.harmonics_db[2],
+            row.metrics.pitch_retained,
+            row.metrics.finite,
+            row.method == selection,
+        )?;
+    }
+    Ok(())
+}
+
+fn write_character_intermodulation(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut output = BufWriter::new(File::create(path)?);
+    writeln!(output, "method\tper_voice_imd_db\tpost_mix_imd_db\tfinite")?;
+    for method in CharacterMethod::ALL {
+        let metrics = measure_character_intermodulation(method, SAMPLE_RATE, 600.0, 900.0, 16_000)?;
+        writeln!(
+            output,
+            "{}\t{:.3}\t{:.3}\t{}",
+            character_method_name(method),
+            metrics.per_voice_imd_db,
+            metrics.post_mix_imd_db,
+            metrics.finite
+        )?;
+    }
+    Ok(())
+}
+
+fn render_character_listening_gate(
+    output_directory: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let base_preset = Preset::parse(include_str!("../../presets/reference.mojsint"))?;
+    let mut manifest = BufWriter::new(File::create(
+        output_directory.join("character-manifest.tsv"),
+    )?);
+    let mut harmonic_distribution = BufWriter::new(File::create(
+        output_directory.join("harmonic-distribution.tsv"),
+    )?);
+    writeln!(
+        manifest,
+        "file\tnote\tcondition\tedge\tcouple\tpeak\trms\tdc\tfundamental_db\tthird_db\tpitch_retained\tfinite\tsample_hash"
+    )?;
+    writeln!(
+        harmonic_distribution,
+        "file\tnote\tcondition\th01_db\th02_db\th03_db\th04_db\th05_db\th06_db\th07_db\th08_db\th09_db\th10_db\th11_db\th12_db"
+    )?;
+    for note in [36_u8, 60, 84] {
+        for (condition, edge, couple) in [
+            ("dry", 0.0_f32, 0.0_f32),
+            ("moderate", 0.6, 0.6),
+            ("strong", 1.0, 1.0),
+        ] {
+            let mut preset = base_preset.clone();
+            preset.voices = 1;
+            preset.macros.shape = Normalized::new(0.5)?;
+            preset.macros.color = Normalized::new(0.5)?;
+            preset.macros.edge = Normalized::new(edge)?;
+            preset.macros.couple = Normalized::new(couple)?;
+            let spec = RenderSpec {
+                sample_rate: 48_000,
+                note,
+                velocity: 0.8,
+                seconds: 1.25,
+            };
+            let mut samples = render_note(&preset, spec)?;
+            loudness_match(&mut samples, spec.sample_rate, 0.08);
+            let filename = format!("note{note:03}_{condition}.wav");
+            write_listening_wav(
+                &output_directory.join(&filename),
+                &samples,
+                spec.sample_rate,
+            )?;
+            let mono = analysis_window(&samples, spec.sample_rate, Some(midi_frequency(note)));
+            let metrics =
+                measure_harmonic_system(&mono, spec.sample_rate as f32, midi_frequency(note))?;
+            let harmonics = measure_harmonic_distribution(
+                &mono,
+                spec.sample_rate as f32,
+                midi_frequency(note),
+            )?;
+            writeln!(
+                manifest,
+                "{filename}\t{note}\t{condition}\t{edge:.2}\t{couple:.2}\t{:.6}\t{:.6}\t{:.9}\t{:.3}\t{:.3}\t{}\t{}\t{:016x}",
+                metrics.peak,
+                metrics.rms,
+                metrics.dc,
+                metrics.fundamental_db,
+                metrics.third_db,
+                metrics.pitch_retained,
+                metrics.finite,
+                metrics.sample_hash
+            )?;
+            write!(harmonic_distribution, "{filename}\t{note}\t{condition}")?;
+            for level in harmonics {
+                write!(harmonic_distribution, "\t{level:.3}")?;
+            }
+            writeln!(harmonic_distribution)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_character_cost(path: &Path, method: CharacterMethod) -> std::io::Result<()> {
+    const SAMPLE_COUNT: usize = 4_800_000;
+    let mut layer = CharacterLayer::new(SAMPLE_RATE, method).expect("fixed valid sample rate");
+    let start = Instant::now();
+    let mut accumulator = 0.0_f32;
+    for index in 0..SAMPLE_COUNT {
+        let dry = (index as f32 * 0.017).sin();
+        accumulator += layer.sample(dry, 1.0, 1.0);
+    }
+    std::hint::black_box(accumulator);
+    let elapsed = start.elapsed();
+    let mut output = BufWriter::new(File::create(path)?);
+    writeln!(output, "scope=isolated_parallel_character_layer")?;
+    writeln!(output, "method={}", character_method_name(method))?;
+    writeln!(output, "sample_count={SAMPLE_COUNT}")?;
+    writeln!(output, "elapsed_nanoseconds={}", elapsed.as_nanos())?;
+    writeln!(
+        output,
+        "nanoseconds_per_sample={:.3}",
+        elapsed.as_nanos() as f64 / SAMPLE_COUNT as f64
+    )?;
+    writeln!(
+        output,
+        "limitation=scalar x86_64 workstation development evidence; not callback timing or Raspberry Pi evidence"
+    )
+}
+
+fn character_method_name(method: CharacterMethod) -> &'static str {
+    match method {
+        CharacterMethod::Direct => "direct",
+        CharacterMethod::Adaa1 => "adaa1",
+        CharacterMethod::Oversampled2x => "oversampled_2x",
     }
 }
 

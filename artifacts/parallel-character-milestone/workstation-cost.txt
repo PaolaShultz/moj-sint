@@ -1,0 +1,6 @@
+scope=isolated_parallel_character_layer
+method=direct
+sample_count=4800000
+elapsed_nanoseconds=73615580
+nanoseconds_per_sample=15.337
+limitation=scalar x86_64 workstation development evidence; not callback timing or Raspberry Pi evidence

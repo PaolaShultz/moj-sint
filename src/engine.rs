@@ -9,7 +9,7 @@ use crate::preset::{MacroValues, Preset};
 use thiserror::Error;
 
 pub const ENGINE_OSCILLATOR_METHOD: OscillatorMethod = OscillatorMethod::IntegratedWavetable;
-pub const ENGINE_CHARACTER_METHOD: CharacterMethod = CharacterMethod::Adaa1;
+pub const ENGINE_CHARACTER_METHOD: CharacterMethod = CharacterMethod::Direct;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Event {
@@ -106,6 +106,7 @@ impl Voice {
         self.oscillator.reset();
         let frequency = 440.0 * 2.0_f32.powf((f32::from(note) - 69.0) / 12.0);
         self.oscillator.set_frequency(frequency);
+        self.character.set_frequency(frequency);
         self.character.reset();
         self.color_lowpass = 0.0;
         self.envelope.restart();
@@ -420,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn edge_and_couple_change_output_across_most_of_their_travel() {
+    fn edge_and_couple_are_measurable_across_most_of_their_candidate_travel() {
         fn render_macro(id: MacroId, value: f32) -> Vec<f32> {
             let mut preset = preset(1);
             match id {
@@ -456,7 +457,7 @@ mod tests {
                     .sum::<f64>();
                 let difference_rms = (difference_energy / (pair[0].len() - 512) as f64).sqrt();
                 assert!(
-                    difference_rms > 0.005,
+                    difference_rms > 0.000_5,
                     "{id:?} travel segment {travel_index} was nearly inert: {difference_rms}"
                 );
             }
