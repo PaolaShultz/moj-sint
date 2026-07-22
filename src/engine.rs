@@ -191,6 +191,9 @@ mod tests {
     use super::*;
     use crate::preset::Preset;
 
+    #[global_allocator]
+    static ALLOCATOR: assert_no_alloc::AllocDisabler = assert_no_alloc::AllocDisabler;
+
     fn preset(voices: usize) -> Preset {
         let source = include_str!("../presets/reference.mojsint")
             .replace("voices = 8", &format!("voices = {voices}"))
@@ -285,7 +288,9 @@ mod tests {
         let mut left = [0.0; 64];
         let mut right = [0.0; 64];
         for _ in 0..100 {
-            engine.render_block(&[], &mut left, &mut right).unwrap();
+            assert_no_alloc::assert_no_alloc(|| {
+                engine.render_block(&[], &mut left, &mut right).unwrap();
+            });
             assert_eq!(engine.voice_storage_address(), storage);
         }
     }
