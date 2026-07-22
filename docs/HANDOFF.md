@@ -446,6 +446,58 @@ intentionally speculative ideas into seven testable Moj Sint experiment
 families. Continue from that register rather than reducing the next phase to
 vintage emulation.
 
+## Next experimental phase: four-family listening gate
+
+The user approved a genuinely varied listening gate built from four separate
+sound-generation hypotheses. These are not four parameter settings in one
+graph, and the first implementation should not force all four into the
+production `Engine`. Prototype them as disposable monophonic offline research
+sources first:
+
+1. **Nonlinear PM/complex oscillator.** Shape or fold a modulator before it
+   drives a bounded phase-modulated carrier. Connection order, ratio, phase,
+   DC control, and sideband behavior are part of the source identity; this is
+   not another processed saw or sine bank.
+2. **Excited comb/resonant source.** Excite tuned or deliberately inharmonic
+   feedback combs with an impulse, noise burst, or another short excitation.
+   Here the delay network generates the sustained tone. Compare pitch-locked,
+   dispersed, and safely damped structures as engineering sweeps, but present
+   the family as one listening candidate rather than pretending that several
+   delay lengths are different source mechanisms.
+3. **Psychoacoustic micro-delay spatial-motion source.** Use several very
+   short, unequal, slowly changing delay paths to create controlled
+   decorrelation, apparent space, and a sensation that energy moves or
+   pulsates across the middle of the image or spectrum. Investigate precedence
+   effect, comb coloration, interaural time/level relationships, mid/side
+   energy, mono compatibility, headphone/speaker translation, and modulation
+   audibility. It must have its own perceptual hypothesis and must not collapse
+   into an ordinary chorus, flanger, ping-pong echo, or wet/dry sweep.
+4. **Spectral-traversal source.** Traverse a small Moj Sint-authored family of
+   related spectra or phase laws as one coherent identity. It must not become
+   an arbitrary waveform browser or copy a commercial wavetable or preset.
+
+The comb/resonant and psychoacoustic micro-delay candidates are deliberately
+separate. In the comb family, delay is the resonating sound generator. In the
+psychoacoustic family, multiple sub-echo delays organize spatial perception
+and internal motion. Sharing a delay-line primitive does not make the two
+topologies equivalent.
+
+Before implementation, research each family from primary or authoritative
+sources and extend `docs/RESEARCH.md` with authorship, publication details,
+direct URLs, licensing implications, and the specific design claim supported
+by each source. Define a concise perceptual hypothesis for every candidate:
+what the listener should recognize, why it differs structurally from the
+other three, and what failure would sound like.
+
+The first listening batch should contain one bounded representative of each
+family, loudness matched across representative low, middle, and high notes.
+Automated sweeps within a family remain engineering evidence only. They test
+stability, useful travel, pitch behavior, aliasing, modulation, mono
+compatibility, and cost; they do not count as additional musical variations.
+The user decides whether the four candidates actually sound distinct and
+worth developing before any one is selected for engine integration or macro
+mapping.
+
 ## Design and workflow state
 
 The architecture above was presented in chat and then revised at the user's
@@ -489,21 +541,36 @@ context. Do not recheck SHR-DAW unless an actively changing host contract is
 directly relevant.
 
 This phase is mono-first sound research, not a permanent monophonic lock and
-not yet a polyphony milestone. Research and design the next smallest
-monophonic oscillator-system experiment from the seven families in
-`docs/RESEARCH.md`. Focus on connection order and controllable identity: good
-starting candidates are nonlinear modulator preprocessing with phase offset,
-a shared 0/120/240-degree harmonic-selection bank, and a bounded two- or
-three-node PM/AM/sync/feedback graph. Compare 2-3 approaches and select one
-small test-first milestone; do not implement all families at once or clone a
-legendary synth.
+not yet a polyphony milestone. The shared-phase harmonic selector and parallel
+character layer already failed human listening because they sounded like weak
+versions of one basic source. Do not revive them through parameter tweaks,
+additional output processing, or batches of related saw/sine variants.
+
+Design a disposable offline listening gate with one bounded representative
+from each of the four approved families in “Next experimental phase:
+four-family listening gate”: nonlinear PM/complex oscillator, excited
+comb/resonant source, psychoacoustic micro-delay spatial-motion source, and
+spectral traversal. Research all four first and state a distinct perceptual
+hypothesis for each. Keep the prototypes isolated from the production Engine
+until the user has listened; do not implement four permanent architectures at
+once or clone a legendary synth.
 
 Keep the DSP scalar, deterministic, finite, smoothed, and allocation-free.
-Define the graph and macro intent before implementation. Use loudness-matched
-A/B renders and measure alias/error, harmonic distribution, peak/RMS/DC,
-pitch retention, useful macro travel, rapid movement, determinism, allocation,
-and workstation cost. Generate clearly named mono listening artifacts, and
-leave human musical-usefulness acceptance to the user.
+Use test-first development for every render path. Measure alias/error where
+oscillation or nonlinearity creates it, harmonic/spectral distribution,
+peak/RMS/DC, pitch retention, useful control travel, rapid movement,
+determinism, allocation, and workstation cost. For the micro-delay candidate,
+also measure mono fold-down, inter-channel correlation, side-to-mid energy,
+delay/modulation bounds, and discontinuity-free delay movement. Generate
+clearly named, loudness-matched low/middle/high-note listening artifacts and
+leave all musical usefulness and spatial-effect acceptance to the user.
+
+Several comb lengths, modulation rates, delay offsets, wet levels, or stereo
+widths do not count as separate listening variations. The comb network must
+act as a source; the psychoacoustic network must aim at controlled space and
+mid-image or midband pulsation without becoming an ordinary chorus, flanger,
+or echo. Verify the spatial candidate on headphones, speakers, and mono only
+when the user explicitly performs or authorizes that listening setup.
 
 Preserve per-voice state so later polyphony remains possible, but do not expand
 voice count or claim a safe count until the selected complex topology is
@@ -511,15 +578,20 @@ benchmarked natively on the Raspberry Pi with callback/headroom evidence. Do
 not implement the live JACK/ALSA host, modify SHR-DAW, start JACK, connect
 hardware, add SIMD, copy third-party DSP/presets/samples, or claim Pi
 performance in this phase. Finish documentation and the repository verification
-matrix required by `AGENTS.md`.
+matrix required by `AGENTS.md`. Keep every generated batch under ignored
+`artifacts/` or a fresh temporary directory. After the user's verdict,
+document the conclusion and delete the batch unless the user explicitly asks
+to preserve a specific result.
 ```
 
 ## Next action
 
-Reset into the continuation prompt above, then perform a focused design/research
-pass for one monophonic oscillator-system experiment. The existing
-`SHAPE`/`COLOR` listening gate remains open, so do not call those routes
-musically useful without user acceptance. Do not rediscover SHR-DAW's
+Reset into the continuation prompt above, research the four approved source
+families, and build the smallest disposable monophonic comparison that gives
+the user one honest representative of each. Stop for human listening before
+selecting a family, integrating it into `Engine`, or assigning stable macros.
+The existing `SHAPE`/`COLOR` listening gate remains open, so do not call those
+routes musically useful without user acceptance. Do not rediscover SHR-DAW's
 established JACK/ALSA/process contract.
 
 ## Executed foundation checkpoint
