@@ -1,0 +1,25 @@
+schema_version = 1
+name = "Reference Sine"
+voices = 8
+output_gain = 0.2
+
+[envelope]
+attack_seconds = 0.01
+decay_seconds = 0.1
+sustain_level = 0.7
+release_seconds = 0.2
+
+[macros]
+evolve = 0.5
+shape = 0.5
+color = 0.5
+edge = 0.5
+couple = 0.5
+motion = 0.5
+depth = 0.5
+width = 0.5
+space = 0.5
+attack = 0.25
+decay = 0.35
+sustain = 0.7
+release = 0.4

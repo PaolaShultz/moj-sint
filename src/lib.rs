@@ -5,3 +5,4 @@ pub const ENGINE_NAME: &str = "Moj Sint";
 pub mod control;
 pub mod dsp;
 pub mod envelope;
+pub mod preset;
