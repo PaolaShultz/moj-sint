@@ -43,8 +43,8 @@ There is no UI in this repository. Control comes through MIDI and SHR-DAW.
 
 At this checkpoint:
 
-- Git is initialized on `main`; foundation work was developed on
-  `feature/initial-foundation` in `.worktrees/initial-foundation`.
+- Git is initialized on clean `main`; the foundation feature branch was merged
+  locally and its temporary worktree was removed.
 - The Rust crate contains the portable DSP/control/preset/engine library,
   offline renderer/validator binary, tests, reference preset, and documentation.
 - User-local stable Rust 1.97.1, Cargo, rustfmt, Clippy, cargo-audit, and
@@ -74,19 +74,24 @@ Present tools and runtimes:
 - ALSA runtime utilities and visible playback devices
 - `perf`, `gdb`, `chrt`, and `taskset`
 - Rust 1.97.1, Cargo 1.97.1, rustfmt, Clippy, cargo-audit, and cargo-deny
+- ALSA development package `libasound2-dev` 1.2.11-1ubuntu0.3; `pkg-config`
+  resolves `alsa` 1.2.11
 
-Missing at audit time:
+Still missing:
 
-- `rustc`, Cargo, and rustup
-- ALSA development metadata (`alsa.pc` / `libasound2-dev`)
 - JACK development metadata
 - PipeWire development metadata
 - Clang/LLD, Valgrind, rr, hyperfine, and just
 
+Rust and ALSA development metadata were missing during the original machine
+audit and are now installed as recorded in the present-tools list. The
+remaining tools are not needed for the current portable foundation and should
+not be installed speculatively.
+
 Do not install every missing item automatically. Install only what the chosen
-architecture or validation actually needs. Rust can be installed for the
-current user with rustup and does not require sudo. A likely system dependency
-on Ubuntu/Raspberry Pi OS is:
+architecture or validation actually needs. On this development machine,
+`libasound2-dev` is already installed. A fresh Raspberry Pi OS machine will
+likely need:
 
 ```sh
 sudo apt update
@@ -395,41 +400,45 @@ Use this short prompt after resetting; this handoff contains the detailed
 context and should not be copied back into the new prompt:
 
 ```text
-Continue Moj Sint in /home/shome/p/moj-sint.
+Continue Moj Sint in `/home/shome/p/moj-sint` from the current clean `main`.
+Record `git rev-parse --short HEAD` before changing files.
 
 Read docs/HANDOFF.md completely first and use it as the current integration,
-controller, environment, research, and workflow context. Recheck the live
-PaolaShultz/shr-daw main branch only where its actively changing contracts need
-verification.
+controller, environment, research, and workflow context. The development
+machine already has `libasound2-dev`; verify rather than reinstall it. Recheck
+the live PaolaShultz/shr-daw main branch only if an actively changing contract
+is directly relevant.
 
-Use the existing design, plan, architecture, host contract, research register,
-and tests. Build the next smallest musical milestone test-first: compare a
-PolyBLEP discontinuity-corrected oscillator with an integrated-wavetable
-approach, choose from measurements, route the selected oscillator meaningfully
-to SHAPE and COLOR, and generate listening renders plus spectral/level sweeps.
+Use the existing design, architecture, host contract, research register, and
+tests. Build the next smallest musical milestone test-first: implement a fair
+PolyBLEP discontinuity-corrected oscillator versus integrated-wavetable
+comparison, measure alias energy, peak/RMS, DC, determinism, finiteness, and
+render-path allocation behavior, then select the better fit from evidence.
+Route the selected oscillator meaningfully across most of `SHAPE` and `COLOR`
+travel with smoothing and safe level compensation. Generate clearly named WAV
+listening renders across several notes and macro positions for the user.
 
 Keep Moj Sint a fourth external SHR-DAW instrument with JACK stereo audio,
 ALSA Sequencer MIDI, and its own preset/control identities. Design around the
 13-control performance contract in the handoff, including measurable macro
-usefulness and later human listening acceptance. Do not modify SHR-DAW, start
-JACK, connect hardware, play audio, or claim Pi performance during this setup
-task.
+usefulness and later human listening acceptance.
 
-Do not implement the live host or modify SHR-DAW in that milestone. Do not make
-Pi performance or musical-usefulness claims without the required native and
-human evidence. Finish with fresh verification and listening artifacts for the
-user to judge.
+Do not implement the live host, modify SHR-DAW, start JACK, or connect hardware
+in this milestone. Preserve the allocation-free DSP boundary and strict preset
+identity. Do not claim Pi performance or musical usefulness without native and
+human evidence. Finish with fresh formatting, tests, Clippy, release-build,
+audit, AArch64 compile, deterministic-render evidence, documented measurements,
+and listening artifacts for the user to judge.
 ```
 
 ## Next action
 
-Complete verification and integrate the foundation branch, then start the
-oscillator milestone using the prompt above. Do not rediscover SHR-DAW's
-established JACK/ALSA/process contract.
+Start the oscillator milestone using the prompt above. Do not rediscover
+SHR-DAW's established JACK/ALSA/process contract.
 
 ## Executed foundation checkpoint
 
-Completed later on 2026-07-22 on branch `feature/initial-foundation`:
+Completed later on 2026-07-22 and merged into local `main`:
 
 - initialized Git and recorded the accepted design and implementation plan;
 - installed user-local stable Rust, rustfmt, Clippy, cargo-audit, and cargo-deny;
@@ -446,7 +455,8 @@ The next smallest musical milestone is one bandlimited, audibly characterful
 oscillator path (recommended starting comparison: PolyBLEP discontinuity
 correction versus integrated wavetable), routed to `SHAPE` and `COLOR`, with
 spectral/level sweeps and listening renders. The live JACK/ALSA host remains a
-separate milestone and still requires `sudo apt install libasound2-dev`.
+separate milestone. `libasound2-dev` is installed on the development machine;
+it will still need installation on a fresh Raspberry Pi OS image.
 
 Fresh foundation verification evidence:
 
