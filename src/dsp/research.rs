@@ -315,8 +315,8 @@ impl SpatialMicroDelay {
             self.movement_phases[index] =
                 advance_phase(self.movement_phases[index], self.movement_increments[index]);
         }
-        let left = 0.34 * buzz + 0.38 * taps[0] + 0.23 * taps[2] - 0.08 * taps[3];
-        let right = 0.34 * buzz + 0.38 * taps[1] + 0.23 * taps[3] - 0.08 * taps[2];
+        let left = 0.55 * buzz + 0.28 * taps[0] + 0.15 * taps[2] - 0.03 * taps[3];
+        let right = 0.55 * buzz + 0.28 * taps[1] + 0.15 * taps[3] - 0.03 * taps[2];
         StereoFrame {
             left: left.clamp(-1.0, 1.0),
             right: right.clamp(-1.0, 1.0),

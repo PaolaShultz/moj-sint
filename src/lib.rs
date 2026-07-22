@@ -9,3 +9,4 @@ pub mod engine;
 pub mod envelope;
 pub mod offline;
 pub mod preset;
+pub mod research;
