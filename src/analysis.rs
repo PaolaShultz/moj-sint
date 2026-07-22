@@ -204,8 +204,7 @@ mod tests {
             .collect();
         let naive_metrics = measure_samples(&naive, &reference);
         let polyblep = measure_candidate(OscillatorMethod::PolyBlep, spec).unwrap();
-        let integrated =
-            measure_candidate(OscillatorMethod::IntegratedWavetable, spec).unwrap();
+        let integrated = measure_candidate(OscillatorMethod::IntegratedWavetable, spec).unwrap();
         assert!(
             polyblep.alias_error_db < naive_metrics.alias_error_db - 3.0
                 || integrated.alias_error_db < naive_metrics.alias_error_db - 3.0,

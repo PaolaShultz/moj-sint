@@ -100,8 +100,7 @@ impl BandlimitedOscillator {
         let phase = wrap_phase(self.phase - 0.5 * self.phase_increment);
         let saw = 2.0 * phase - 1.0 - poly_blep(phase, self.phase_increment);
         let opposite_phase = wrap_phase(phase + 0.5);
-        let square = if phase < 0.5 { 1.0 } else { -1.0 }
-            + poly_blep(phase, self.phase_increment)
+        let square = if phase < 0.5 { 1.0 } else { -1.0 } + poly_blep(phase, self.phase_increment)
             - poly_blep(opposite_phase, self.phase_increment);
         (saw, square)
     }

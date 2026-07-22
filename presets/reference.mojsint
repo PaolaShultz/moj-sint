@@ -1,5 +1,5 @@
 schema_version = 1
-name = "Reference Sine"
+name = "Integrated Shapes"
 voices = 8
 output_gain = 0.2
 

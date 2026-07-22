@@ -26,17 +26,18 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
-        [command, output] if command == "render" => match render_listening_matrix(Path::new(output))
-        {
-            Ok(()) => {
-                println!("wrote listening matrix to {output}");
-                ExitCode::SUCCESS
+        [command, output] if command == "render" => {
+            match render_listening_matrix(Path::new(output)) {
+                Ok(()) => {
+                    println!("wrote listening matrix to {output}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::FAILURE
+                }
             }
-            Err(error) => {
-                eprintln!("error: {error}");
-                ExitCode::FAILURE
-            }
-        },
+        }
         _ => {
             eprintln!(
                 "Usage:\n  oscillator-lab compare <output-directory>\n  oscillator-lab render <output-directory>"
@@ -46,9 +47,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn render_listening_matrix(
-    output_directory: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn render_listening_matrix(output_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(output_directory)?;
     let base_preset = Preset::parse(include_str!("../../presets/reference.mojsint"))?;
     let manifest_path = output_directory.join("listening-manifest.tsv");
@@ -75,7 +74,11 @@ fn render_listening_matrix(
                     (shape * 100.0).round() as u8,
                     (color * 100.0).round() as u8
                 );
-                write_listening_wav(&output_directory.join(&filename), &samples, spec.sample_rate)?;
+                write_listening_wav(
+                    &output_directory.join(&filename),
+                    &samples,
+                    spec.sample_rate,
+                )?;
                 let (peak, rms, dc, sample_hash) = listening_metrics(&samples);
                 writeln!(
                     manifest,
@@ -88,11 +91,7 @@ fn render_listening_matrix(
     Ok(())
 }
 
-fn write_listening_wav(
-    path: &Path,
-    samples: &[f32],
-    sample_rate: u32,
-) -> Result<(), hound::Error> {
+fn write_listening_wav(path: &Path, samples: &[f32], sample_rate: u32) -> Result<(), hound::Error> {
     let specification = hound::WavSpec {
         channels: 2,
         sample_rate,
@@ -150,7 +149,7 @@ fn comparison_rows() -> Result<Vec<ComparisonRow>, Box<dyn std::error::Error>> {
     for method in [
         OscillatorMethod::PolyBlep,
         OscillatorMethod::IntegratedWavetable,
-        ] {
+    ] {
         for note in NOTES {
             let nominal_frequency_hz = midi_frequency(note);
             let period_samples = (SAMPLE_RATE / nominal_frequency_hz).round() as usize;
@@ -183,8 +182,7 @@ fn select_method(rows: &[ComparisonRow]) -> OscillatorMethod {
     let integrated = aggregate(rows, OscillatorMethod::IntegratedWavetable);
     const WORST_CASE_TIE_DB: f64 = 0.1;
     if polyblep.1 < integrated.1 - WORST_CASE_TIE_DB
-        || ((polyblep.1 - integrated.1).abs() <= WORST_CASE_TIE_DB
-            && polyblep.0 <= integrated.0)
+        || ((polyblep.1 - integrated.1).abs() <= WORST_CASE_TIE_DB && polyblep.0 <= integrated.0)
     {
         OscillatorMethod::PolyBlep
     } else {

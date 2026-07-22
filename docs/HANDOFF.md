@@ -47,6 +47,14 @@ At this checkpoint:
   locally and its temporary worktree was removed.
 - The Rust crate contains the portable DSP/control/preset/engine library,
   offline renderer/validator binary, tests, reference preset, and documentation.
+- The first bandlimited-oscillator milestone is implemented: fair scalar
+  PolyBLEP and integrated-wavetable candidates were measured, the integrated
+  wavetable was selected by the recorded rule, and smoothed `SHAPE`/`COLOR`
+  routes now drive the engine.
+- Twenty-seven deterministic listening WAVs cover MIDI notes 36/60/84 and all
+  low/mid/high `SHAPE`/`COLOR` combinations under
+  `artifacts/oscillator-milestone/`. Human musical-usefulness acceptance is
+  intentionally still open.
 - User-local stable Rust 1.97.1, Cargo, rustfmt, Clippy, cargo-audit, and
   cargo-deny are installed.
 - The live JACK/ALSA host is not implemented and no audio service or hardware
@@ -433,8 +441,10 @@ and listening artifacts for the user to judge.
 
 ## Next action
 
-Start the oscillator milestone using the prompt above. Do not rediscover
-SHR-DAW's established JACK/ALSA/process contract.
+Listen across the named oscillator artifact matrix. Do not call `SHAPE` or
+`COLOR` musically useful until that pass succeeds. Any requested adjustment
+should remain test-first and rerun the same comparison/listening evidence. Do
+not rediscover SHR-DAW's established JACK/ALSA/process contract.
 
 ## Executed foundation checkpoint
 
@@ -451,12 +461,11 @@ Completed later on 2026-07-22 and merged into local `main`:
 - documented architecture, live-host contract, portability/Pi validation,
   primary-source research, licensing, and repository-specific instructions.
 
-The next smallest musical milestone is one bandlimited, audibly characterful
-oscillator path (recommended starting comparison: PolyBLEP discontinuity
-correction versus integrated wavetable), routed to `SHAPE` and `COLOR`, with
-spectral/level sweeps and listening renders. The live JACK/ALSA host remains a
-separate milestone. `libasound2-dev` is installed on the development machine;
-it will still need installation on a fresh Raspberry Pi OS image.
+That checkpoint's proposed next milestone—the PolyBLEP versus integrated-
+wavetable comparison and first `SHAPE`/`COLOR` route—is recorded below as
+complete from automated evidence. The live JACK/ALSA host remains a separate
+milestone. `libasound2-dev` is installed on the development machine; it will
+still need installation on a fresh Raspberry Pi OS image.
 
 Fresh foundation verification evidence:
 
@@ -471,3 +480,42 @@ Fresh foundation verification evidence:
   only, not a native Pi build);
 - two independent reference renders were byte-identical at SHA-256
   `306e7af0f5ddf9a2fffad3a5b040ae77963244206d8bd155e4ad1fe6d11d92bc`.
+
+## Bandlimited oscillator checkpoint
+
+Completed later on 2026-07-22:
+
+- implemented independent PolyBLEP and generic integrated-wavetable candidates
+  over the same corrected saw-to-square target family;
+- measured coherent note/shape matrices against finite band-limited Fourier
+  references, with peak, RMS, DC, finiteness, exact sample hashes, and
+  conservative alias/error residual energy;
+- selected the integrated wavetable from aggregate residual (-25.586 dB versus
+  -25.188 dB) after worst cases tied within the documented 0.1 dB window;
+- added sample-path and full-engine allocation guards for both candidates and
+  rapid macro events;
+- routed `SHAPE` through the corrected morph and `COLOR` through a tracked
+  harmonic-dark to direct-bright path, both with 10 ms smoothing and bounded
+  level compensation;
+- generated 27 stereo 32-bit float WAVs at 48 kHz for notes 36/60/84 and the
+  complete low/mid/high `SHAPE`/`COLOR` matrix; listening-render peak spans
+  0.132612 to 0.178935, RMS spans 0.046470 to 0.110782, and maximum absolute DC
+  is 0.000082385; and
+- did not implement the live host, touch SHR-DAW/JACK/hardware, add SIMD, or
+  make Raspberry Pi or human musical-usefulness claims.
+
+Fresh oscillator-milestone verification evidence:
+
+- `cargo fmt --check`: exit 0;
+- `cargo test --all-targets --all-features`: 27 library and 4 CLI tests passed,
+  0 failed;
+- `cargo clippy --all-targets --all-features -- -D warnings`: exit 0;
+- `cargo build --release`: exit 0;
+- `cargo audit`: scanned 35 crate dependencies with no reported vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- `cargo check --target aarch64-unknown-linux-gnu`: exit 0 (compile evidence
+  only, not a native Pi build); and
+- two fresh independently generated 27-WAV matrices plus manifests had no hash
+  diff; their sorted SHA-256 evidence aggregates to
+  `aa8458f0209eb8d63ffa3b44c71a7d21d09e295e5fd5aeb52d86d8a8f58b705b`.

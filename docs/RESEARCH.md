@@ -16,7 +16,8 @@ separate license review.
   terms, so use the mathematics and citation, not copied prose/figures/code.
 - Günter Geiger, “Table Lookup Oscillators Using Generic Integrated
   Wavetables,” DAFx-06, 2006.
-  [DAFx record](https://www.dafx.de/paper-archive/details/ocJiGEUzdj2dyPlyCGROcw).
+  [DAFx record](https://www.dafx.de/paper-archive/details/ocJiGEUzdj2dyPlyCGROcw)
+  and [paper PDF](https://www.dafx.de/paper-archive/2006/papers/p_169.pdf).
   Useful comparison point for wavetable and differentiated-integral approaches.
 - Joseph Timoney, Victor Lazzarini, Jari Kleimola, Jussi Pekonen, and Vesa
   Välimäki, “Virtual Analog Oscillator Hard Synchronisation,” DAFx-12, 2012.
@@ -54,6 +55,41 @@ separate license review.
 Future source passes should separately cover phase distortion, coupled/chaotic
 oscillators, physical models, feedback-delay networks, nonlinear filters, and
 denormal/DC handling before selecting an unfamiliar-sound architecture.
+
+### 2026-07-22 oscillator comparison implementation
+
+The first oscillator milestone independently implemented two scalar method
+families from the registered papers; no third-party DSP source, tables, prose,
+presets, samples, or figures were copied.
+
+- The PolyBLEP candidate applies the second-order residual obtained by
+  integrating first-order linear interpolation at the saw and square
+  discontinuities. This is the smallest polynomial method described by
+  Välimäki, Pekonen, and Nam and uses no lookup table.
+- The generic integrated-wavetable candidate stores immutable antiderivative
+  tables for the same saw and square targets, linearly interpolates them, then
+  restores the waveform through one-sample differentiation and phase-increment
+  normalization. This follows Geiger's integration/differentiation method while
+  using exact target antiderivatives to avoid adding table-construction error to
+  the comparison.
+
+Both candidates used the same phase convention, target morph, 48 kHz rate, 32
+coherent periods, and representative note/shape matrix. The non-real-time
+metric removes DC and fits one scalar gain before comparing with a finite
+band-limited Fourier reference. Because the residual includes amplitude and
+phase approximation error as well as alias products, it is named
+`alias_error_db` and treated as a conservative alias/error measurement.
+
+The recorded aggregate residual is -25.188 dB for PolyBLEP and -25.586 dB for
+the integrated wavetable. Worst cases are effectively tied at -18.325 dB; the
+predeclared 0.1 dB tie window therefore selects the lower aggregate integrated-
+wavetable result. This is engineering evidence for the current route, not a
+claim of perceptual superiority. Raw conditions and rows are in
+`artifacts/oscillator-milestone/oscillator-comparison.tsv`.
+
+The JASA author manuscript retains ASA redistribution/copyright terms, and the
+DAFx paper retains its publication rights. Moj Sint uses only the described
+mathematics and citations.
 
 ## Real-time I/O and platform
 

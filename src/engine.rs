@@ -103,9 +103,8 @@ impl Voice {
             return 0.0;
         }
         let oscillator_sample = self.oscillator.sample(shape);
-        let color_coefficient = (self.oscillator.phase_increment()
-            * (8.0 + 120.0 * color * color))
-            .clamp(0.001, 0.75);
+        let color_coefficient =
+            (self.oscillator.phase_increment() * (8.0 + 120.0 * color * color)).clamp(0.001, 0.75);
         self.color_lowpass += color_coefficient * (oscillator_sample - self.color_lowpass);
         let colored = self.color_lowpass + color * (oscillator_sample - self.color_lowpass);
         let shape_compensation = 1.0 + 4.0 * shape * (1.0 - shape);
@@ -383,15 +382,16 @@ mod tests {
                     .skip(512)
                     .map(|(left, right)| f64::from(left - right).powi(2))
                     .sum::<f64>();
-                let difference_rms =
-                    (difference_energy / (pair[0].len() - 512) as f64).sqrt();
+                let difference_rms = (difference_energy / (pair[0].len() - 512) as f64).sqrt();
                 assert!(
                     difference_rms > 0.005,
                     "{id:?} travel segment {travel_index} was nearly inert: {difference_rms}"
                 );
             }
             for render in renders {
-                let peak = render.iter().fold(0.0_f32, |peak, sample| peak.max(sample.abs()));
+                let peak = render
+                    .iter()
+                    .fold(0.0_f32, |peak, sample| peak.max(sample.abs()));
                 assert!(peak > 0.01 && peak <= 0.35, "{id:?} peak={peak}");
                 assert!(render.iter().all(|sample| sample.is_finite()));
             }
@@ -486,9 +486,7 @@ mod tests {
         let mut left = [0.0; 128];
         let mut right = [0.0; 128];
         assert_no_alloc::assert_no_alloc(|| {
-            engine
-                .render_block(&events, &mut left, &mut right)
-                .unwrap();
+            engine.render_block(&events, &mut left, &mut right).unwrap();
         });
         assert!(left.iter().all(|sample| sample.is_finite()));
         assert!(left.iter().all(|sample| sample.abs() <= 0.35));
