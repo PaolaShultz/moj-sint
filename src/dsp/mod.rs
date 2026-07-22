@@ -1,6 +1,7 @@
 pub mod character;
 pub mod harmonic_selector;
 pub mod oscillator;
+pub mod research;
 
 #[inline]
 pub fn finite_or_zero(value: f32) -> f32 {
