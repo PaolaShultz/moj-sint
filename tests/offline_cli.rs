@@ -99,3 +99,71 @@ fn oscillator_lab_writes_a_deterministic_listening_matrix() {
         std::fs::read(second.join("listening-manifest.tsv")).unwrap()
     );
 }
+
+#[test]
+fn oscillator_lab_writes_harmonic_selector_evidence() {
+    let directory = tempfile::tempdir().unwrap();
+    let first = directory.path().join("first");
+    let second = directory.path().join("second");
+    for output_directory in [&first, &second] {
+        let output = Command::new(env!("CARGO_BIN_EXE_oscillator-lab"))
+            .args(["system"])
+            .arg(output_directory)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let evidence_paths = |directory: &std::path::Path| {
+        let mut paths: Vec<_> = std::fs::read_dir(directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.extension().is_some_and(|extension| extension == "wav")
+                    || path.file_name().is_some_and(|name| {
+                        name == "system-manifest.tsv" || name == "alias-matrix.tsv"
+                    })
+            })
+            .collect();
+        paths.sort();
+        paths
+    };
+    let first_paths = evidence_paths(&first);
+    let second_paths = evidence_paths(&second);
+    assert_eq!(first_paths.len(), 29);
+    assert_eq!(second_paths.len(), 29);
+    for (first_path, second_path) in first_paths.iter().zip(&second_paths) {
+        assert_eq!(first_path.file_name(), second_path.file_name());
+        assert_eq!(
+            std::fs::read(first_path).unwrap(),
+            std::fs::read(second_path).unwrap()
+        );
+    }
+    let manifest = std::fs::read_to_string(first.join("system-manifest.tsv")).unwrap();
+    assert!(manifest.starts_with(
+        "file\tnote\tfrequency_hz\tedge\tcouple\tpeak\trms\tdc\tfundamental_db\tthird_db\tnonharmonic_error_db\tpitch_retained\tfinite\tsample_hash\n"
+    ));
+    assert_eq!(
+        manifest
+            .lines()
+            .skip(1)
+            .filter(|line| line.contains("\ttrue\ttrue\t"))
+            .count(),
+        24
+    );
+    assert!(manifest.contains("note060_edge000_couple000.wav"));
+    assert!(manifest.contains("note060_edge100_couple100.wav"));
+    let alias_matrix = std::fs::read_to_string(first.join("alias-matrix.tsv")).unwrap();
+    assert!(alias_matrix.starts_with(
+        "note\tfrequency_hz\ttarget_third_hz\tthird_weight\tnonharmonic_error_db\tpitch_retained\tfinite\n"
+    ));
+    assert!(
+        alias_matrix
+            .lines()
+            .any(|line| line.starts_with("120\t") && line.contains("\t0.000\t"))
+    );
+}

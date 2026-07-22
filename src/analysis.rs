@@ -20,6 +20,19 @@ pub struct WaveformMetrics {
     pub finite: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HarmonicSystemMetrics {
+    pub peak: f64,
+    pub rms: f64,
+    pub dc: f64,
+    pub fundamental_db: f64,
+    pub third_db: f64,
+    pub nonharmonic_error_db: f64,
+    pub pitch_retained: bool,
+    pub sample_hash: u64,
+    pub finite: bool,
+}
+
 #[derive(Clone, Copy, Debug, Error, PartialEq)]
 pub enum AnalysisError {
     #[error("sample rate must be finite and positive")]
@@ -67,6 +80,109 @@ pub fn bandlimited_reference(spec: AnalysisSpec) -> Result<Vec<f32>, AnalysisErr
         reference.push(saw + spec.shape * (square - saw));
     }
     Ok(reference)
+}
+
+pub fn measure_harmonic_system(
+    samples: &[f32],
+    sample_rate: f32,
+    frequency_hz: f32,
+) -> Result<HarmonicSystemMetrics, AnalysisError> {
+    let spec = AnalysisSpec {
+        sample_rate,
+        frequency_hz,
+        shape: 0.0,
+        sample_count: samples.len(),
+    };
+    validate_spec(spec)?;
+    let count = samples.len() as f64;
+    let dc = samples.iter().map(|sample| f64::from(*sample)).sum::<f64>() / count;
+    let mut peak = 0.0_f64;
+    let mut energy = 0.0;
+    let mut finite = true;
+    let mut sample_hash = 0xcbf2_9ce4_8422_2325_u64;
+    for &sample in samples {
+        finite &= sample.is_finite();
+        let centered = f64::from(sample) - dc;
+        peak = peak.max(f64::from(sample).abs());
+        energy += centered * centered;
+        sample_hash ^= u64::from(sample.to_bits());
+        sample_hash = sample_hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+
+    let harmonic_count = (0.5 * sample_rate / frequency_hz).floor() as usize;
+    let mut coefficients = Vec::with_capacity(harmonic_count);
+    let mut fundamental_amplitude = 0.0;
+    let mut third_amplitude = 0.0;
+    for harmonic in 1..=harmonic_count {
+        let angle = TAU as f64 * frequency_hz as f64 * harmonic as f64 / sample_rate as f64;
+        let (rotation_sine, rotation_cosine) = angle.sin_cos();
+        let mut sine = 0.0_f64;
+        let mut cosine = 1.0_f64;
+        let mut sine_sum = 0.0;
+        let mut cosine_sum = 0.0;
+        for &sample in samples {
+            let centered = f64::from(sample) - dc;
+            sine_sum += centered * sine;
+            cosine_sum += centered * cosine;
+            let next_sine = sine * rotation_cosine + cosine * rotation_sine;
+            cosine = cosine * rotation_cosine - sine * rotation_sine;
+            sine = next_sine;
+        }
+        let sine_amplitude = 2.0 * sine_sum / count;
+        let cosine_amplitude = 2.0 * cosine_sum / count;
+        let amplitude = sine_amplitude.hypot(cosine_amplitude);
+        coefficients.push((sine_amplitude, cosine_amplitude));
+        if harmonic == 1 {
+            fundamental_amplitude = amplitude;
+        } else if harmonic == 3 {
+            third_amplitude = amplitude;
+        }
+    }
+
+    let mut phases: Vec<_> = (1..=harmonic_count)
+        .map(|harmonic| {
+            let angle = TAU as f64 * frequency_hz as f64 * harmonic as f64 / sample_rate as f64;
+            let (rotation_sine, rotation_cosine) = angle.sin_cos();
+            (0.0_f64, 1.0_f64, rotation_sine, rotation_cosine)
+        })
+        .collect();
+    let mut residual_energy = 0.0;
+    for &sample in samples {
+        let mut reconstructed = 0.0;
+        for ((sine_amplitude, cosine_amplitude), phase) in coefficients.iter().zip(&mut phases) {
+            reconstructed += sine_amplitude * phase.0 + cosine_amplitude * phase.1;
+            let next_sine = phase.0 * phase.3 + phase.1 * phase.2;
+            phase.1 = phase.1 * phase.3 - phase.0 * phase.2;
+            phase.0 = next_sine;
+        }
+        let residual = (f64::from(sample) - dc) - reconstructed;
+        residual_energy += residual * residual;
+    }
+    let residual_ratio = if energy > 0.0 {
+        (residual_energy / energy).max(1.0e-12)
+    } else {
+        1.0
+    };
+    let rms = (samples
+        .iter()
+        .map(|sample| f64::from(*sample).powi(2))
+        .sum::<f64>()
+        / count)
+        .sqrt();
+    let amplitude_db = |amplitude: f64| 20.0 * amplitude.max(1.0e-12).log10();
+    let fundamental_db = amplitude_db(fundamental_amplitude);
+    let third_db = amplitude_db(third_amplitude);
+    Ok(HarmonicSystemMetrics {
+        peak,
+        rms,
+        dc,
+        fundamental_db,
+        third_db,
+        nonharmonic_error_db: 10.0 * residual_ratio.log10(),
+        pitch_retained: fundamental_db >= third_db - 30.0,
+        sample_hash,
+        finite,
+    })
 }
 
 fn validate_spec(spec: AnalysisSpec) -> Result<(), AnalysisError> {

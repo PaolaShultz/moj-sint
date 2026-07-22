@@ -271,6 +271,67 @@ and harmonic measurements, DC/peak/RMS/finiteness/determinism checks, rapid
 parameter sweeps, render-path allocation tests, and a cost report. Reject a
 graph that is merely complicated but not controllably different.
 
+### 2026-07-22 shared-phase harmonic-selector experiment
+
+The first oscillator-system experiment selected family 2, the shared
+0/120/240-degree bank. Nonlinear modulator preprocessing was deferred because a
+fair first pass also requires a modulation-phase API, DC handling, and a
+nonlinear antialiasing decision. A directed PM/AM/feedback graph was deferred
+because its ratios, edge order, feedback bounds, and sideband behavior create a
+larger experiment than the shared-phase invariant.
+
+The implementation is independently derived from the elementary phase
+identities. One per-voice recursive sine/cosine state produces all three taps
+with fixed coefficients. Equal linear taps cancel. Cubing each tap, summing,
+and multiplying by -4/3 isolates a unit third harmonic because the linear terms
+cancel and all three `sin(3x)` terms align. No third-party source, table, preset,
+sample, prose, or figure was imported. The existing source authorship,
+publication URLs, and licensing notes above remain the provenance boundary.
+
+`EDGE` traverses from the zero-degree fundamental tap to the cubic three-tap
+third harmonic. `COUPLE` traverses from the existing `SHAPE`/`COLOR` path to
+that selector. Both are smoothed over 10 ms and use bounded algebraic level
+compensation. The `COUPLE=0` baseline is intentionally independent of `EDGE`.
+State stays per voice, although the evidence phase renders exactly one voice.
+The third-harmonic route stays full through 40% of sample rate, tapers to zero
+before 48%, and then returns to the fundamental tap. The weight is prepared at
+note frequency changes, not calculated with transcendental work per sample.
+
+The experiment generated 27 loudness-matched renders covering notes 36/60/84
+and all low/middle/high `EDGE`/`COUPLE` combinations. Peak was
+0.107426–0.142435,
+active-window RMS was 0.079778–0.080013, and maximum absolute DC was
+0.000000297. The pure third-harmonic endpoints deliberately remove the fitted
+fundamental and report pitch retention as false; the other 24 conditions retain
+it under the declared 30 dB rule. Conservative non-harmonic residual ranges
+from -100.118 dB to -27.053 dB. Tests cover deterministic reset, exact
+third-harmonic selection, rapid movement, finite/bounded output, and allocation-
+free oscillator and engine render paths.
+
+The separate high-note alias matrix covers MIDI 84/96/108/114/117/120/127.
+The cubic third remains full through note 114, is half weighted at note 117,
+and has fallen back to the fundamental before its target crosses Nyquist at
+notes 120 and 127. Every row is finite and its measured non-harmonic residual
+is between -85.907 dB and -63.405 dB. This is alias/error evidence for the
+implemented guard, not a general claim that every later nonlinear route is
+alias-free.
+
+The release-build workstation micro-timing is stored separately from the
+deterministic manifest because it is volatile. It describes only the isolated
+primitive and is not Raspberry Pi or callback evidence. Automated measurements
+established controlled change, not musical usefulness.
+
+The user then listened to all generated conditions and rejected the experiment:
+the outputs sounded like largely undifferentiated pure-sine material and offered
+no useful distinctive identity. That is consistent with the graph itself,
+which only crossfades a sine fundamental and a sine third harmonic. The
+generated artifact directory was removed after review. The deterministic lab
+command remains because tests use temporary output, but the `EDGE`/`COUPLE`
+mapping is not musically accepted and must not be promoted into a factory
+preset. The next research phase should preserve a base sound while comparing
+parallel nonlinear, excited-harmonic, subharmonic, or feedback layers rather
+than treating sparse sine partial selection as sufficient identity.
+
 ## Real-time I/O and platform
 
 - JACK project, [API overview](https://jackaudio.org/api/) and

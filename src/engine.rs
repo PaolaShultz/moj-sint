@@ -1,6 +1,7 @@
 use crate::control::{MacroId, Normalized, Smoother};
 use crate::dsp::{
     finite_or_zero,
+    harmonic_selector::ThreePhaseBank,
     oscillator::{BandlimitedOscillator, OscillatorMethod},
 };
 use crate::envelope::{Adsr, AdsrConfig};
@@ -49,9 +50,12 @@ struct Voice {
     velocity: f32,
     age: u64,
     oscillator: BandlimitedOscillator,
+    harmonic_selector: ThreePhaseBank,
     envelope: Adsr,
     shape: Smoother,
     color: Smoother,
+    edge: Smoother,
+    couple: Smoother,
     color_lowpass: f32,
 }
 
@@ -63,20 +67,29 @@ impl Voice {
     ) -> Result<Self, EngineError> {
         let oscillator = BandlimitedOscillator::new(sample_rate, ENGINE_OSCILLATOR_METHOD)
             .map_err(|_| EngineError::InvalidSampleRate)?;
+        let harmonic_selector =
+            ThreePhaseBank::new(sample_rate).map_err(|_| EngineError::InvalidSampleRate)?;
         let envelope =
             Adsr::new(sample_rate, envelope).map_err(|_| EngineError::InvalidSampleRate)?;
         let shape = Smoother::new(macros.shape.get(), sample_rate, 0.01)
             .map_err(|_| EngineError::InvalidSampleRate)?;
         let color = Smoother::new(macros.color.get(), sample_rate, 0.01)
             .map_err(|_| EngineError::InvalidSampleRate)?;
+        let edge = Smoother::new(macros.edge.get(), sample_rate, 0.01)
+            .map_err(|_| EngineError::InvalidSampleRate)?;
+        let couple = Smoother::new(macros.couple.get(), sample_rate, 0.01)
+            .map_err(|_| EngineError::InvalidSampleRate)?;
         Ok(Self {
             note: 0,
             velocity: 0.0,
             age: 0,
             oscillator,
+            harmonic_selector,
             envelope,
             shape,
             color,
+            edge,
+            couple,
             color_lowpass: 0.0,
         })
     }
@@ -92,6 +105,7 @@ impl Voice {
         self.oscillator.reset();
         let frequency = 440.0 * 2.0_f32.powf((f32::from(note) - 69.0) / 12.0);
         self.oscillator.set_frequency(frequency);
+        self.harmonic_selector.set_frequency(frequency);
         self.color_lowpass = 0.0;
         self.envelope.restart();
     }
@@ -99,6 +113,8 @@ impl Voice {
     fn next(&mut self) -> f32 {
         let shape = self.shape.advance();
         let color = self.color.advance();
+        let edge = self.edge.advance();
+        let couple = self.couple.advance();
         if self.envelope.is_idle() {
             return 0.0;
         }
@@ -107,12 +123,18 @@ impl Voice {
             (self.oscillator.phase_increment() * (8.0 + 120.0 * color * color)).clamp(0.001, 0.75);
         self.color_lowpass += color_coefficient * (oscillator_sample - self.color_lowpass);
         let colored = self.color_lowpass + color * (oscillator_sample - self.color_lowpass);
+        let harmonic = self.harmonic_selector.sample();
+        let selected = harmonic.fundamental + edge * (harmonic.third - harmonic.fundamental);
+        let coupled = colored + couple * (selected - colored);
         let shape_compensation = 1.0 + 4.0 * shape * (1.0 - shape);
         let color_compensation = 1.15 - 0.15 * color;
+        let selector_compensation =
+            (1.0 + 0.4 * couple * (1.0 - couple)) * (1.0 + 0.2 * couple * edge * (1.0 - edge));
         finite_or_zero(
-            colored
+            coupled
                 * shape_compensation
                 * color_compensation
+                * selector_compensation
                 * self.envelope.advance()
                 * self.velocity,
         )
@@ -122,6 +144,8 @@ impl Voice {
         match id {
             MacroId::Shape => self.shape.set_target(value.get()),
             MacroId::Color => self.color.set_target(value.get()),
+            MacroId::Edge => self.edge.set_target(value.get()),
+            MacroId::Couple => self.couple.set_target(value.get()),
             _ => {}
         }
     }
@@ -399,6 +423,57 @@ mod tests {
     }
 
     #[test]
+    fn edge_and_couple_change_output_across_most_of_their_travel() {
+        fn render_macro(id: MacroId, value: f32) -> Vec<f32> {
+            let mut preset = preset(1);
+            match id {
+                MacroId::Edge => preset.macros.edge = Normalized::new(value).unwrap(),
+                MacroId::Couple => preset.macros.couple = Normalized::new(value).unwrap(),
+                _ => unreachable!(),
+            }
+            let mut engine = Engine::new(48_000.0, &preset).unwrap();
+            let events = [TimedEvent::new(
+                0,
+                Event::NoteOn {
+                    note: 60,
+                    velocity: 1.0,
+                },
+            )];
+            let mut left = vec![0.0; 4_096];
+            let mut right = vec![0.0; 4_096];
+            engine.render_block(&events, &mut left, &mut right).unwrap();
+            left
+        }
+
+        for id in [MacroId::Edge, MacroId::Couple] {
+            let renders: Vec<_> = [0.0, 0.25, 0.5, 0.75, 1.0]
+                .into_iter()
+                .map(|value| render_macro(id, value))
+                .collect();
+            for (travel_index, pair) in renders.windows(2).enumerate() {
+                let difference_energy = pair[0]
+                    .iter()
+                    .zip(&pair[1])
+                    .skip(512)
+                    .map(|(left, right)| f64::from(left - right).powi(2))
+                    .sum::<f64>();
+                let difference_rms = (difference_energy / (pair[0].len() - 512) as f64).sqrt();
+                assert!(
+                    difference_rms > 0.005,
+                    "{id:?} travel segment {travel_index} was nearly inert: {difference_rms}"
+                );
+            }
+            for render in renders {
+                let peak = render
+                    .iter()
+                    .fold(0.0_f32, |peak, sample| peak.max(sample.abs()));
+                assert!(peak > 0.01 && peak <= 0.45, "{id:?} peak={peak}");
+                assert!(render.iter().all(|sample| sample.is_finite()));
+            }
+        }
+    }
+
+    #[test]
     fn timed_macro_changes_are_smoothed() {
         let mut preset = preset(1);
         preset.macros.shape = Normalized::new(0.0).unwrap();
@@ -444,6 +519,49 @@ mod tests {
     }
 
     #[test]
+    fn timed_harmonic_selector_changes_are_smoothed() {
+        let mut preset = preset(1);
+        preset.macros.edge = Normalized::new(0.0).unwrap();
+        preset.macros.couple = Normalized::new(0.0).unwrap();
+        let mut engine = Engine::new(48_000.0, &preset).unwrap();
+        let mut left = [0.0; 1];
+        let mut right = [0.0; 1];
+        engine
+            .render_block(
+                &[
+                    TimedEvent::new(
+                        0,
+                        Event::NoteOn {
+                            note: 60,
+                            velocity: 1.0,
+                        },
+                    ),
+                    TimedEvent::new(
+                        0,
+                        Event::SetMacro {
+                            id: MacroId::Edge,
+                            value: Normalized::new(1.0).unwrap(),
+                        },
+                    ),
+                    TimedEvent::new(
+                        0,
+                        Event::SetMacro {
+                            id: MacroId::Couple,
+                            value: Normalized::new(1.0).unwrap(),
+                        },
+                    ),
+                ],
+                &mut left,
+                &mut right,
+            )
+            .unwrap();
+        assert!(engine.voices[0].edge.current() > 0.0 && engine.voices[0].edge.current() < 0.01);
+        assert!(
+            engine.voices[0].couple.current() > 0.0 && engine.voices[0].couple.current() < 0.01
+        );
+    }
+
+    #[test]
     fn rapid_macro_changes_remain_finite_bounded_and_allocation_free() {
         let mut engine = Engine::new(48_000.0, &preset(2)).unwrap();
         let events = [
@@ -479,6 +597,34 @@ mod tests {
                 32,
                 Event::SetMacro {
                     id: MacroId::Color,
+                    value: Normalized::new(0.0).unwrap(),
+                },
+            ),
+            TimedEvent::new(
+                40,
+                Event::SetMacro {
+                    id: MacroId::Edge,
+                    value: Normalized::new(1.0).unwrap(),
+                },
+            ),
+            TimedEvent::new(
+                48,
+                Event::SetMacro {
+                    id: MacroId::Couple,
+                    value: Normalized::new(1.0).unwrap(),
+                },
+            ),
+            TimedEvent::new(
+                56,
+                Event::SetMacro {
+                    id: MacroId::Edge,
+                    value: Normalized::new(0.0).unwrap(),
+                },
+            ),
+            TimedEvent::new(
+                64,
+                Event::SetMacro {
+                    id: MacroId::Couple,
                     value: Normalized::new(0.0).unwrap(),
                 },
             ),

@@ -1,5 +1,8 @@
-use moj_sint::analysis::{AnalysisSpec, WaveformMetrics, measure_candidate};
+use moj_sint::analysis::{
+    AnalysisSpec, WaveformMetrics, measure_candidate, measure_harmonic_system,
+};
 use moj_sint::control::Normalized;
+use moj_sint::dsp::harmonic_selector::ThreePhaseBank;
 use moj_sint::dsp::oscillator::OscillatorMethod;
 use moj_sint::offline::{RenderSpec, render_note};
 use moj_sint::preset::Preset;
@@ -7,6 +10,7 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::process::ExitCode;
+use std::time::Instant;
 
 const SAMPLE_RATE: f32 = 48_000.0;
 const ANALYSIS_CYCLES: usize = 32;
@@ -38,13 +42,183 @@ fn main() -> ExitCode {
                 }
             }
         }
+        [command, output] if command == "system" => {
+            match render_harmonic_selector_evidence(Path::new(output)) {
+                Ok(()) => {
+                    println!("wrote harmonic-selector evidence to {output}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         _ => {
             eprintln!(
-                "Usage:\n  oscillator-lab compare <output-directory>\n  oscillator-lab render <output-directory>"
+                "Usage:\n  oscillator-lab compare <output-directory>\n  oscillator-lab render <output-directory>\n  oscillator-lab system <output-directory>"
             );
             ExitCode::FAILURE
         }
     }
+}
+
+fn render_harmonic_selector_evidence(
+    output_directory: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(output_directory)?;
+    let base_preset = Preset::parse(include_str!("../../presets/reference.mojsint"))?;
+    let mut manifest = BufWriter::new(File::create(output_directory.join("system-manifest.tsv"))?);
+    writeln!(
+        manifest,
+        "file\tnote\tfrequency_hz\tedge\tcouple\tpeak\trms\tdc\tfundamental_db\tthird_db\tnonharmonic_error_db\tpitch_retained\tfinite\tsample_hash"
+    )?;
+    for note in [36_u8, 60, 84] {
+        for edge in [0.0_f32, 0.5, 1.0] {
+            for couple in [0.0_f32, 0.5, 1.0] {
+                let mut preset = base_preset.clone();
+                preset.voices = 1;
+                preset.macros.edge = Normalized::new(edge)?;
+                preset.macros.couple = Normalized::new(couple)?;
+                let spec = RenderSpec {
+                    sample_rate: 48_000,
+                    note,
+                    velocity: 0.8,
+                    seconds: 1.25,
+                };
+                let mut samples = render_note(&preset, spec)?;
+                loudness_match(&mut samples, spec.sample_rate, 0.08);
+                let filename = format!(
+                    "note{note:03}_edge{:03}_couple{:03}.wav",
+                    (edge * 100.0).round() as u8,
+                    (couple * 100.0).round() as u8
+                );
+                write_listening_wav(
+                    &output_directory.join(&filename),
+                    &samples,
+                    spec.sample_rate,
+                )?;
+                let mono = analysis_window(&samples, spec.sample_rate, Some(midi_frequency(note)));
+                let metrics =
+                    measure_harmonic_system(&mono, spec.sample_rate as f32, midi_frequency(note))?;
+                writeln!(
+                    manifest,
+                    "{filename}\t{note}\t{:.6}\t{edge:.2}\t{couple:.2}\t{:.6}\t{:.6}\t{:.9}\t{:.3}\t{:.3}\t{:.3}\t{}\t{}\t{:016x}",
+                    midi_frequency(note),
+                    metrics.peak,
+                    metrics.rms,
+                    metrics.dc,
+                    metrics.fundamental_db,
+                    metrics.third_db,
+                    metrics.nonharmonic_error_db,
+                    metrics.pitch_retained,
+                    metrics.finite,
+                    metrics.sample_hash,
+                )?;
+            }
+        }
+    }
+    manifest.flush()?;
+    write_alias_matrix(&output_directory.join("alias-matrix.tsv"))?;
+    write_workstation_cost(&output_directory.join("workstation-cost.txt"))?;
+    Ok(())
+}
+
+fn write_alias_matrix(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut output = BufWriter::new(File::create(path)?);
+    writeln!(
+        output,
+        "note\tfrequency_hz\ttarget_third_hz\tthird_weight\tnonharmonic_error_db\tpitch_retained\tfinite"
+    )?;
+    for note in [84_u8, 96, 108, 114, 117, 120, 127] {
+        let frequency_hz = midi_frequency(note);
+        let sample_count = coherent_sample_count(32_768, SAMPLE_RATE, frequency_hz);
+        let mut selector = ThreePhaseBank::new(SAMPLE_RATE)?;
+        selector.set_frequency(frequency_hz);
+        let third_weight = selector.third_harmonic_weight();
+        let samples: Vec<_> = (0..sample_count).map(|_| selector.sample().third).collect();
+        let metrics = measure_harmonic_system(&samples, SAMPLE_RATE, frequency_hz)?;
+        writeln!(
+            output,
+            "{note}\t{frequency_hz:.6}\t{:.6}\t{third_weight:.3}\t{:.3}\t{}\t{}",
+            3.0 * frequency_hz,
+            metrics.nonharmonic_error_db,
+            metrics.pitch_retained,
+            metrics.finite,
+        )?;
+    }
+    Ok(())
+}
+
+fn analysis_window(samples: &[f32], sample_rate: u32, frequency_hz: Option<f32>) -> Vec<f32> {
+    let start_frame = (sample_rate as usize) / 5;
+    let maximum = 32_768.min(samples.len() / 2 - start_frame);
+    let frame_count = frequency_hz.map_or(maximum, |frequency_hz| {
+        coherent_sample_count(maximum, sample_rate as f32, frequency_hz)
+    });
+    (start_frame..start_frame + frame_count)
+        .map(|frame| samples[2 * frame])
+        .collect()
+}
+
+fn coherent_sample_count(maximum: usize, sample_rate: f32, frequency_hz: f32) -> usize {
+    (8_192.min(maximum)..=maximum)
+        .min_by(|left, right| {
+            let left_cycles = frequency_hz * *left as f32 / sample_rate;
+            let right_cycles = frequency_hz * *right as f32 / sample_rate;
+            let left_error = left_cycles.fract().min(1.0 - left_cycles.fract());
+            let right_error = right_cycles.fract().min(1.0 - right_cycles.fract());
+            left_error.total_cmp(&right_error)
+        })
+        .unwrap_or(maximum)
+}
+
+fn loudness_match(samples: &mut [f32], sample_rate: u32, target_rms: f64) {
+    let active = analysis_window(samples, sample_rate, None);
+    let rms = (active
+        .iter()
+        .map(|sample| f64::from(*sample).powi(2))
+        .sum::<f64>()
+        / active.len() as f64)
+        .sqrt();
+    let peak = samples
+        .iter()
+        .fold(0.0_f32, |peak, sample| peak.max(sample.abs()));
+    let gain = if rms > 0.0 {
+        (target_rms / rms).min(0.95 / f64::from(peak.max(1.0e-12))) as f32
+    } else {
+        1.0
+    };
+    for sample in samples {
+        *sample *= gain;
+    }
+}
+
+fn write_workstation_cost(path: &Path) -> std::io::Result<()> {
+    const SAMPLE_COUNT: usize = 4_800_000;
+    let mut selector = ThreePhaseBank::new(48_000.0).expect("fixed valid sample rate");
+    selector.set_frequency(440.0);
+    let start = Instant::now();
+    let mut accumulator = 0.0_f32;
+    for _ in 0..SAMPLE_COUNT {
+        let sample = selector.sample();
+        accumulator += sample.fundamental + sample.third;
+    }
+    std::hint::black_box(accumulator);
+    let elapsed = start.elapsed();
+    let mut output = BufWriter::new(File::create(path)?);
+    writeln!(output, "scope=shared_three_phase_bank_only")?;
+    writeln!(output, "sample_count={SAMPLE_COUNT}")?;
+    writeln!(output, "elapsed_nanoseconds={}", elapsed.as_nanos())?;
+    writeln!(
+        output,
+        "nanoseconds_per_sample={:.3}",
+        elapsed.as_nanos() as f64 / SAMPLE_COUNT as f64
+    )?;
+    writeln!(
+        output,
+        "limitation=workstation development evidence; not callback timing or Raspberry Pi evidence"
+    )
 }
 
 fn render_listening_matrix(output_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {

@@ -1,3 +1,4 @@
+pub mod harmonic_selector;
 pub mod oscillator;
 
 #[inline]

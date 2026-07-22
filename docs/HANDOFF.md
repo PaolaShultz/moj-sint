@@ -567,3 +567,46 @@ Fresh oscillator-milestone verification evidence:
 - two fresh independently generated 27-WAV matrices plus manifests had no hash
   diff; their sorted SHA-256 evidence aggregates to
   `aa8458f0209eb8d63ffa3b44c71a7d21d09e295e5fd5aeb52d86d8a8f58b705b`.
+
+## Shared-phase harmonic-selector checkpoint
+
+Completed later on 2026-07-22:
+
+- compared nonlinear modulator preprocessing, a shared three-phase selector,
+  and a small directed operator graph, then selected the shared 0/120/240-degree
+  bank as the smallest bounded connection-order experiment;
+- implemented one scalar per-voice recursive phase source whose algebraic taps
+  cancel linearly and whose normalized equal cubic sum isolates the third
+  harmonic, without per-sample trigonometric setup;
+- routed smoothed `EDGE` from the selector fundamental to its third harmonic and
+  smoothed `COUPLE` from the existing oscillator to the selector, preserving the
+  thirteen stable roles and the unchanged `COUPLE=0` baseline;
+- added exact tap/cancellation, deterministic reset, finite/bounded output,
+  high-note third-harmonic guard, macro-travel, rapid-movement, and
+  oscillator/engine allocation tests;
+- generated 27 loudness-matched one-voice listening conditions for notes
+  36/60/84 and low/middle/high `EDGE`/`COUPLE`, with harmonic, pitch-retention,
+  residual alias/error, peak/RMS/DC, and deterministic-hash evidence;
+- measured the selector through MIDI 127 and tapered its third harmonic between
+  40% and 48% of sample rate so the route returns to the fundamental before the
+  generated partial crosses Nyquist;
+- recorded a separate volatile release workstation micro-timing for the
+  isolated selector, without treating it as callback or Raspberry Pi evidence;
+  and
+- left human musical-usefulness acceptance open at generation time and made no
+  Pi, latency, polyphony, or sound-quality claim.
+
+The design and plan are in `docs/superpowers/`. The pure third-harmonic endpoint
+intentionally removed the fundamental, while the rest of the matrix retained it
+under the recorded test rule.
+
+The user completed the human listening pass and rejected all 27 conditions as
+too close to pure sine material and not usefully distinct. The generated
+`artifacts/harmonic-selector-milestone/` directory was removed after review;
+the lab generator remains only for reproducible temporary test evidence. The
+experimental `EDGE`/`COUPLE` route is therefore a negative research result, not
+an accepted macro mapping or factory sound. The next phase should keep a stable
+base sound and investigate controlled parallel output/character layers such as
+bounded saturation, harmonic excitation, subharmonic reinforcement, or
+feedback/resonant processing, comparing per-voice and post-mix placement rather
+than stacking every layer serially.
