@@ -1,12 +1,19 @@
-use crate::dsp::{finite_or_zero, oscillator::SineOscillator};
+use crate::control::{MacroId, Normalized, Smoother};
+use crate::dsp::{
+    finite_or_zero,
+    oscillator::{BandlimitedOscillator, OscillatorMethod},
+};
 use crate::envelope::{Adsr, AdsrConfig};
-use crate::preset::Preset;
+use crate::preset::{MacroValues, Preset};
 use thiserror::Error;
+
+pub const ENGINE_OSCILLATOR_METHOD: OscillatorMethod = OscillatorMethod::IntegratedWavetable;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Event {
     NoteOn { note: u8, velocity: f32 },
     NoteOff { note: u8 },
+    SetMacro { id: MacroId, value: Normalized },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -41,22 +48,36 @@ struct Voice {
     note: u8,
     velocity: f32,
     age: u64,
-    oscillator: SineOscillator,
+    oscillator: BandlimitedOscillator,
     envelope: Adsr,
+    shape: Smoother,
+    color: Smoother,
+    color_lowpass: f32,
 }
 
 impl Voice {
-    fn new(sample_rate: f32, envelope: AdsrConfig) -> Result<Self, EngineError> {
-        let oscillator =
-            SineOscillator::new(sample_rate).map_err(|_| EngineError::InvalidSampleRate)?;
+    fn new(
+        sample_rate: f32,
+        envelope: AdsrConfig,
+        macros: MacroValues,
+    ) -> Result<Self, EngineError> {
+        let oscillator = BandlimitedOscillator::new(sample_rate, ENGINE_OSCILLATOR_METHOD)
+            .map_err(|_| EngineError::InvalidSampleRate)?;
         let envelope =
             Adsr::new(sample_rate, envelope).map_err(|_| EngineError::InvalidSampleRate)?;
+        let shape = Smoother::new(macros.shape.get(), sample_rate, 0.01)
+            .map_err(|_| EngineError::InvalidSampleRate)?;
+        let color = Smoother::new(macros.color.get(), sample_rate, 0.01)
+            .map_err(|_| EngineError::InvalidSampleRate)?;
         Ok(Self {
             note: 0,
             velocity: 0.0,
             age: 0,
             oscillator,
             envelope,
+            shape,
+            color,
+            color_lowpass: 0.0,
         })
     }
 
@@ -71,14 +92,39 @@ impl Voice {
         self.oscillator.reset();
         let frequency = 440.0 * 2.0_f32.powf((f32::from(note) - 69.0) / 12.0);
         self.oscillator.set_frequency(frequency);
+        self.color_lowpass = 0.0;
         self.envelope.restart();
     }
 
     fn next(&mut self) -> f32 {
+        let shape = self.shape.advance();
+        let color = self.color.advance();
         if self.envelope.is_idle() {
             return 0.0;
         }
-        finite_or_zero(self.oscillator.sample() * self.envelope.advance() * self.velocity)
+        let oscillator_sample = self.oscillator.sample(shape);
+        let color_coefficient = (self.oscillator.phase_increment()
+            * (8.0 + 120.0 * color * color))
+            .clamp(0.001, 0.75);
+        self.color_lowpass += color_coefficient * (oscillator_sample - self.color_lowpass);
+        let colored = self.color_lowpass + color * (oscillator_sample - self.color_lowpass);
+        let shape_compensation = 1.0 + 4.0 * shape * (1.0 - shape);
+        let color_compensation = 1.15 - 0.15 * color;
+        finite_or_zero(
+            colored
+                * shape_compensation
+                * color_compensation
+                * self.envelope.advance()
+                * self.velocity,
+        )
+    }
+
+    fn set_macro_target(&mut self, id: MacroId, value: Normalized) {
+        match id {
+            MacroId::Shape => self.shape.set_target(value.get()),
+            MacroId::Color => self.color.set_target(value.get()),
+            _ => {}
+        }
     }
 }
 
@@ -96,7 +142,7 @@ impl Engine {
         }
         let mut voices = Vec::with_capacity(preset.voices);
         for _ in 0..preset.voices {
-            voices.push(Voice::new(sample_rate, preset.envelope)?);
+            voices.push(Voice::new(sample_rate, preset.envelope, preset.macros)?);
         }
         Ok(Self {
             voices,
@@ -146,6 +192,11 @@ impl Engine {
 
     fn apply_event(&mut self, event: Event) {
         match event {
+            Event::SetMacro { id, value } => {
+                for voice in &mut self.voices {
+                    voice.set_macro_target(id, value);
+                }
+            }
             Event::NoteOn { note, velocity } if velocity > 0.0 => {
                 self.note_age = self.note_age.wrapping_add(1);
                 let index = self
@@ -190,6 +241,7 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::control::{MacroId, Normalized};
     use crate::preset::Preset;
 
     #[global_allocator]
@@ -215,8 +267,8 @@ mod tests {
         let mut left = [0.0; 12];
         let mut right = [0.0; 12];
         engine.render_block(&events, &mut left, &mut right).unwrap();
-        assert_eq!(&left[..=2], &[0.0, 0.0, 0.0]);
-        assert!(left[3..].iter().any(|sample| sample.abs() > 0.0));
+        assert_eq!(&left[..2], &[0.0, 0.0]);
+        assert!(left[2..].iter().any(|sample| sample.abs() > 0.0));
         assert_eq!(left, right);
         assert!(left.iter().all(|sample| sample.is_finite()));
     }
@@ -294,5 +346,152 @@ mod tests {
             });
             assert_eq!(engine.voice_storage_address(), storage);
         }
+    }
+
+    #[test]
+    fn shape_and_color_change_output_across_most_of_their_travel() {
+        fn render_macro(id: MacroId, value: f32) -> Vec<f32> {
+            let mut preset = preset(1);
+            match id {
+                MacroId::Shape => preset.macros.shape = Normalized::new(value).unwrap(),
+                MacroId::Color => preset.macros.color = Normalized::new(value).unwrap(),
+                _ => unreachable!(),
+            }
+            let mut engine = Engine::new(48_000.0, &preset).unwrap();
+            let events = [TimedEvent::new(
+                0,
+                Event::NoteOn {
+                    note: 60,
+                    velocity: 1.0,
+                },
+            )];
+            let mut left = vec![0.0; 4_096];
+            let mut right = vec![0.0; 4_096];
+            engine.render_block(&events, &mut left, &mut right).unwrap();
+            left
+        }
+
+        for id in [MacroId::Shape, MacroId::Color] {
+            let renders: Vec<_> = [0.0, 0.25, 0.5, 0.75, 1.0]
+                .into_iter()
+                .map(|value| render_macro(id, value))
+                .collect();
+            for (travel_index, pair) in renders.windows(2).enumerate() {
+                let difference_energy = pair[0]
+                    .iter()
+                    .zip(&pair[1])
+                    .skip(512)
+                    .map(|(left, right)| f64::from(left - right).powi(2))
+                    .sum::<f64>();
+                let difference_rms =
+                    (difference_energy / (pair[0].len() - 512) as f64).sqrt();
+                assert!(
+                    difference_rms > 0.005,
+                    "{id:?} travel segment {travel_index} was nearly inert: {difference_rms}"
+                );
+            }
+            for render in renders {
+                let peak = render.iter().fold(0.0_f32, |peak, sample| peak.max(sample.abs()));
+                assert!(peak > 0.01 && peak <= 0.35, "{id:?} peak={peak}");
+                assert!(render.iter().all(|sample| sample.is_finite()));
+            }
+        }
+    }
+
+    #[test]
+    fn timed_macro_changes_are_smoothed() {
+        let mut preset = preset(1);
+        preset.macros.shape = Normalized::new(0.0).unwrap();
+        let mut engine = Engine::new(48_000.0, &preset).unwrap();
+        let mut left = [0.0; 64];
+        let mut right = [0.0; 64];
+        engine
+            .render_block(
+                &[TimedEvent::new(
+                    0,
+                    Event::NoteOn {
+                        note: 60,
+                        velocity: 1.0,
+                    },
+                )],
+                &mut left,
+                &mut right,
+            )
+            .unwrap();
+        let mut one_left = [0.0; 1];
+        let mut one_right = [0.0; 1];
+        engine
+            .render_block(
+                &[TimedEvent::new(
+                    0,
+                    Event::SetMacro {
+                        id: MacroId::Shape,
+                        value: Normalized::new(1.0).unwrap(),
+                    },
+                )],
+                &mut one_left,
+                &mut one_right,
+            )
+            .unwrap();
+        let smoothed = engine.voices[0].shape.current();
+        assert!(smoothed > 0.0 && smoothed < 0.01, "shape={smoothed}");
+        let mut settle_left = [0.0; 4_800];
+        let mut settle_right = [0.0; 4_800];
+        engine
+            .render_block(&[], &mut settle_left, &mut settle_right)
+            .unwrap();
+        assert!((engine.voices[0].shape.current() - 1.0).abs() < 1.0e-4);
+    }
+
+    #[test]
+    fn rapid_macro_changes_remain_finite_bounded_and_allocation_free() {
+        let mut engine = Engine::new(48_000.0, &preset(2)).unwrap();
+        let events = [
+            TimedEvent::new(
+                0,
+                Event::NoteOn {
+                    note: 84,
+                    velocity: 1.0,
+                },
+            ),
+            TimedEvent::new(
+                8,
+                Event::SetMacro {
+                    id: MacroId::Shape,
+                    value: Normalized::new(0.0).unwrap(),
+                },
+            ),
+            TimedEvent::new(
+                16,
+                Event::SetMacro {
+                    id: MacroId::Color,
+                    value: Normalized::new(1.0).unwrap(),
+                },
+            ),
+            TimedEvent::new(
+                24,
+                Event::SetMacro {
+                    id: MacroId::Shape,
+                    value: Normalized::new(1.0).unwrap(),
+                },
+            ),
+            TimedEvent::new(
+                32,
+                Event::SetMacro {
+                    id: MacroId::Color,
+                    value: Normalized::new(0.0).unwrap(),
+                },
+            ),
+        ];
+        let mut left = [0.0; 128];
+        let mut right = [0.0; 128];
+        assert_no_alloc::assert_no_alloc(|| {
+            engine
+                .render_block(&events, &mut left, &mut right)
+                .unwrap();
+        });
+        assert!(left.iter().all(|sample| sample.is_finite()));
+        assert!(left.iter().all(|sample| sample.abs() <= 0.35));
+        assert_eq!(left, right);
     }
 }

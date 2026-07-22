@@ -1,5 +1,8 @@
 use moj_sint::analysis::{AnalysisSpec, WaveformMetrics, measure_candidate};
+use moj_sint::control::Normalized;
 use moj_sint::dsp::oscillator::OscillatorMethod;
+use moj_sint::offline::{RenderSpec, render_note};
+use moj_sint::preset::Preset;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -23,11 +26,101 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        [command, output] if command == "render" => match render_listening_matrix(Path::new(output))
+        {
+            Ok(()) => {
+                println!("wrote listening matrix to {output}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::FAILURE
+            }
+        },
         _ => {
-            eprintln!("Usage: oscillator-lab compare <output-directory>");
+            eprintln!(
+                "Usage:\n  oscillator-lab compare <output-directory>\n  oscillator-lab render <output-directory>"
+            );
             ExitCode::FAILURE
         }
     }
+}
+
+fn render_listening_matrix(
+    output_directory: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(output_directory)?;
+    let base_preset = Preset::parse(include_str!("../../presets/reference.mojsint"))?;
+    let manifest_path = output_directory.join("listening-manifest.tsv");
+    let mut manifest = BufWriter::new(File::create(manifest_path)?);
+    writeln!(
+        manifest,
+        "file\tnote\tfrequency_hz\tshape\tcolor\tpeak\trms\tdc\tsample_hash"
+    )?;
+    for note in [36_u8, 60, 84] {
+        for shape in [0.0_f32, 0.5, 1.0] {
+            for color in [0.0_f32, 0.5, 1.0] {
+                let mut preset = base_preset.clone();
+                preset.macros.shape = Normalized::new(shape)?;
+                preset.macros.color = Normalized::new(color)?;
+                let spec = RenderSpec {
+                    sample_rate: 48_000,
+                    note,
+                    velocity: 0.8,
+                    seconds: 1.25,
+                };
+                let samples = render_note(&preset, spec)?;
+                let filename = format!(
+                    "note{note:03}_shape{:03}_color{:03}.wav",
+                    (shape * 100.0).round() as u8,
+                    (color * 100.0).round() as u8
+                );
+                write_listening_wav(&output_directory.join(&filename), &samples, spec.sample_rate)?;
+                let (peak, rms, dc, sample_hash) = listening_metrics(&samples);
+                writeln!(
+                    manifest,
+                    "{filename}\t{note}\t{:.6}\t{shape:.2}\t{color:.2}\t{peak:.6}\t{rms:.6}\t{dc:.9}\t{sample_hash:016x}",
+                    midi_frequency(note)
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_listening_wav(
+    path: &Path,
+    samples: &[f32],
+    sample_rate: u32,
+) -> Result<(), hound::Error> {
+    let specification = hound::WavSpec {
+        channels: 2,
+        sample_rate,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut writer = hound::WavWriter::create(path, specification)?;
+    for sample in samples {
+        writer.write_sample(*sample)?;
+    }
+    writer.finalize()
+}
+
+fn listening_metrics(samples: &[f32]) -> (f64, f64, f64, u64) {
+    let mut peak = 0.0_f64;
+    let mut energy = 0.0;
+    let mut sum = 0.0;
+    let mut sample_hash = 0xcbf2_9ce4_8422_2325_u64;
+    for sample in samples {
+        let sample_f64 = f64::from(*sample);
+        peak = peak.max(sample_f64.abs());
+        energy += sample_f64 * sample_f64;
+        sum += sample_f64;
+        sample_hash ^= u64::from(sample.to_bits());
+        sample_hash = sample_hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    let count = samples.len() as f64;
+    (peak, (energy / count).sqrt(), sum / count, sample_hash)
 }
 
 fn compare(output_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {

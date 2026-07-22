@@ -299,4 +299,22 @@ mod tests {
             BandlimitedOscillator::new(f32::NAN, OscillatorMethod::IntegratedWavetable).is_err()
         );
     }
+
+    #[test]
+    fn bandlimited_candidate_sample_paths_do_not_allocate() {
+        for method in [
+            OscillatorMethod::PolyBlep,
+            OscillatorMethod::IntegratedWavetable,
+        ] {
+            let mut oscillator = BandlimitedOscillator::new(48_000.0, method).unwrap();
+            oscillator.set_frequency(1_046.5);
+            assert_no_alloc::assert_no_alloc(|| {
+                let mut sum = 0.0;
+                for _ in 0..4_096 {
+                    sum += oscillator.sample(0.37);
+                }
+                std::hint::black_box(sum);
+            });
+        }
+    }
 }
