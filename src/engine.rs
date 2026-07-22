@@ -69,6 +69,8 @@ impl Voice {
         };
         self.age = age;
         self.oscillator.reset();
+        let frequency = 440.0 * 2.0_f32.powf((f32::from(note) - 69.0) / 12.0);
+        self.oscillator.set_frequency(frequency);
         self.envelope.restart();
     }
 
@@ -76,8 +78,7 @@ impl Voice {
         if self.envelope.is_idle() {
             return 0.0;
         }
-        let frequency = 440.0 * 2.0_f32.powf((f32::from(self.note) - 69.0) / 12.0);
-        finite_or_zero(self.oscillator.next(frequency) * self.envelope.next() * self.velocity)
+        finite_or_zero(self.oscillator.sample() * self.envelope.advance() * self.velocity)
     }
 }
 

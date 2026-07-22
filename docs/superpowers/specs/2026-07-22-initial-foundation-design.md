@@ -23,7 +23,9 @@ formatting, subprocesses, or panics in the callback.
 
 ## Reference Sound and Controls
 
-The first sound is a phase-accumulator sine oscillator through a standard ADSR.
+The first sound is a quadrature-recurrence sine oscillator through a standard
+ADSR. Frequency preparation happens on note events, keeping per-sample work to
+bounded arithmetic without trigonometric calls.
 The thirteen stable controls are represented by a closed enum and normalized
 values. ADSR time controls use exponential mappings. Every control is smoothed;
 the eight timbral macros and EVOLVE have stable identities but intentionally do

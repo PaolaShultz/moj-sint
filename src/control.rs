@@ -132,7 +132,7 @@ impl Smoother {
         self.target = target;
     }
 
-    pub fn next(&mut self) -> f32 {
+    pub fn advance(&mut self) -> f32 {
         self.current = self.target + self.coefficient * (self.current - self.target);
         self.current
     }
@@ -180,7 +180,7 @@ mod tests {
         smoother.set_target(1.0);
         let mut previous = 0.0;
         for _ in 0..4_800 {
-            let current = smoother.next();
+            let current = smoother.advance();
             assert!(current >= previous && current <= 1.0);
             previous = current;
         }

@@ -108,7 +108,7 @@ impl Adsr {
     }
 
     #[inline]
-    pub fn next(&mut self) -> f32 {
+    pub fn advance(&mut self) -> f32 {
         match self.stage {
             Stage::Idle => self.level = 0.0,
             Stage::Attack => {
@@ -154,16 +154,16 @@ mod tests {
     fn envelope_traverses_attack_decay_sustain_and_release() {
         let config = AdsrConfig::new(0.002, 0.002, 0.5, 0.002).unwrap();
         let mut envelope = Adsr::new(1_000.0, config).unwrap();
-        assert_eq!(envelope.next(), 0.0);
+        assert_eq!(envelope.advance(), 0.0);
         envelope.note_on();
-        assert!(envelope.next() > 0.0);
+        assert!(envelope.advance() > 0.0);
         for _ in 0..8 {
-            envelope.next();
+            envelope.advance();
         }
         assert!((envelope.level() - 0.5).abs() < 1.0e-6);
         envelope.note_off();
         for _ in 0..8 {
-            envelope.next();
+            envelope.advance();
         }
         assert_eq!(envelope.level(), 0.0);
         assert!(envelope.is_idle());

@@ -7,6 +7,10 @@ is a Raspberry Pi 5; development is also supported on x86_64 Linux.
 This initial foundation contains a pure DSP engine and deterministic offline
 renderer. It does not yet contain the live JACK/ALSA host.
 
+The current oscillator is intentionally a plain reference sine. Its purpose is
+to verify engine, preset, control, and rendering boundaries before unfamiliar
+oscillator work begins.
+
 ## Development
 
 ```sh

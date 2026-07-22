@@ -43,13 +43,16 @@ There is no UI in this repository. Control comes through MIDI and SHR-DAW.
 
 At this checkpoint:
 
-- `/home/shome/p/moj-sint` began empty.
-- It is not yet a Git repository.
-- No Rust project has been scaffolded.
-- No tools or libraries have been installed.
-- The only project file created so far is this handoff.
-- Architecture analysis was performed read-only against a temporary shallow
-  clone of SHR-DAW under `/tmp`; that clone is not part of this workspace.
+- Git is initialized on `main`; foundation work was developed on
+  `feature/initial-foundation` in `.worktrees/initial-foundation`.
+- The Rust crate contains the portable DSP/control/preset/engine library,
+  offline renderer/validator binary, tests, reference preset, and documentation.
+- User-local stable Rust 1.97.1, Cargo, rustfmt, Clippy, cargo-audit, and
+  cargo-deny are installed.
+- The live JACK/ALSA host is not implemented and no audio service or hardware
+  was touched.
+- SHR-DAW was rechecked read-only at main commit
+  `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
 ## Development-machine audit
 
@@ -70,6 +73,7 @@ Present tools and runtimes:
 - PipeWire 1.0.5 runtime
 - ALSA runtime utilities and visible playback devices
 - `perf`, `gdb`, `chrt`, and `taskset`
+- Rust 1.97.1, Cargo 1.97.1, rustfmt, Clippy, cargo-audit, and cargo-deny
 
 Missing at audit time:
 
@@ -77,7 +81,7 @@ Missing at audit time:
 - ALSA development metadata (`alsa.pc` / `libasound2-dev`)
 - JACK development metadata
 - PipeWire development metadata
-- Clang/LLD, Valgrind, rr, hyperfine, just, cargo-audit, and cargo-deny
+- Clang/LLD, Valgrind, rr, hyperfine, and just
 
 Do not install every missing item automatically. Install only what the chosen
 architecture or validation actually needs. Rust can be installed for the
@@ -369,12 +373,10 @@ should proceed without reopening settled questions such as installation
 authorization, ALSA-versus-JACK output, external-process integration, or the
 13-control target.
 
-Some low-level implementation details are intentionally left for the written
-implementation plan and test-first work: exact crate versions, whether JACK is
-accessed through dynamic FFI or a maintained crate, final module boundaries,
-preset field syntax, CC assignments, voice-count defaults, and measurable
-control-usefulness thresholds. These are engineering decisions within the
-accepted direction, not gates requiring another broad design discussion.
+The initial plan and design are recorded under `docs/superpowers/`. The
+foundation fixed module and preset boundaries. The JACK crate-versus-dynamic-FFI
+decision, CC numbers, useful macro mappings, and measurable usefulness
+thresholds remain later engineering decisions, not broad design blockers.
 
 The settled high-level choices are:
 
@@ -393,21 +395,18 @@ Use this short prompt after resetting; this handoff contains the detailed
 context and should not be copied back into the new prompt:
 
 ```text
-Continue the initial Moj Sint preparation in /home/shome/p/moj-sint.
+Continue Moj Sint in /home/shome/p/moj-sint.
 
 Read docs/HANDOFF.md completely first and use it as the current integration,
 controller, environment, research, and workflow context. Recheck the live
 PaolaShultz/shr-daw main branch only where its actively changing contracts need
 verification.
 
-Carry the preparation through in phases: record the accepted bounded design,
-write the implementation plan, install the needed user-local Rust
-tooling, report exact sudo packages, initialize Git, scaffold the portable Rust
-project using test-first development, establish the pure DSP/control/preset and
-offline-render boundaries, verify native x86_64 builds/tests, document the
-AArch64/Pi path, perform the requested authoritative synth and real-time-audio
-research with preserved links, investigate useful skills/MCPs/tools, and create
-the project-specific AGENTS.md.
+Use the existing design, plan, architecture, host contract, research register,
+and tests. Build the next smallest musical milestone test-first: compare a
+PolyBLEP discontinuity-corrected oscillator with an integrated-wavetable
+approach, choose from measurements, route the selected oscillator meaningfully
+to SHAPE and COLOR, and generate listening renders plus spectral/level sweeps.
 
 Keep Moj Sint a fourth external SHR-DAW instrument with JACK stereo audio,
 ALSA Sequencer MIDI, and its own preset/control identities. Design around the
@@ -416,14 +415,49 @@ usefulness and later human listening acceptance. Do not modify SHR-DAW, start
 JACK, connect hardware, play audio, or claim Pi performance during this setup
 task.
 
-Finish with fresh verification evidence, installed and remaining dependencies,
-created files, portability limitations, research links, the precise future
-SHR-DAW integration work, and the next smallest musical milestone.
+Do not implement the live host or modify SHR-DAW in that milestone. Do not make
+Pi performance or musical-usefulness claims without the required native and
+human evidence. Finish with fresh verification and listening artifacts for the
+user to judge.
 ```
 
 ## Next action
 
-Start a fresh session using the prompt above. The new session should proceed
-through planning and implementation without requesting another broad design
-approval. Do not spend another long turn rediscovering SHR-DAW's established
-JACK/ALSA/process contract.
+Complete verification and integrate the foundation branch, then start the
+oscillator milestone using the prompt above. Do not rediscover SHR-DAW's
+established JACK/ALSA/process contract.
+
+## Executed foundation checkpoint
+
+Completed later on 2026-07-22 on branch `feature/initial-foundation`:
+
+- initialized Git and recorded the accepted design and implementation plan;
+- installed user-local stable Rust, rustfmt, Clippy, cargo-audit, and cargo-deny;
+- created a pure Rust library, strict version-1 `.mojsint` preset, thirteen
+  stable control identities, reference sine/ADSR, fixed voice engine, and
+  deterministic stereo float WAV renderer/validator CLI;
+- enforced no allocation inside `Engine::render_block` in tests;
+- rechecked SHR-DAW main at
+  `8b7d0d7c17c582292ac06a915ca1fe750d77bc40`;
+- documented architecture, live-host contract, portability/Pi validation,
+  primary-source research, licensing, and repository-specific instructions.
+
+The next smallest musical milestone is one bandlimited, audibly characterful
+oscillator path (recommended starting comparison: PolyBLEP discontinuity
+correction versus integrated wavetable), routed to `SHAPE` and `COLOR`, with
+spectral/level sweeps and listening renders. The live JACK/ALSA host remains a
+separate milestone and still requires `sudo apt install libasound2-dev`.
+
+Fresh foundation verification evidence:
+
+- `cargo fmt --check`: exit 0;
+- `cargo test --all-targets --all-features`: 21 passed, 0 failed;
+- `cargo clippy --all-targets --all-features -- -D warnings`: exit 0;
+- `cargo build --release`: exit 0;
+- `cargo audit`: scanned 35 crate dependencies with no reported vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed; it reports
+  one accepted duplicate-version warning for `winnow` 0.7/1.0 inside `toml`;
+- `cargo check --target aarch64-unknown-linux-gnu`: exit 0 (compile evidence
+  only, not a native Pi build);
+- two independent reference renders were byte-identical at SHA-256
+  `306e7af0f5ddf9a2fffad3a5b040ae77963244206d8bd155e4ad1fe6d11d92bc`.
