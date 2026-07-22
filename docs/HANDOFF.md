@@ -45,6 +45,31 @@ There is no UI in this repository. Control comes through MIDI and SHR-DAW.
   they should not copy generic agent or skill instructions that the next
   session will already load.
 
+## Experimental-output and variation policy
+
+This policy applies specifically to sound-research experiments. Generated
+audio, measurement tables, manifests, batch-specific reports, parameter files,
+and similar experiment outputs are disposable by default. Generate them under
+the ignored `artifacts/` tree or outside the repository. When an experiment is
+rejected, record its conclusion and limitation in the durable research/handoff
+documents, then delete the generated batch rather than archiving it.
+
+If a batch, individual tone, experiment-specific document, parameter/preset
+file, or other output appears worth developing or retaining, the assistant may
+offer to preserve that exact material. It must not copy anything into a
+separate tracked directory unless the user explicitly requests preservation.
+No preservation directory should be created speculatively. This restriction
+does not apply to ordinary source code, tests, or concise updates to durable
+project documentation.
+
+Listening experiments must compare fundamentally different sound-generation
+hypotheses: for example, a phase-structured multi-oscillator source versus a
+noise-excited resonator versus another genuinely distinct topology. Different
+parameter values, drive amounts, filtering strengths, wet levels, or several
+closely related saw/sine variants do not count as different sounds. Automated
+parameter sweeps remain useful for bounds, aliasing, stability, and cost, but
+must not be presented as the musical-variation listening gate.
+
 ## Current workspace state
 
 At this checkpoint:
