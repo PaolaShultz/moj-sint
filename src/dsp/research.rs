@@ -158,6 +158,9 @@ struct ExcitedComb {
     excitation_remaining: usize,
     initial_excitation_samples: usize,
     noise_state: u32,
+    previous_output: f32,
+    dc_output: f32,
+    dc_coefficient: f32,
 }
 
 impl ExcitedComb {
@@ -173,6 +176,9 @@ impl ExcitedComb {
             excitation_remaining: excitation_samples,
             initial_excitation_samples: excitation_samples,
             noise_state: 0x6d2b_79f5,
+            previous_output: 0.0,
+            dc_output: 0.0,
+            dc_coefficient: (-std::f32::consts::TAU * 10.0 / sample_rate).exp(),
         }
     }
 
@@ -190,7 +196,9 @@ impl ExcitedComb {
         let output = 0.56 * self.lines[0].sample(excitation)
             + 0.26 * self.lines[1].sample(0.72 * excitation)
             + 0.18 * self.lines[2].sample(-0.55 * excitation);
-        output.clamp(-1.0, 1.0)
+        self.dc_output = output - self.previous_output + self.dc_coefficient * self.dc_output;
+        self.previous_output = output;
+        self.dc_output.clamp(-1.0, 1.0)
     }
 
     fn reset(&mut self) {
@@ -199,6 +207,8 @@ impl ExcitedComb {
         }
         self.excitation_remaining = self.initial_excitation_samples;
         self.noise_state = 0x6d2b_79f5;
+        self.previous_output = 0.0;
+        self.dc_output = 0.0;
     }
 
     fn delay_bounds(&self) -> (f32, f32) {
@@ -382,8 +392,8 @@ impl SpectralTraversal {
         let mut rotation_cosine = [1.0; SPECTRAL_PARTIALS];
         for index in 0..active_partials {
             let phase_increment = frequency_hz * (index + 1) as f32 / sample_rate;
-            rotation_sine[index] = sine_lookup(phase_increment);
-            rotation_cosine[index] = sine_lookup(phase_increment + 0.25);
+            let angle = std::f32::consts::TAU * phase_increment;
+            (rotation_sine[index], rotation_cosine[index]) = angle.sin_cos();
         }
         Self {
             sine: [0.0; SPECTRAL_PARTIALS],

@@ -54,6 +54,11 @@ fn five_family_lab_writes_deterministic_listening_gate() {
     assert!(readme.contains("not Raspberry Pi evidence"));
     let manifest = fs::read_to_string(first.path().join("manifest.tsv")).unwrap();
     assert_eq!(manifest.lines().count(), 16);
+    for row in manifest.lines().skip(1) {
+        let fields: Vec<_> = row.split('\t').collect();
+        let rms: f64 = fields[5].parse().unwrap();
+        assert!((rms - 0.06).abs() < 0.002, "row={row}");
+    }
 }
 
 fn run_lab(output: &Path) {

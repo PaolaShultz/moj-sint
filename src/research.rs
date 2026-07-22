@@ -194,7 +194,9 @@ pub fn loudness_match(samples: &mut [f32], _sample_rate: u32, target_rms: f64) {
     if current_rms <= 0.0 || peak <= 0.0 {
         return;
     }
-    let gain = (target_rms / current_rms).min(0.98 / peak);
+    // Leave one millipercent of margin so the f64 gain-to-f32 sample conversion
+    // cannot round a nominal 0.98 peak above the declared ceiling.
+    let gain = (target_rms / current_rms).min(0.979 / peak);
     for sample in samples {
         *sample *= gain as f32;
     }
@@ -363,7 +365,7 @@ mod tests {
         loudness_match(&mut result.samples, 48_000, 0.08);
         let metrics = measure_stereo(&result.samples, 48_000.0, midi_frequency(60)).unwrap();
         assert!((metrics.rms - 0.08).abs() < 0.002, "rms={}", metrics.rms);
-        assert!(metrics.peak <= 0.98);
+        assert!(metrics.peak <= 0.98, "peak={}", metrics.peak);
     }
 
     #[test]
@@ -377,5 +379,44 @@ mod tests {
                 "family={family:?} value={first}"
             );
         }
+    }
+
+    #[test]
+    fn spectral_traversal_keeps_the_requested_fundamental_over_a_long_render() {
+        let result = render_and_measure(
+            ResearchFamily::SpectralTraversal,
+            ResearchRenderSpec {
+                sample_rate: 48_000,
+                note: 60,
+                seconds: 1.5,
+            },
+        )
+        .unwrap();
+        assert!(
+            result.metrics.fundamental_db > -12.0,
+            "fundamental_db={}",
+            result.metrics.fundamental_db
+        );
+        let residual = measure_alias_error(ResearchFamily::SpectralTraversal, 60, 8_192).unwrap();
+        assert!(residual < -15.0, "alias_error_db={residual}");
+    }
+
+    #[test]
+    fn high_comb_note_is_dc_controlled_at_common_listening_level() {
+        let mut result = render_and_measure(
+            ResearchFamily::ExcitedComb,
+            ResearchRenderSpec {
+                sample_rate: 48_000,
+                note: 84,
+                seconds: 1.5,
+            },
+        )
+        .unwrap();
+        apply_fades(&mut result.samples, 48_000, 0.01);
+        loudness_match(&mut result.samples, 48_000, 0.06);
+        let metrics = measure_stereo(&result.samples, 48_000.0, midi_frequency(84)).unwrap();
+        assert!((metrics.rms - 0.06).abs() < 0.002, "rms={}", metrics.rms);
+        assert!(metrics.dc.abs() < 0.005, "dc={}", metrics.dc);
+        assert!(metrics.peak <= 0.98, "peak={}", metrics.peak);
     }
 }

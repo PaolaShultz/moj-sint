@@ -62,7 +62,7 @@ fn render_gate(output_directory: &Path) -> Result<(), Box<dyn std::error::Error>
                 },
             )?;
             apply_fades(&mut render.samples, SAMPLE_RATE, 0.01);
-            loudness_match(&mut render.samples, SAMPLE_RATE, 0.08);
+            loudness_match(&mut render.samples, SAMPLE_RATE, 0.06);
             let metrics =
                 measure_stereo(&render.samples, SAMPLE_RATE as f32, midi_frequency(note))?;
             let filename = format!("{}_note{note:03}.wav", family_slug(family));
@@ -192,7 +192,7 @@ fn write_readme(path: &Path) -> std::io::Result<()> {
     )?;
     writeln!(
         output,
-        "For each MIDI note 36, 60, and 84, compare nonlinear PM, excited comb, spatial micro-delay, spectral traversal, and integer swarm. All files are stereo 32-bit float at 48 kHz and were matched toward RMS 0.08 subject to a 0.98 peak ceiling.\n"
+        "For each MIDI note 36, 60, and 84, compare nonlinear PM, excited comb, spatial micro-delay, spectral traversal, and integer swarm. All files are stereo 32-bit float at 48 kHz and were matched to RMS 0.06 under a 0.98 peak ceiling.\n"
     )?;
     writeln!(
         output,
