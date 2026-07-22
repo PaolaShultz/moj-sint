@@ -50,20 +50,23 @@ S(u) = sign(u) 2/3, otherwise
 ```
 
 The generated component is `S(drive * b) / drive - b`, where `b` is the
-band-limited branch. Subtracting the linear component makes the return vanish
-as drive tends to zero and prevents the parallel path from becoming an EQ-like
-copy of the dry signal. A one-pole DC blocker follows the nonlinear residual;
-theoretical odd symmetry does not replace a measured DC guard for asymmetric
-source waveforms. The final voice sample is:
+band-limited branch. Subtracting the linear component prevents the parallel
+path from becoming an EQ-like copy of the dry signal. A one-pole DC blocker
+follows the nonlinear residual; theoretical odd symmetry does not replace a
+measured DC guard for asymmetric source waveforms. Measured early revisions
+showed that this residual could partly cancel the fundamental or become too
+subtle. The retained revision therefore passes the return through two cascaded
+note-tracked high-pass sections prepared at 2.5 times note frequency and capped
+at 6 kHz, then inverts it. The final voice sample is:
 
 ```text
-y = x + return_gain * dc_block(generated_component)
+y = x - 1.2 * return_amount * highpass2(dc_block(generated_component))
 ```
 
-`return_gain` is explicitly bounded. `EDGE` is the candidate drive/intensity
-control and `COUPLE` is the candidate dry-to-character interaction/return
-control, both through the existing 10 ms smoothers. `COUPLE=0` is bit-exactly
-independent of `EDGE` and is the research baseline. These mappings remain
+`EDGE` maps drive from 1x to 2x and supplies a bounded concave intensity curve;
+`COUPLE` is the candidate dry-to-character interaction/return control. Both use
+the existing 10 ms smoothers. `COUPLE=0` is bit-exactly independent of `EDGE`
+and is the research baseline. These mappings remain
 experimental even if automated checks pass; only user listening can accept
 them as useful stable-role implementations.
 
@@ -87,6 +90,13 @@ every measured note. If no candidate meets those limits, the branch bandwidth
 or drive range must be reduced before listening files are produced. Ties prefer
 direct evaluation, then ADAA, then two-times oversampling. The measurements
 will be recorded rather than assuming that filtering alone is sufficient.
+
+Measured 8x-reference evidence selected direct evaluation after the maximum
+drive was reduced from 8x to 2x. Its worst moderate/strong residuals are
+-73.700/-59.121 dB. ADAA measured -53.093/-49.502 dB and the two-times path
+-64.365/-61.442 dB. Direct is the cheapest method inside the 3 dB selection
+window that passes both absolute thresholds. This is specific to the retained
+filtered low-drive graph, not a general nonlinear-antialiasing conclusion.
 
 First-order ADAA follows the independently implemented antiderivative method
 described by Stefan Bilbao, Fabián Esqueda, Julian D. Parker, and Vesa
@@ -116,3 +126,7 @@ identity, the branch is rejected rather than expanded into a larger matrix.
 
 All timing is scalar x86_64 workstation development evidence. It is not native
 Raspberry Pi callback, latency, polyphony, or sound-quality evidence.
+
+The nine-file gate was generated with deterministic manifests and a 12-partial
+distribution. Automated evidence passed; the user listening verdict remains
+open, so the graph and candidate macro mapping are not factory-accepted.

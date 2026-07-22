@@ -61,6 +61,10 @@ At this checkpoint:
   low/mid/high `SHAPE`/`COLOR` combinations under
   `artifacts/oscillator-milestone/`. Human musical-usefulness acceptance is
   intentionally still open.
+- The rejected harmonic selector has been retired from the engine render path.
+  A per-voice parallel character layer now has automated evidence and a small
+  nine-file dry/moderate/strong listening gate under
+  `artifacts/parallel-character-milestone/`; its human verdict is open.
 - The foundation engine can preallocate multiple voices, but this is not a
   final polyphony commitment. The next oscillator-system design and listening
   work is explicitly monophonic; native Raspberry Pi evidence gates later
@@ -610,3 +614,51 @@ base sound and investigate controlled parallel output/character layers such as
 bounded saturation, harmonic excitation, subharmonic reinforcement, or
 feedback/resonant processing, comparing per-voice and post-mix placement rather
 than stacking every layer serially.
+
+## Parallel character-layer checkpoint
+
+Completed later on 2026-07-22:
+
+- compared a full-band symmetric saturation return, a band-limited symmetric
+  generated-residual return, and a band-pass asymmetric exciter; separately
+  deferred per-voice oscillator, divider, and tracked subharmonic forms;
+- selected one per-voice branch before mixing, preserving the existing
+  `SHAPE`/`COLOR` output as an untouched dry anchor and avoiding post-mix
+  inter-voice products;
+- implemented a four-pole 6 kHz branch low-pass, bounded cubic soft clip,
+  linear-component subtraction, 10 Hz DC blocker, and two-stage note-tracked
+  return high-pass, all with scalar preallocated per-voice state;
+- retired the rejected selector from `Voice` while preserving its standalone
+  deterministic negative-result generator and primitive tests;
+- kept `EDGE` as candidate drive/intensity and `COUPLE` as candidate return,
+  both smoothed over 10 ms, with sample-identical `COUPLE=0` bypass for every
+  `EDGE` value;
+- rejected two intermediate revisions that either cancelled the dry
+  fundamental or measured like minor level/EQ change, then capped drive at 2x
+  and retained a return that measurably lifts a broad upper-harmonic set;
+- compared direct, first-order ADAA, and two-times evaluation against an eight-
+  times zero-phase reference. Direct passed the declared rule at -73.700 dB
+  worst moderate and -59.121 dB worst strong residual and was selected; this is
+  topology-specific evidence, not a general rejection of nonlinear
+  antialiasing;
+- measured 600/900 Hz intermodulation at -134.381 dB for separate per-voice
+  branches versus -15.463 dB for the deferred post-mix placement;
+- generated exactly nine loudness-matched listening WAVs: dry, moderate, and
+  strong for MIDI notes 36, 60, and 84. Peak is 0.139552-0.143008, RMS is
+  0.079769-0.079980, maximum absolute DC is 0.000000196, and every condition
+  retains the fitted fundamental;
+- recorded 12-partial distributions, deterministic hashes, alias/error rows,
+  intermodulation evidence, and volatile scalar workstation timing under
+  `artifacts/parallel-character-milestone/`; and
+- left the listening verdict open. Neither the graph nor its `EDGE`/`COUPLE`
+  mapping is an accepted factory sound until the user listens.
+
+The listening files are ignored by Git but are generated in the artifact
+directory by `cargo run --release --bin oscillator-lab -- character
+artifacts/parallel-character-milestone`. Keep or regenerate them before asking
+the user to listen. The tracked manifests and README describe the exact gate.
+
+All cost evidence in this checkpoint comes from the scalar x86_64 workstation.
+It is not Raspberry Pi callback, latency, safe-polyphony, or sound-quality
+evidence. No JACK/ALSA host, SHR-DAW change, hardware connection, SIMD path, or
+Pi claim was added.

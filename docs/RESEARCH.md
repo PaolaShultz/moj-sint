@@ -332,6 +332,87 @@ preset. The next research phase should preserve a base sound while comparing
 parallel nonlinear, excited-harmonic, subharmonic, or feedback layers rather
 than treating sparse sine partial selection as sufficient identity.
 
+### 2026-07-22 parallel character-layer experiment
+
+The next phase compared three small dry-plus-return graphs before changing the
+engine:
+
+1. a full-band symmetric soft-clipped copy, which was smallest but exposed all
+   existing high partials to nonlinear aliasing and risked generic distortion;
+2. a band-limited symmetric generated-residual return, which preserved the dry
+   path and was selected as the first implementation; and
+3. a band-pass biased/asymmetric exciter, which could add even and odd products
+   but also required a bias, two cutoff policies, and stronger DC control.
+
+Subharmonic reinforcement was separately compared as a later family. A
+per-voice oscillator at half frequency has the clearest octave and future chord
+semantics. Period division adds waveform/onset policy, while post-mix tracking
+becomes ambiguous for chords. None was combined with this experiment. Placement
+was selected per voice before mixing so state remains pitch-specific and the
+nonlinearity cannot create inter-voice products. A measured 600/900 Hz two-tone
+probe found -134.381 dB combined intermodulation for separated direct branches
+and -15.463 dB when the same character process was applied post-mix. This is a
+controlled placement comparison, not a polyphony or audibility claim.
+
+The implemented branch keeps the existing `SHAPE`/`COLOR` sample as an
+untouched dry anchor. Its copy passes through four cascaded one-pole low-pass
+sections at 6 kHz, a symmetric cubic soft clip with constant continuation,
+linear-component subtraction, a 10 Hz DC blocker, and two cascaded note-tracked
+high-pass sections. The latter are prepared at 2.5 times note frequency and
+capped at 6 kHz, preventing the generated return from cancelling the dry
+fundamental. The return polarity was selected to add rather than cancel upper
+content and its gain is explicitly bounded. `EDGE` supplies the candidate
+drive/intensity route from 1x to 2x; `COUPLE` supplies the candidate return
+route. Both retain 10 ms smoothing, and `COUPLE=0` is sample-identical for all
+`EDGE` values. These are research mappings, not accepted stable factory
+behavior.
+
+Early measured revisions were rejected before handoff. A high return without
+the note-tracked filter partially cancelled the fundamental, while the first
+conservative return moved the third harmonic by less than 1 dB and looked like
+minor level/EQ change. The retained revision requires a 440 Hz sine probe to
+keep fundamental amplitude above 0.7 while adding a third-harmonic amplitude
+above 0.05. Over the real saw/square base, the strong listening conditions lift
+partials 4-12 by roughly 1-1.5 dB on MIDI 36/60; MIDI 84 changes less and is a
+known limitation. The 12-partial rows are recorded rather than calling that
+change musically useful.
+
+Direct, first-order ADAA, and a two-times interpolated research path were
+compared against an independently rendered eight-times direct reference. A
+zero-phase 127-tap windowed-sinc low-pass removes reference content above 90%
+of target Nyquist; only the generated path receives the half-sample alignment
+used by ADAA and the two-times variant. The predeclared selection requires at
+most -60 dB residual at moderate drive, -50 dB at strong drive, and no more than
+3 dB regression from the best worst case. Reducing the drive ceiling from 8x
+to 2x was necessary before any method passed. Direct evaluation then measured
+-73.700 dB worst-case moderate and -59.121 dB worst-case strong and was selected
+as the cheapest passing method. ADAA measured -53.093/-49.502 dB and the
+two-times path -64.365/-61.442 dB. Although the two-times path has the lowest
+strong residual, direct stays within the declared window and passes both
+absolute limits. This result applies only to this filtered 1x-2x graph; it does
+not establish that direct evaluation is generally preferable for nonlinear DSP.
+BLAMP was not implemented because the graph has no known fold/reset
+discontinuity to correct.
+
+The nine loudness-matched 48 kHz stereo listening files are `note036_dry.wav`,
+`note036_moderate.wav`, `note036_strong.wav`, and the corresponding note 60 and
+84 triplets under `artifacts/parallel-character-milestone/`. Active-window RMS
+is 0.079769-0.079980, peak is 0.139552-0.143008, maximum absolute DC is
+0.000000196, and every row retains the fitted fundamental. The manifest, 12-
+partial distribution, alias comparison, intermodulation table, and volatile
+workstation timing accompany the files. The user listening verdict remains
+open; automated checks do not accept `EDGE`, `COUPLE`, or the graph as a factory
+sound.
+
+The independently implemented ADAA comparison uses the mathematics described
+by Stefan Bilbao, Fabián Esqueda, Julian D. Parker, and Vesa Välimäki,
+“Antiderivative Antialiasing for Memoryless Nonlinearities,” *IEEE Signal
+Processing Letters* 24(7), 2017, DOI 10.1109/LSP.2017.2675541,
+[author manuscript](https://www.research.ed.ac.uk/files/34115216/bilbao_pdf.pdf).
+No third-party source, presets, samples, prose, or figures were copied.
+Workstation cost is scalar x86_64 development evidence only. It is not native
+Raspberry Pi callback, latency, safe-polyphony, or sound-quality evidence.
+
 ## Real-time I/O and platform
 
 - JACK project, [API overview](https://jackaudio.org/api/) and

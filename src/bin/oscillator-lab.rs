@@ -137,6 +137,14 @@ fn render_character_evidence(output_directory: &Path) -> Result<(), Box<dyn std:
     )?;
     writeln!(
         readme,
+        "Listen to each note in dry, moderate, strong order without additional normalization. Reject the branch if it reads as minor EQ or generic distortion; do not expand the matrix before that decision.\n"
+    )?;
+    writeln!(
+        readme,
+        "`character-manifest.tsv` records level, DC, pitch, and hashes; `harmonic-distribution.tsv` records the first 12 partials; `alias-comparison.tsv` records method selection; `intermodulation.tsv` compares per-voice and post-mix placement.\n"
+    )?;
+    writeln!(
+        readme,
         "The selected production method is `{}`. Workstation timing is scalar development evidence only, not Raspberry Pi evidence.",
         character_method_name(selection)
     )?;
