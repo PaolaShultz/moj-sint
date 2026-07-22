@@ -45,6 +45,30 @@ There is no UI in this repository. Control comes through MIDI and SHR-DAW.
   they should not copy generic agent or skill instructions that the next
   session will already load.
 
+### Experimental intent and rapid idea capture
+
+The user is building Moj Sint to explore unfamiliar machine behavior, not to
+make another conventional sine/saw synthesizer or to demonstrate music-theory
+knowledge. The desired instrument is a machine whose physical controls produce
+meaningful, discoverable responses and can reach sounds worth playing without
+hiding experimental behavior behind generic presets.
+
+Capture the user's new sound or machine ideas in this handoff or
+`docs/RESEARCH.md` promptly, even when they arrive as incomplete metaphors,
+rough implementation thoughts, or apparently incompatible mechanisms. Do not
+require the user to translate an idea into established synthesis terminology,
+and do not silently normalize unusual ideas into familiar subtractive-synth
+patterns. Preserve the strange premise, separate what is known from what is
+speculative, and turn it into the smallest bounded experiment that could prove
+or reject it.
+
+Think from the machine outward as well as from acoustics or music theory
+inward. Registers, integer overflow, shifts, rotates, carry, quantization,
+lookup addressing, state-machine cycles, memory layout, connection order, and
+cheap parallel state are legitimate sources of sound hypotheses. Mathematical
+or psychoacoustic analysis should help bound and understand those hypotheses;
+it should not automatically replace them with textbook oscillator designs.
+
 ## Experimental-output and variation policy
 
 This policy applies specifically to sound-research experiments. Generated
@@ -446,11 +470,11 @@ intentionally speculative ideas into seven testable Moj Sint experiment
 families. Continue from that register rather than reducing the next phase to
 vintage emulation.
 
-## Next experimental phase: four-family listening gate
+## Next experimental phase: five-family listening gate
 
-The user approved a genuinely varied listening gate built from four separate
-sound-generation hypotheses. These are not four parameter settings in one
-graph, and the first implementation should not force all four into the
+The user approved a genuinely varied listening gate built from five separate
+sound-generation hypotheses. These are not five parameter settings in one
+graph, and the first implementation should not force all five into the
 production `Engine`. Prototype them as disposable monophonic offline research
 sources first:
 
@@ -475,6 +499,16 @@ sources first:
 4. **Spectral-traversal source.** Traverse a small Moj Sint-authored family of
    related spectra or phase laws as one coherent identity. It must not become
    an arbitrary waveform browser or copy a commercial wavetable or preset.
+5. **Small-register integer machine and oscillator swarm.** Build sound from
+   explicitly sized integer phase/state registers, wrapping arithmetic,
+   shifts, rotates, carry/borrow relationships, bit selection, and other
+   bounded state-machine operations. For a fixed-point phase increment, a
+   left shift can represent a power-of-two frequency relationship such as an
+   octave until the defined-width boundary is reached; the boundary behavior
+   must be deliberate rather than accidental overflow. Explore whether small
+   registers, short cycles, quantization, and many extremely cheap interacting
+   integer voices create useful controlled nastiness. This is a sound-source
+   hypothesis, not merely a premature optimization exercise.
 
 The comb/resonant and psychoacoustic micro-delay candidates are deliberately
 separate. In the comb family, delay is the resonating sound generator. In the
@@ -487,16 +521,33 @@ sources and extend `docs/RESEARCH.md` with authorship, publication details,
 direct URLs, licensing implications, and the specific design claim supported
 by each source. Define a concise perceptual hypothesis for every candidate:
 what the listener should recognize, why it differs structurally from the
-other three, and what failure would sound like.
+other four, and what failure would sound like.
 
 The first listening batch should contain one bounded representative of each
 family, loudness matched across representative low, middle, and high notes.
 Automated sweeps within a family remain engineering evidence only. They test
 stability, useful travel, pitch behavior, aliasing, modulation, mono
 compatibility, and cost; they do not count as additional musical variations.
-The user decides whether the four candidates actually sound distinct and
+The user decides whether the five candidates actually sound distinct and
 worth developing before any one is selected for engine integration or macro
 mapping.
+
+For the integer-machine family, use portable scalar Rust with explicit
+fixed-width types and defined wrapping operations first. Do not introduce
+inline assembly, SIMD, architecture-specific behavior, or undefined overflow
+semantics merely because the idea began from an assembly metaphor. Convert to
+the floating-point audio boundary in a controlled place and measure DC,
+periodicity, pitch error, level, spectral distribution, aliasing, deterministic
+replay, and the audible consequences of register-width and state-cycle
+changes. Different bit widths and oscillator counts are engineering sweeps
+inside this one family, not separate listening mechanisms.
+
+The hoped-for payoff is enough cheap parallel machines to support an eventual
+four-note polyphonic instrument with rich internal oscillator populations.
+“Zillions of oscillators” is a productive hypothesis, not a performance claim.
+Research remains monophonic first; only native Raspberry Pi callback/headroom
+measurements may establish how many machines per voice and whether four
+simultaneous notes are actually safe.
 
 ## Design and workflow state
 
@@ -547,13 +598,14 @@ versions of one basic source. Do not revive them through parameter tweaks,
 additional output processing, or batches of related saw/sine variants.
 
 Design a disposable offline listening gate with one bounded representative
-from each of the four approved families in “Next experimental phase:
-four-family listening gate”: nonlinear PM/complex oscillator, excited
-comb/resonant source, psychoacoustic micro-delay spatial-motion source, and
-spectral traversal. Research all four first and state a distinct perceptual
-hypothesis for each. Keep the prototypes isolated from the production Engine
-until the user has listened; do not implement four permanent architectures at
-once or clone a legendary synth.
+from each of the five approved families in “Next experimental phase:
+five-family listening gate”: nonlinear PM/complex oscillator, excited
+comb/resonant source, psychoacoustic micro-delay spatial-motion source,
+spectral traversal, and a small-register integer machine/oscillator swarm.
+Research all five first and state a distinct perceptual hypothesis for each.
+Keep the prototypes isolated from the production Engine until the user has
+listened; do not implement five permanent architectures at once or clone a
+legendary synth.
 
 Keep the DSP scalar, deterministic, finite, smoothed, and allocation-free.
 Use test-first development for every render path. Measure alias/error where
@@ -564,6 +616,12 @@ also measure mono fold-down, inter-channel correlation, side-to-mid energy,
 delay/modulation bounds, and discontinuity-free delay movement. Generate
 clearly named, loudness-matched low/middle/high-note listening artifacts and
 leave all musical usefulness and spatial-effect acceptance to the user.
+
+For the integer-machine candidate, define register widths and every overflow,
+shift, rotate, and conversion rule explicitly. Test finite/bounded output,
+repeat periods and accidental lockups, pitch relationships, DC, aliasing,
+determinism, allocation, and cost. Start in portable scalar Rust. Do not add
+assembly, SIMD, or architecture gates until measurement proves a need.
 
 Several comb lengths, modulation rates, delay offsets, wet levels, or stereo
 widths do not count as separate listening variations. The comb network must
@@ -586,7 +644,7 @@ to preserve a specific result.
 
 ## Next action
 
-Reset into the continuation prompt above, research the four approved source
+Reset into the continuation prompt above, research the five approved source
 families, and build the smallest disposable monophonic comparison that gives
 the user one honest representative of each. Stop for human listening before
 selecting a family, integrating it into `Engine`, or assigning stable macros.
