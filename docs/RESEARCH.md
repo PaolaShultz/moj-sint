@@ -627,11 +627,19 @@ Two fresh release-mode generations produced byte-identical WAVs and reports
 apart from the explicitly volatile workstation timing file. The SHA-256 of the
 sorted per-file hash manifest is
 `820f8a46f5fa8bcf39c9884b5b986196809b4cccfb7f3b328e4e67916798f572`.
-The ignored batch is under `artifacts/five-family-listening-gate/`; it is
-disposable after the user's verdict. No result is preserved elsewhere, no
-family or macro is accepted as useful, and no Raspberry Pi, callback, latency,
-polyphony, headphone, speaker, mono-listening, or sound-quality claim follows
-from this workstation evidence.
+The user's first listening verdict is cautiously directional rather than a
+family selection: the work feels far from the intended instrument, but it is
+finally moving along the right path and is worth continuing. No candidate was
+accepted, rejected, ranked, integrated, or assigned a macro. The next session
+will continue exploring genuinely different fundamentals under the user's
+guidance rather than narrowing prematurely around these five representatives.
+
+The ignored batch was deleted after that verdict, as required by the disposable
+experiment policy; the generator, tests, durable measurements, and negative
+integer sample-rate result remain reproducible. No result is preserved
+elsewhere, and no Raspberry Pi, callback, latency, polyphony, headphone,
+speaker, mono-listening, or sound-quality claim follows from this workstation
+evidence.
 
 ## Real-time I/O and platform
 

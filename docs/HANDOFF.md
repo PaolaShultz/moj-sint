@@ -122,9 +122,10 @@ At this checkpoint:
 - The live JACK/ALSA host is not implemented and no audio service or hardware
   was touched.
 - The approved five-family comparison is implemented as isolated disposable
-  offline research code. Its 15-file batch is under ignored
-  `artifacts/five-family-listening-gate/` and now awaits human listening; no
-  family is selected and none is routed into `Engine` or stable macros.
+  offline research code. The user found the direction promising but still far
+  from the intended instrument; no family is selected and none is routed into
+  `Engine` or stable macros. The reviewed 15-file batch was deleted under the
+  experimental-output policy.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -862,8 +863,12 @@ Completed on 2026-07-23 and left open for human listening:
   AArch64 compile check, and `git diff --check`. `cargo deny` retains only the
   accepted `winnow` 0.7/1.0 duplicate warning inside `toml`.
 
-The user must now listen before any family is selected, integrated, expanded,
-or mapped to a stable control. The spatial candidate has not been accepted on
-headphones, speakers, or mono; automated metrics cannot make that decision.
-After the verdict, record accepted/rejected conclusions and delete the ignored
-batch unless the user explicitly asks to preserve one exact result.
+The user's first listening verdict is that Moj Sint remains far from the goal,
+but these fundamentally different sources finally point in the right direction.
+This is not acceptance, rejection, or ranking of any family. Do not select,
+integrate, expand, or map one based on this pass. The next session should keep
+exploring different fundamentals under the user's guidance rather than
+prematurely converging on these five representatives. The spatial candidate
+has not been accepted on headphones, speakers, or mono; automated metrics
+cannot make that decision. The reviewed ignored batch was deleted after the
+verdict, while the reproducible generator, tests, and durable evidence remain.
