@@ -57,14 +57,13 @@ At this checkpoint:
   PolyBLEP and integrated-wavetable candidates were measured, the integrated
   wavetable was selected by the recorded rule, and smoothed `SHAPE`/`COLOR`
   routes now drive the engine.
-- Twenty-seven deterministic listening WAVs cover MIDI notes 36/60/84 and all
-  low/mid/high `SHAPE`/`COLOR` combinations under
-  `artifacts/oscillator-milestone/`. Human musical-usefulness acceptance is
-  intentionally still open.
+- The oscillator listening matrix was rejected as insufficiently varied. All
+  generated milestone artifacts have been removed from the workspace; only
+  the documented measurements and disposable generators remain.
 - The rejected harmonic selector has been retired from the engine render path.
-  A per-voice parallel character layer now has automated evidence and a small
-  nine-file dry/moderate/strong listening gate under
-  `artifacts/parallel-character-milestone/`; its human verdict is open.
+  The subsequent per-voice parallel character layer also failed listening: it
+  presented the same weak source under similar treatments rather than distinct
+  sound identities. It is not an accepted factory sound or macro mapping.
 - The foundation engine can preallocate multiple voices, but this is not a
   final polyphony commitment. The next oscillator-system design and listening
   work is explicitly monophonic; native Raspberry Pi evidence gates later
@@ -549,8 +548,9 @@ Completed later on 2026-07-22:
 - routed `SHAPE` through the corrected morph and `COLOR` through a tracked
   harmonic-dark to direct-bright path, both with 10 ms smoothing and bounded
   level compensation;
-- generated 27 stereo 32-bit float WAVs at 48 kHz for notes 36/60/84 and the
-  complete low/mid/high `SHAPE`/`COLOR` matrix; listening-render peak spans
+- generated, measured, and later removed 27 stereo 32-bit float WAVs at 48 kHz
+  for notes 36/60/84 and the complete low/mid/high `SHAPE`/`COLOR` matrix;
+  listening-render peak spans
   0.132612 to 0.178935, RMS spans 0.046470 to 0.110782, and maximum absolute DC
   is 0.000082385; and
 - did not implement the live host, touch SHR-DAW/JACK/hardware, add SIMD, or
@@ -648,15 +648,16 @@ Completed later on 2026-07-22:
   0.079769-0.079980, maximum absolute DC is 0.000000196, and every condition
   retains the fitted fundamental;
 - recorded 12-partial distributions, deterministic hashes, alias/error rows,
-  intermodulation evidence, and volatile scalar workstation timing under
-  `artifacts/parallel-character-milestone/`; and
-- left the listening verdict open. Neither the graph nor its `EDGE`/`COUPLE`
-  mapping is an accepted factory sound until the user listens.
+  intermodulation evidence, and volatile scalar workstation timing; and
+- received a negative listening verdict: all conditions sounded like the same
+  basic tone with small treatments, so neither the graph nor its
+  `EDGE`/`COUPLE` mapping is an accepted factory sound.
 
-The listening files are ignored by Git but are generated in the artifact
-directory by `cargo run --release --bin oscillator-lab -- character
-artifacts/parallel-character-milestone`. Keep or regenerate them before asking
-the user to listen. The tracked manifests and README describe the exact gate.
+All generated oscillator, selector, and parallel-character milestone artifacts
+have been removed after review. Future evidence must be generated into a fresh
+temporary directory and removed after its decision is documented. The next
+experiment must improve the dry per-voice source and compare structurally
+different source families rather than adding more output processing.
 
 All cost evidence in this checkpoint comes from the scalar x86_64 workstation.
 It is not Raspberry Pi callback, latency, safe-polyphony, or sound-quality

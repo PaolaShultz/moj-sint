@@ -84,8 +84,8 @@ The recorded aggregate residual is -25.188 dB for PolyBLEP and -25.586 dB for
 the integrated wavetable. Worst cases are effectively tied at -18.325 dB; the
 predeclared 0.1 dB tie window therefore selects the lower aggregate integrated-
 wavetable result. This is engineering evidence for the current route, not a
-claim of perceptual superiority. Raw conditions and rows are in
-`artifacts/oscillator-milestone/oscillator-comparison.tsv`.
+claim of perceptual superiority. The generated raw table and listening corpus
+were removed after review; the durable measurements are retained here.
 
 The JASA author manuscript retains ASA redistribution/copyright terms, and the
 DAFx paper retains its publication rights. Moj Sint uses only the described
@@ -394,15 +394,15 @@ not establish that direct evaluation is generally preferable for nonlinear DSP.
 BLAMP was not implemented because the graph has no known fold/reset
 discontinuity to correct.
 
-The nine loudness-matched 48 kHz stereo listening files are `note036_dry.wav`,
-`note036_moderate.wav`, `note036_strong.wav`, and the corresponding note 60 and
-84 triplets under `artifacts/parallel-character-milestone/`. Active-window RMS
-is 0.079769-0.079980, peak is 0.139552-0.143008, maximum absolute DC is
-0.000000196, and every row retains the fitted fundamental. The manifest, 12-
-partial distribution, alias comparison, intermodulation table, and volatile
-workstation timing accompany the files. The user listening verdict remains
-open; automated checks do not accept `EDGE`, `COUPLE`, or the graph as a factory
-sound.
+The nine loudness-matched 48 kHz stereo listening files covered dry, moderate,
+and strong conditions at notes 36, 60, and 84. Active-window RMS was
+0.079769-0.079980, peak was 0.139552-0.143008, maximum absolute DC was
+0.000000196, and every row retained the fitted fundamental. The user rejected
+the complete gate: it sounded like one weak source under similar treatments,
+not meaningfully different sound identities. Automated success therefore does
+not accept `EDGE`, `COUPLE`, or the graph as factory behavior. All generated
+milestone artifacts, including tables and WAVs, were removed after review; the
+generator remains only for disposable temporary regression evidence.
 
 The independently implemented ADAA comparison uses the mathematics described
 by Stefan Bilbao, Fabián Esqueda, Julian D. Parker, and Vesa Välimäki,
