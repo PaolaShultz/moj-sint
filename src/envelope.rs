@@ -94,6 +94,12 @@ impl Adsr {
         self.stage = Stage::Attack;
     }
 
+    pub fn restart(&mut self) {
+        self.level = 0.0;
+        self.release_step = 0.0;
+        self.stage = Stage::Attack;
+    }
+
     pub fn note_off(&mut self) {
         if self.stage != Stage::Idle {
             self.release_step = self.level / (self.config.release_seconds * self.sample_rate);
