@@ -6,4 +6,5 @@ pub mod control;
 pub mod dsp;
 pub mod engine;
 pub mod envelope;
+pub mod offline;
 pub mod preset;
