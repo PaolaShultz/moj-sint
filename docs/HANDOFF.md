@@ -19,6 +19,12 @@ Raspberry Pi OS, and NVMe. Sources must also build and run on the current
 x86_64 Ubuntu development machine. Do not make performance, latency,
 polyphony, or sound-quality claims before measuring them on the actual Pi.
 
+Moj Sint is not permanently monophonic. Design and validate its sound engine
+monophonically first so oscillator topology, routing, macro behavior, and cost
+can be understood without voice-count multiplication. Expand the selected
+architecture to polyphony only after native Raspberry Pi callback/headroom
+measurements establish a safe voice budget.
+
 There is no UI in this repository. Control comes through MIDI and SHR-DAW.
 
 ## User working preferences and authorization
@@ -55,6 +61,10 @@ At this checkpoint:
   low/mid/high `SHAPE`/`COLOR` combinations under
   `artifacts/oscillator-milestone/`. Human musical-usefulness acceptance is
   intentionally still open.
+- The foundation engine can preallocate multiple voices, but this is not a
+  final polyphony commitment. The next oscillator-system design and listening
+  work is explicitly monophonic; native Raspberry Pi evidence gates later
+  polyphonic expansion.
 - User-local stable Rust 1.97.1, Cargo, rustfmt, Clippy, cargo-audit, and
   cargo-deny are installed.
 - The live JACK/ALSA host is not implemented and no audio service or hardware
@@ -305,6 +315,29 @@ several notes, velocities, held durations, and polyphonic phrases. The user is
 the final judge of whether the full physical travel is musically worthwhile
 and whether the stable label matches what is heard.
 
+## Voice-count strategy
+
+The musical architecture is **mono-first, poly-later**, not mono-only:
+
+- During oscillator research, routing experiments, macro mapping, and initial
+  listening, render exactly one active musical voice. This makes phase,
+  feedback, nonlinear gain, smoothing, and CPU cost attributable.
+- Do not use the existing `voices = 8` foundation preset as evidence that eight
+  complex voices are affordable. It only proves fixed preallocated voice
+  storage for the simple current engine.
+- Keep oscillator/DSP state structurally per-voice and keep the engine boundary
+  capable of fixed polyphony; do not introduce global singleton DSP state that
+  would make later expansion unsafe.
+- Before expanding, run native Raspberry Pi callback timing under representative
+  notes, macro motion, and worst-case topology. Establish a conservative budget
+  with headroom for JACK, MIDI/event transfer, and the rest of SHR-DAW.
+- Add voices incrementally and repeat allocation, deadline, determinism,
+  finiteness, level, and listening checks. Polyphony may also need per-voice
+  phase/seed policy, voice stealing, mix compensation, and reduced internal
+  topology; none is selected yet.
+- Do not promise a voice count until native evidence exists. Monophonic design
+  is a sequencing decision that protects sound research, not a product lock.
+
 ## Initial software direction
 
 Keep the first implementation bounded:
@@ -377,6 +410,14 @@ Potential skill gaps identified so far:
 - reproducible DSP benchmarking; and
 - listening-test and sound-design experiment protocols.
 
+The first broader oscillator-system survey is now recorded in
+`docs/RESEARCH.md` under “Distinctive oscillator systems and routing survey.”
+It covers Moog, Prophet-5, Buchla, DX7, Casio CZ, PPG, JP-8000, higher-order
+FM, nonlinear modeling cost, and coupled oscillators, then converts the user's
+intentionally speculative ideas into seven testable Moj Sint experiment
+families. Continue from that register rather than reducing the next phase to
+vintage emulation.
+
 ## Design and workflow state
 
 The architecture above was presented in chat and then revised at the user's
@@ -399,6 +440,8 @@ The settled high-level choices are:
 - pure/testable DSP core;
 - fourth distinct SHR-DAW engine;
 - 13 musically meaningful performance controls;
+- mono-first oscillator-system design with polyphony deferred until native Pi
+  cost/headroom evidence, without permanently locking the engine to mono;
 - Raspberry Pi 5 / 2 GB / 64-bit OS primary target; and
 - x86_64 Linux development compatibility.
 
@@ -411,40 +454,45 @@ context and should not be copied back into the new prompt:
 Continue Moj Sint in `/home/shome/p/moj-sint` from the current clean `main`.
 Record `git rev-parse --short HEAD` before changing files.
 
-Read docs/HANDOFF.md completely first and use it as the current integration,
-controller, environment, research, and workflow context. The development
-machine already has `libasound2-dev`; verify rather than reinstall it. Recheck
-the live PaolaShultz/shr-daw main branch only if an actively changing contract
-is directly relevant.
+Read `docs/HANDOFF.md` and `docs/RESEARCH.md` completely before planning or
+changing files. Treat the existing integration contract, 13 controls,
+bandlimited-oscillator evidence, and source/licensing register as settled
+context. Do not recheck SHR-DAW unless an actively changing host contract is
+directly relevant.
 
-Use the existing design, architecture, host contract, research register, and
-tests. Build the next smallest musical milestone test-first: implement a fair
-PolyBLEP discontinuity-corrected oscillator versus integrated-wavetable
-comparison, measure alias energy, peak/RMS, DC, determinism, finiteness, and
-render-path allocation behavior, then select the better fit from evidence.
-Route the selected oscillator meaningfully across most of `SHAPE` and `COLOR`
-travel with smoothing and safe level compensation. Generate clearly named WAV
-listening renders across several notes and macro positions for the user.
+This phase is mono-first sound research, not a permanent monophonic lock and
+not yet a polyphony milestone. Research and design the next smallest
+monophonic oscillator-system experiment from the seven families in
+`docs/RESEARCH.md`. Focus on connection order and controllable identity: good
+starting candidates are nonlinear modulator preprocessing with phase offset,
+a shared 0/120/240-degree harmonic-selection bank, and a bounded two- or
+three-node PM/AM/sync/feedback graph. Compare 2-3 approaches and select one
+small test-first milestone; do not implement all families at once or clone a
+legendary synth.
 
-Keep Moj Sint a fourth external SHR-DAW instrument with JACK stereo audio,
-ALSA Sequencer MIDI, and its own preset/control identities. Design around the
-13-control performance contract in the handoff, including measurable macro
-usefulness and later human listening acceptance.
+Keep the DSP scalar, deterministic, finite, smoothed, and allocation-free.
+Define the graph and macro intent before implementation. Use loudness-matched
+A/B renders and measure alias/error, harmonic distribution, peak/RMS/DC,
+pitch retention, useful macro travel, rapid movement, determinism, allocation,
+and workstation cost. Generate clearly named mono listening artifacts, and
+leave human musical-usefulness acceptance to the user.
 
-Do not implement the live host, modify SHR-DAW, start JACK, or connect hardware
-in this milestone. Preserve the allocation-free DSP boundary and strict preset
-identity. Do not claim Pi performance or musical usefulness without native and
-human evidence. Finish with fresh formatting, tests, Clippy, release-build,
-audit, AArch64 compile, deterministic-render evidence, documented measurements,
-and listening artifacts for the user to judge.
+Preserve per-voice state so later polyphony remains possible, but do not expand
+voice count or claim a safe count until the selected complex topology is
+benchmarked natively on the Raspberry Pi with callback/headroom evidence. Do
+not implement the live JACK/ALSA host, modify SHR-DAW, start JACK, connect
+hardware, add SIMD, copy third-party DSP/presets/samples, or claim Pi
+performance in this phase. Finish documentation and the repository verification
+matrix required by `AGENTS.md`.
 ```
 
 ## Next action
 
-Listen across the named oscillator artifact matrix. Do not call `SHAPE` or
-`COLOR` musically useful until that pass succeeds. Any requested adjustment
-should remain test-first and rerun the same comparison/listening evidence. Do
-not rediscover SHR-DAW's established JACK/ALSA/process contract.
+Reset into the continuation prompt above, then perform a focused design/research
+pass for one monophonic oscillator-system experiment. The existing
+`SHAPE`/`COLOR` listening gate remains open, so do not call those routes
+musically useful without user acceptance. Do not rediscover SHR-DAW's
+established JACK/ALSA/process contract.
 
 ## Executed foundation checkpoint
 

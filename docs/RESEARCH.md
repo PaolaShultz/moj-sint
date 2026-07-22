@@ -91,6 +91,186 @@ The JASA author manuscript retains ASA redistribution/copyright terms, and the
 DAFx paper retains its publication rights. Moj Sint uses only the described
 mathematics and citations.
 
+## Distinctive oscillator systems and routing survey
+
+This 2026-07-22 pass asks what actually distinguished several influential
+instruments and which ideas are useful for Moj Sint. “Legendary” is a cultural
+and musical judgment, not a measurable engineering category. The durable
+technical lesson is that identity usually came from a whole signal path,
+modulation topology, control law, or useful imperfection rather than from one
+isolated ideal oscillator.
+
+### Primary and authoritative sources
+
+- Moog Music, *Minimoog Model D Manual*, current official reissue manual.
+  [PDF](https://api.moogmusic.com/sites/default/files/2018-01/Minimoog_Model_D_Manual.pdf).
+  The documented path mixes three oscillators, noise, and external input before
+  the filter; high mixer/output settings and feedback can overload that path.
+  This supports treating oscillator beating, mixer saturation, ladder behavior,
+  and feedback as a system rather than attributing the sound to a raw saw wave.
+  The manufacturer manual is copyrighted; use facts and independently developed
+  DSP, not copied prose, figures, circuits, or presets.
+- Sequential, *Prophet-5 User's Guide*, version 1.3, 2021.
+  [PDF](https://sequential.com/wp-content/uploads/2021/02/Prophet-5-Users-Guide-1.3.pdf).
+  Its Poly-Mod sources are the filter envelope and Oscillator B; destinations
+  are Oscillator A frequency, Oscillator A pulse width, and filter cutoff. The
+  manual explicitly connects this topology to many original classic sounds and
+  notes that the modulator waveshape changes the modulation character. This is
+  strong evidence for routing order and source shape as first-class timbre.
+- Buchla, *259e Twisted Waveform Generator* documentation.
+  [Official documentation](https://buchlausa.github.io/buchla_doc/docs/200e/259e-md).
+  It pairs principal and modulation oscillators and routes the latter to pitch,
+  wavetable morph, or warp. The principal oscillator's sine drives selectable
+  wavetables whose morph and drive level become timbre controls. For the older
+  analog 259 wavefolder, Esqueda, Pöntynen, Välimäki, and Parker's DAFx-17 model
+  remains the technical reference already registered above; the publication is
+  CC BY and reports five parallel folding stages plus a direct path and an
+  antialiasing treatment using BLAMP with eight-times oversampling.
+- Yamaha, *DX7 Operating Manual*, official scanned edition.
+  [PDF](https://usa.yamaha.com/files/download/other_assets/9/333979/DX7E1.pdf).
+  Read alongside John Chowning's 1973 paper registered above. The important
+  design lesson is not “six expensive oscillators”: simple operators become a
+  broad instrument through frequency ratios, level envelopes, 32 connection
+  algorithms, multiple carriers, and feedback. Moj Sint should investigate
+  smaller purpose-designed graphs before assuming a six-operator clone.
+- Masanori Ishibashi / Casio Computer Co., US patent 4,658,691, *Electronic
+  musical instrument*, priority 1982, published 1987.
+  [Patent record](https://patents.google.com/patent/US4658691).
+  It describes changing the rate of a waveform-memory address within each cycle
+  so a timbre control changes the spectrum. This phase/address-warp principle is
+  computationally attractive, but abrupt phase-law corners alias and require
+  the same measurement discipline as hard sync and other discontinuities. The
+  patent has ceased according to the record; patent text/figures still are not
+  project prose or assets.
+- Wolfgang Palm, first-person PPG development account, “Wavecomputer.”
+  [Author account](https://palm.seib.info/story/c7.html).
+  Palm describes placing analyzed/synthesized spectra at wavetable positions
+  and playing them with a digital oscillator; the resulting spectral traversal
+  produced the characteristic bright “jingle” rather than an analog filter
+  imitation. This supports motion through related spectra as an oscillator
+  design, not merely a large static waveform menu.
+- Roland, *JP-8000* official product document.
+  [PDF](https://cdn.roland.com/assets/media/pdf/JP-8000.pdf). It describes the
+  Super Saw as seven simultaneous saws with DETUNE and MIX controls, alongside
+  Triangle Mod, Feedback Oscillator, sync, ring modulation, and cross
+  modulation. Adam Szabo, *How to Emulate the Super Saw*, KTH Royal Institute
+  of Technology bachelor's thesis, 2010,
+  [PDF](https://www.adamszabo.com/internet/adam_szabo_how_to_emulate_the_super_saw.pdf),
+  measured phase, detune, mix, high-pass, and aliasing details. The thesis is a
+  reverse-engineering source, not permission to copy code, samples, prose, or
+  exact proprietary presets.
+- Victor Lazzarini and Joseph Timoney, “Higher-Order Frequency Modulation
+  Synthesis,” 2023. [Preprint](https://arxiv.org/abs/2305.07909). It develops
+  higher-order direct-FM arrangements through an equivalent PM formulation and
+  treats feedback FM. The equations may guide an independent implementation;
+  do not copy the accompanying reference source without separate license review.
+- David Morrison DeFilippo, *Coupled Oscillator Systems*, UC San Diego doctoral
+  dissertation, 2023.
+  [Repository record and PDF](https://escholarship.org/uc/item/6bc2r6n5).
+  It studies seven velocity-coupled systems containing three to nine
+  oscillators and analyzes their nonlinear/nonstationary behavior. It supports
+  coupled networks as a real synthesis family, while also showing that topology
+  needs analysis rather than arbitrary connection for its own sake.
+- Antti Huovilainen, “Non-Linear Digital Implementation of the Moog Ladder
+  Filter,” DAFx-04, 2004.
+  [Paper](https://dafx.de/paper-archive/2004/P_061.PDF). It derives a real-time
+  cascade of nonlinear first-order sections from circuit equations. This is a
+  useful procedural-model cost reference: component-inspired behavior can be
+  practical, but nonlinear stages, tuning correction, feedback, and
+  oversampling are materially more expensive than one table lookup.
+
+### What “good” and “bad” sound mean here
+
+No scalar metric establishes good sound. For Moj Sint, automated evidence must
+instead reject unintended failure and describe intentional character:
+
+- retain a stable perceived pitch or document when a topology deliberately
+  gives it up;
+- produce useful spectral motion over most macro travel rather than a tiny
+  sweet spot surrounded by sameness or noise;
+- control DC, peak, RMS, low-note energy, high-note spectral collapse, and
+  discontinuities under static settings and rapid movement;
+- distinguish intended inharmonicity, beating, roughness, aliasing, or chaos
+  from accidental numerical instability and sample-rate-dependent garbage;
+- preserve deterministic replay unless seeded variation is explicitly part of
+  the preset; and
+- pass human listening across notes, velocities, durations, phrases, and mix
+  contexts. Measurements can reject defects and compare changes, but cannot
+  declare an oscillator musical.
+
+Historically characteristic artifacts must not be removed automatically. For
+example, a measured legacy ensemble may include aliasing or unusual filtering
+that listeners associate with its identity. Moj Sint may retain a controlled
+artifact only after A/B renders show that it is intentional, bounded, and more
+valuable than the cleaner alternative. “Analog drift,” “warmth,” and “fatness”
+are not specifications until converted into reproducible behaviors.
+
+### Cost classes before Raspberry Pi measurement
+
+These are relative algorithmic expectations, not Raspberry Pi performance or
+polyphony claims:
+
+| Family | Expected scalar cost | Main risk |
+| --- | --- | --- |
+| Table/BLEP/DPW oscillator | Low, bounded work per sample | Limited topology or residual aliasing |
+| Phase distortion or 2–3 PM operators | Low to moderate, roughly per operator/edge | Wide sidebands, DC/pitch errors, aliasing |
+| Shared-phase 3-tap bank | Low if taps share phase/table state | Linear cancellation can make controls inert |
+| Independently detuned ensemble | Roughly proportional to oscillator count | CPU/state multiplication and level growth |
+| Wavefold/drive/ring/nonlinear modulation | Moderate before antialiasing, potentially high after it | Frequency expansion often needs ADAA/BLAMP or oversampling |
+| Circuit-inspired nonlinear feedback | Moderate to high and topology-dependent | Solver/oversampling cost and stability |
+| Coupled ODE/chaotic network | Highest uncertainty; scales with nodes, edges, and integration substeps | Instability, pitch loss, sample-rate dependence |
+| Additive/resynthesis | Proportional to active partial count | Low-note cost and macro preparation |
+
+The next monophonic experiments should measure workstation instruction/time
+cost only as development evidence. Real Raspberry Pi callback timing and
+headroom decide whether and how the chosen architecture expands to polyphony.
+
+### Moj Sint experiment families
+
+The user's intentionally speculative routing examples are valid research
+directions when expressed as controlled graphs:
+
+1. **Nonlinear modulator preprocessing.** Compare
+   `modulator -> phase offset -> drive/fold -> DC block -> PM carrier` against
+   `modulator -> drive/fold -> fractional delay/all-pass -> DC block -> PM
+   carrier`. Offsetting oscillator phase and phase-shifting an already
+   nonlinear rich waveform are different operations; nonlinearity and phase
+   manipulation generally do not commute. Sweep drive, offset/delay, ratio,
+   and index while matching RMS.
+2. **Three-phase harmonic selector.** Derive 0°, 120°, and 240° taps from one
+   pitch-locked phase source, optionally inject low harmonics into individual
+   taps, apply different bounded nonlinearities, then weight and sum them.
+   Equal linear taps cancel the fundamental and all harmonics not divisible by
+   three; asymmetry, tap-specific processing, and macro-controlled weights turn
+   that cancellation into a predictable spectral tool. This is cheaper and
+   more coherent than assuming three independent VCOs, while independent drift
+   remains a later variant.
+3. **Small directed operator graph.** Use two or three pitch-related nodes with
+   PM/FM, AM/ring, sync, or feedback edges. Compare edge ordering explicitly:
+   source shaping before modulation, destination shaping after modulation, and
+   one bounded feedback edge. Prefer PM semantics for nested graphs unless a
+   direct-FM formulation proves pitch-stable.
+4. **Complex-oscillator path.** Principal oscillator plus modulation oscillator,
+   with separate modulation of pitch and nonlinear timbre. Compare parallel
+   dry/folded paths against serial folding; do not start with a component-exact
+   Buchla clone.
+5. **Spectral traversal.** Interpolate through a small authored family of
+   related spectra or phase laws, PPG/Casio-inspired but Moj Sint-owned. Test
+   whether `EVOLVE` or `SHAPE` can traverse a coherent identity without turning
+   into an arbitrary waveform browser.
+6. **Controlled ensemble.** Compare shared-phase offsets, deterministic detune,
+   seeded phase variation, and a small three-voice cluster before any seven-
+   oscillator design. Measure whether thickness comes from beating, phase,
+   mix law, or filtering rather than merely adding oscillators.
+7. **Coupled nonlinear trio.** Only after the bounded graphs above, prototype a
+   three-node velocity- or phase-coupled system with explicit energy limiting.
+   Map stable, quasi-periodic, and unstable regions before exposing a macro.
+
+Every family needs the same baseline, loudness-matched A/B renders, alias/error
+and harmonic measurements, DC/peak/RMS/finiteness/determinism checks, rapid
+parameter sweeps, render-path allocation tests, and a cost report. Reject a
+graph that is merely complicated but not controllably different.
+
 ## Real-time I/O and platform
 
 - JACK project, [API overview](https://jackaudio.org/api/) and
