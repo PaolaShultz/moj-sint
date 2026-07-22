@@ -2,6 +2,7 @@
 
 pub const ENGINE_NAME: &str = "Moj Sint";
 
+pub mod analysis;
 pub mod control;
 pub mod dsp;
 pub mod engine;
