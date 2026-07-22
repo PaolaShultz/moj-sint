@@ -3,7 +3,8 @@ use moj_sint::analysis::{
 };
 use moj_sint::control::Normalized;
 use moj_sint::dsp::harmonic_selector::ThreePhaseBank;
-use moj_sint::dsp::oscillator::OscillatorMethod;
+use moj_sint::dsp::oscillator::{BandlimitedOscillator, OscillatorMethod};
+use moj_sint::engine::ENGINE_OSCILLATOR_METHOD;
 use moj_sint::offline::{RenderSpec, render_note};
 use moj_sint::preset::Preset;
 use std::fs::{self, File};
@@ -86,7 +87,16 @@ fn render_harmonic_selector_evidence(
                     velocity: 0.8,
                     seconds: 1.25,
                 };
-                let mut samples = render_note(&preset, spec)?;
+                let mut samples = render_legacy_harmonic_selector(
+                    spec.sample_rate,
+                    note,
+                    spec.velocity,
+                    spec.seconds,
+                    preset.macros.shape.get(),
+                    preset.macros.color.get(),
+                    edge,
+                    couple,
+                )?;
                 loudness_match(&mut samples, spec.sample_rate, 0.08);
                 let filename = format!(
                     "note{note:03}_edge{:03}_couple{:03}.wav",
@@ -122,6 +132,49 @@ fn render_harmonic_selector_evidence(
     write_alias_matrix(&output_directory.join("alias-matrix.tsv"))?;
     write_workstation_cost(&output_directory.join("workstation-cost.txt"))?;
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_legacy_harmonic_selector(
+    sample_rate: u32,
+    note: u8,
+    velocity: f32,
+    seconds: f32,
+    shape: f32,
+    color: f32,
+    edge: f32,
+    couple: f32,
+) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+    let sample_rate_f32 = sample_rate as f32;
+    let frame_count = (seconds * sample_rate_f32).round() as usize;
+    let frequency = midi_frequency(note);
+    let mut oscillator = BandlimitedOscillator::new(sample_rate_f32, ENGINE_OSCILLATOR_METHOD)?;
+    oscillator.set_frequency(frequency);
+    let mut selector = ThreePhaseBank::new(sample_rate_f32)?;
+    selector.set_frequency(frequency);
+    let mut color_lowpass = 0.0_f32;
+    let mut samples = Vec::with_capacity(2 * frame_count);
+    let fade_frames = (sample_rate / 100).max(1) as usize;
+    for frame in 0..frame_count {
+        let oscillator_sample = oscillator.sample(shape);
+        let color_coefficient =
+            (oscillator.phase_increment() * (8.0 + 120.0 * color * color)).clamp(0.001, 0.75);
+        color_lowpass += color_coefficient * (oscillator_sample - color_lowpass);
+        let colored = color_lowpass + color * (oscillator_sample - color_lowpass);
+        let harmonic = selector.sample();
+        let selected = harmonic.fundamental + edge * (harmonic.third - harmonic.fundamental);
+        let coupled = colored + couple * (selected - colored);
+        let compensation = (1.0 + 4.0 * shape * (1.0 - shape))
+            * (1.15 - 0.15 * color)
+            * (1.0 + 0.4 * couple * (1.0 - couple))
+            * (1.0 + 0.2 * couple * edge * (1.0 - edge));
+        let fade_in = (frame as f32 / fade_frames as f32).min(1.0);
+        let fade_out = ((frame_count - frame) as f32 / fade_frames as f32).min(1.0);
+        let sample = coupled * compensation * velocity * 0.2 * fade_in * fade_out;
+        samples.push(sample);
+        samples.push(sample);
+    }
+    Ok(samples)
 }
 
 fn write_alias_matrix(path: &Path) -> Result<(), Box<dyn std::error::Error>> {

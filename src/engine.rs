@@ -1,7 +1,7 @@
 use crate::control::{MacroId, Normalized, Smoother};
 use crate::dsp::{
+    character::{CharacterLayer, CharacterMethod},
     finite_or_zero,
-    harmonic_selector::ThreePhaseBank,
     oscillator::{BandlimitedOscillator, OscillatorMethod},
 };
 use crate::envelope::{Adsr, AdsrConfig};
@@ -9,6 +9,7 @@ use crate::preset::{MacroValues, Preset};
 use thiserror::Error;
 
 pub const ENGINE_OSCILLATOR_METHOD: OscillatorMethod = OscillatorMethod::IntegratedWavetable;
+pub const ENGINE_CHARACTER_METHOD: CharacterMethod = CharacterMethod::Adaa1;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Event {
@@ -50,7 +51,7 @@ struct Voice {
     velocity: f32,
     age: u64,
     oscillator: BandlimitedOscillator,
-    harmonic_selector: ThreePhaseBank,
+    character: CharacterLayer,
     envelope: Adsr,
     shape: Smoother,
     color: Smoother,
@@ -67,8 +68,8 @@ impl Voice {
     ) -> Result<Self, EngineError> {
         let oscillator = BandlimitedOscillator::new(sample_rate, ENGINE_OSCILLATOR_METHOD)
             .map_err(|_| EngineError::InvalidSampleRate)?;
-        let harmonic_selector =
-            ThreePhaseBank::new(sample_rate).map_err(|_| EngineError::InvalidSampleRate)?;
+        let character = CharacterLayer::new(sample_rate, ENGINE_CHARACTER_METHOD)
+            .map_err(|_| EngineError::InvalidSampleRate)?;
         let envelope =
             Adsr::new(sample_rate, envelope).map_err(|_| EngineError::InvalidSampleRate)?;
         let shape = Smoother::new(macros.shape.get(), sample_rate, 0.01)
@@ -84,7 +85,7 @@ impl Voice {
             velocity: 0.0,
             age: 0,
             oscillator,
-            harmonic_selector,
+            character,
             envelope,
             shape,
             color,
@@ -105,7 +106,7 @@ impl Voice {
         self.oscillator.reset();
         let frequency = 440.0 * 2.0_f32.powf((f32::from(note) - 69.0) / 12.0);
         self.oscillator.set_frequency(frequency);
-        self.harmonic_selector.set_frequency(frequency);
+        self.character.reset();
         self.color_lowpass = 0.0;
         self.envelope.restart();
     }
@@ -123,18 +124,13 @@ impl Voice {
             (self.oscillator.phase_increment() * (8.0 + 120.0 * color * color)).clamp(0.001, 0.75);
         self.color_lowpass += color_coefficient * (oscillator_sample - self.color_lowpass);
         let colored = self.color_lowpass + color * (oscillator_sample - self.color_lowpass);
-        let harmonic = self.harmonic_selector.sample();
-        let selected = harmonic.fundamental + edge * (harmonic.third - harmonic.fundamental);
-        let coupled = colored + couple * (selected - colored);
+        let characterized = self.character.sample(colored, edge, couple);
         let shape_compensation = 1.0 + 4.0 * shape * (1.0 - shape);
         let color_compensation = 1.15 - 0.15 * color;
-        let selector_compensation =
-            (1.0 + 0.4 * couple * (1.0 - couple)) * (1.0 + 0.2 * couple * edge * (1.0 - edge));
         finite_or_zero(
-            coupled
+            characterized
                 * shape_compensation
                 * color_compensation
-                * selector_compensation
                 * self.envelope.advance()
                 * self.velocity,
         )
@@ -375,6 +371,7 @@ mod tests {
     fn shape_and_color_change_output_across_most_of_their_travel() {
         fn render_macro(id: MacroId, value: f32) -> Vec<f32> {
             let mut preset = preset(1);
+            preset.macros.couple = Normalized::new(0.0).unwrap();
             match id {
                 MacroId::Shape => preset.macros.shape = Normalized::new(value).unwrap(),
                 MacroId::Color => preset.macros.color = Normalized::new(value).unwrap(),
@@ -474,6 +471,32 @@ mod tests {
     }
 
     #[test]
+    fn character_layer_is_per_voice_and_zero_couple_is_edge_independent() {
+        fn render(edge: f32) -> Vec<f32> {
+            let mut preset = preset(1);
+            preset.macros.edge = Normalized::new(edge).unwrap();
+            preset.macros.couple = Normalized::new(0.0).unwrap();
+            let mut engine = Engine::new(48_000.0, &preset).unwrap();
+            let _per_voice_state = &engine.voices[0].character;
+            let events = [TimedEvent::new(
+                0,
+                Event::NoteOn {
+                    note: 60,
+                    velocity: 1.0,
+                },
+            )];
+            let mut left = vec![0.0; 4_096];
+            let mut right = vec![0.0; 4_096];
+            engine.render_block(&events, &mut left, &mut right).unwrap();
+            left
+        }
+
+        let baseline = render(0.0);
+        assert_eq!(baseline, render(0.5));
+        assert_eq!(baseline, render(1.0));
+    }
+
+    #[test]
     fn timed_macro_changes_are_smoothed() {
         let mut preset = preset(1);
         preset.macros.shape = Normalized::new(0.0).unwrap();
@@ -519,7 +542,7 @@ mod tests {
     }
 
     #[test]
-    fn timed_harmonic_selector_changes_are_smoothed() {
+    fn timed_character_layer_changes_are_smoothed() {
         let mut preset = preset(1);
         preset.macros.edge = Normalized::new(0.0).unwrap();
         preset.macros.couple = Normalized::new(0.0).unwrap();

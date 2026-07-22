@@ -59,7 +59,7 @@ impl CharacterLayer {
             branch = *state;
         }
 
-        let drive = 1.0 + 7.0 * edge * edge;
+        let drive = 1.0 + 3.0 * edge;
         let driven = drive * branch;
         let generated = match self.method {
             CharacterMethod::Direct => soft_clip(driven) / drive - branch,
@@ -86,7 +86,8 @@ impl CharacterLayer {
 
         self.dc_output = generated - self.previous_generated + self.dc_coefficient * self.dc_output;
         self.previous_generated = generated;
-        let output = dry + 0.35 * couple * self.dc_output;
+        let intensity = 1.0 - (1.0 - edge) * (1.0 - edge) * (1.0 - edge);
+        let output = dry + 1.3 * couple * intensity * self.dc_output;
         if output.is_finite() { output } else { 0.0 }
     }
 
