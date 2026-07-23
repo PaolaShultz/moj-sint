@@ -5,6 +5,12 @@ Equations and described topologies may guide an independent implementation;
 third-party source code, presets, and samples must not be copied without a
 separate license review.
 
+## 2026-07-23 visceral bass design research
+
+The perception, nonlinear/resonant engineering, chord, stereo, evidence, and
+safe-listening research for the three planned complete hybrid voices is in
+[`BASS_IMPACT_RESEARCH.md`](BASS_IMPACT_RESEARCH.md).
+
 ## Oscillators and nonlinear DSP
 
 - Vesa Välimäki, Jussi Pekonen, and Juhan Nam, “Perceptually Informed
