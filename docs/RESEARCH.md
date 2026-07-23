@@ -24,6 +24,91 @@ pairwise exchange whose isolated difference products have 31.281 dB margin
 below the weakest chord target. This is engineering acceptance only, not a
 musical verdict.
 
+### 2026-07-23 compact one-to-three-mechanism power experiment
+
+The successor experiment does not repeat the completed twelve-player
+reconstruction study. It preserves that code and its raw 48 kHz hashes only as
+regression evidence, then replaces the disposable listening presentation with
+ten hardwired machines that each use one, two, or three simultaneous source
+mechanisms.
+
+The retained mechanism vocabulary is independently authored from existing
+project primitives: table oscillator, bounded nonlinear phase interaction,
+authored spectral bank, fixed-width register rotor, deterministic noise
+transient, damped two-pole resonant body, and excited feedback comb. No
+third-party source, tables, presets, samples, prose, or figures were copied.
+The existing primary-source register for phase modulation, spectral traversal,
+fixed-width machines, resonators, and feedback delays remains the provenance
+boundary.
+
+Every topology declares fixed source gains, stereo widths, envelope/pitch-drop
+values, drive method and amount, 12 Hz pre/post-drive DC control, output gain,
+and a 0.999 written-sample ceiling. These constants are reused across D1/D2/D3
+and low/middle/high tone positions. There is no per-file normalization,
+analysis-dependent limiter, or emergency make-up gain. Cubic and rational
+saturation and hard clipping are intentional source/output topology.
+
+The hot delayed reference measures active RMS 0.120000 and a deterministic
+short-term perceptual proxy of -19.535 dB. The six sustained or musical
+compact machines are 12.748-17.892 dB above that proxy and 16.260-17.378 dB
+above its RMS. Event files range from +2.987 dB RMS/+6.919 dB proxy for the
+struck comb to +16.465/+12.992 dB for the resonant thump. This establishes a
+digital loudness floor only. The proxy is a high-pass/high-frequency-weighted
+measurement, not calibrated LUFS or acoustic SPL.
+
+Tone sweeps reuse one gain policy and report only 0.026-0.502 dB RMS span and
+0.027-0.462 dB perceptual-proxy span. D1/D2/D3 rows remain finite and bounded.
+Context Relay now transposes its complete eight-event score around the
+requested base note; an earlier report revision incorrectly reused the
+absolute D2-centered score for every pitch row and was rejected.
+
+All bass-bearing files lose at most 0.001 dB on mono fold in the primary rows;
+the widest struck file loses 0.048 dB. No measured projected fundamental loses
+level in the fold because stereo differences use bounded amplitude matrices,
+not opposing low-frequency phase. This does not establish headphone/speaker
+translation.
+
+The conservative 4x high-rate residuals are:
+
+- Deep Rotor -13.884 dB;
+- Phase Forge -36.362 dB;
+- Evolving Lattice -11.129 dB;
+- Pedal Monolith -3.292 dB;
+- D2 Braid -42.181 dB;
+- Clipped Thump -42.262 dB;
+- Resonant Thump -2.262 dB;
+- Synthetic Kick -5.694 dB;
+- Struck Comb -0.004 dB; and
+- Context Relay -11.923 dB.
+
+These include amplitude, phase, nonlinear, event, and state-rate differences.
+Struck Comb is especially sample-rate dependent and is not alias-clean.
+Pedal Monolith, Resonant Thump, and Synthetic Kick also retain severe
+residuals. They remain listening hypotheses, not accepted oscillators.
+
+Engineering iteration removed the Clipped Thump noise layer after its absence
+measured -28.9 dB full and -27.4 dB onset difference. Deep Rotor and Evolving
+Lattice register gains were strengthened from 0.34/0.31 to 0.44/0.42. Pedal
+Monolith's resonator/register gains moved from 0.38/0.27 to 0.72/0.46 while
+drive fell from 4.4 to 3.6. Synthetic Kick noise moved through
+0.34/0.68/1.10 to 1.35 after quick/release ablations remained weak. Context
+Relay's register moved from 0.27 to 0.62. The final mute differences span
+-22.588 to +0.395 dB; sparse transient layers additionally pass the onset
+ablation.
+
+Report review also rejected output without final DC control: Evolving Lattice
+and Context Relay initially measured DC +0.083/+0.036. Pre-drive-only and
+ordinary post-filter revisions still left Deep Rotor around -0.027 to -0.015.
+The retained 12 Hz pre-drive blocker plus post-drive emitted-sample DC servo
+brings primary absolute DC below 4.1e-7 without normalizing or weakening the
+declared drive.
+
+Release generation produces 73.11 seconds of WAV audio in 4.612 seconds on
+this workstation: 15.852 audio seconds per generation second, or about
+0.126 seconds for an equivalent two-second WAV. This is offline x86_64
+evidence only, not Raspberry Pi, callback, latency, polyphony, or memory
+evidence.
+
 ### 2026-07-23 level, octave, bass, and punch correction
 
 The first composite batch was not a fair listening comparison. Whole-file

@@ -385,3 +385,125 @@ accidental identity at controlled level; whether its D1 behavior is musically
 usable on headphones, speakers, and mono; and whether the single retained
 envelope produces desirable punch. No topology, octave behavior, or ADSR has
 been musically accepted.
+
+## 2026-07-23 compact composite power experiment
+
+### Correction and scope
+
+The previous 54-WAV hot batch remained valuable engineering evidence but was
+not the requested reduction: its successor candidates still contained three
+or four complete hybrid layers and the references contained twelve. It also
+forbade clipping and retained a 0.75 ceiling. The new isolated
+`compact_composite` boundary preserves both reconstruction hashes and replaces
+only the disposable listening presentation.
+
+Ten primary experiments now use at most three simultaneous mechanisms:
+
+| File / experiment | Role | Mechanisms | Fixed source gains | Drive and output |
+| --- | --- | --- | --- | --- |
+| `02` Deep Rotor | sustained D1 | table sub + register rotor | 0.94, 0.44 | rational 3.4, output 0.92 |
+| `03` Phase Forge | playable D3 | nonlinear phase interaction | 1.00 | cubic 2.9, output 0.96 |
+| `04` Evolving Lattice | evolving D2 | spectral bank + register rotor | 0.82, 0.42 | rational 3.7, output 0.90 |
+| `05` Pedal Monolith | D1 pedal | table sub + resonant body + register rotor | 0.82, 0.72, 0.46 | rational 3.6, output 0.92 |
+| `06` D2 Braid | D2 bass | nonlinear phase interaction + table sub | 0.72, 0.62 | cubic 3.2, output 0.96 |
+| `07` Clipped Thump | D1 thump | pitch-drop table oscillator | 1.00 | hard clip 8.0, output 1.00 |
+| `08` Resonant Thump | D1 thump | resonant body + table sub | 0.74, 0.72 | rational 6.0, output 0.94 |
+| `09` Synthetic Kick | D1 kick | pitch-drop table oscillator + noise + resonant body | 1.00, 1.35, 0.46 | hard clip 9.5, output 1.00 |
+| `10` Struck Comb | struck D3 | noise transient + excited comb | 0.42, 0.92 | cubic 4.2, output 0.94 |
+| `11` Context Relay | eight-event context | table sub + spectral bank + register rotor | 0.67, 0.62, 0.62 | rational 3.9, output 0.92 |
+
+Every row uses 12 Hz pre/post-drive DC control and a declared 0.999 written
+ceiling. Stereo widths and exact envelope/tone settings are in `settings.tsv`.
+No gain changes across pitch or tone, and no per-file normalization occurs.
+
+### Envelopes and event evidence
+
+Sustained machines use 12/180/0.86/220 ms ADSR with a 3700 ms gate. Evolving
+Lattice uses 18/240/0.88/300 ms and a 5650 ms gate. Context Relay uses
+4/90/0.72/180 ms per 760 ms event.
+
+The one-shot settings are:
+
+- Clipped Thump: 0.5/95/0.32/260 ms, 210 ms gate, 19-semitone drop over 95 ms;
+- Resonant Thump: 1.2/140/0.42/340 ms, 270 ms gate, 7-semitone drop over 130 ms;
+- Synthetic Kick: 0.25/72/0.18/290 ms, 160 ms gate, 28-semitone drop over 78 ms; and
+- Struck Comb: 0.4/120/0.28/1150 ms, 190 ms gate, no pitch drop.
+
+Their first 10/25/50/100/250 ms RMS values are respectively:
+
+- Clipped Thump: 0.900/0.907/0.907/0.885/0.839;
+- Resonant Thump: 0.892/0.904/0.874/0.866/0.825;
+- Synthetic Kick: 0.948/0.912/0.919/0.861/0.798; and
+- Struck Comb: 0.619/0.609/0.466/0.337/0.214.
+
+Declared pitch trajectories are 110.000 to 36.708 Hz, 55.000 to 36.708 Hz,
+184.997 to 36.708 Hz, and a stable 146.832 Hz. Measured -60 dB
+decay/tail times are 485/551, 631/689, 457/517, and 581/821 ms. Full-file
+clipped proportions are 8.015%, 6.231%, 4.854%, and 0%. Maximum sample jumps
+are 0.132, 1.444, 1.996, and 1.881. All return-to-zero values are zero at the
+reported precision; absolute DC is below 2.6e-8 for these files.
+
+### Loudness floor, control retention, mono, and ablation
+
+The hot delayed reference remains first and measures active RMS 0.120000 and
+perceptual proxy -19.535 dB. Primary active RMS spans 0.169-0.887; the
+struck event is +2.987 dB RMS/+6.919 dB proxy above the reference, while the
+other events and all sustained/musical rows are much hotter. Primary full-file
+clipping is deliberate: Deep Rotor 28.070%, Phase Forge 21.470%, Evolving
+Lattice 9.647%, Pedal Monolith 28.478%, D2 Braid 29.208%, Clipped Thump
+8.015%, Resonant Thump 6.231%, Synthetic Kick 4.854%, Struck Comb 0%, and
+Context Relay 27.806%.
+
+Minimum/median/maximum tone sweeps retain RMS within 0.026-0.502 dB and the
+perceptual proxy within 0.027-0.462 dB. D1/D2/D3 use one fixed gain policy.
+All bass-bearing primary mono folds lose at most 0.001 dB; the widest file,
+Struck Comb, loses 0.048 dB. Low side/mid is at most 0.0181 and no projected
+fundamental loses level after fold.
+
+Every final mechanism has a mute hash and active difference. Full differences
+span -22.588 to +0.395 dB. Pedal Monolith's resonant body is the quietest
+whole-file ablation but changes the first 250 ms by -10.764 dB. The final
+Clipped Thump has one mechanism because its prior noise transient was removed
+at -28.9 dB whole/-27.4 dB onset difference.
+
+### Rejections and limitations
+
+Other rejected/revised points:
+
+- weak register/resonator/noise gains were strengthened until mute evidence
+  passed; exact iteration values are in `RESEARCH.md`;
+- output without final DC control produced +0.083/+0.036 DC and was rejected;
+- absolute-note Context Relay pitch rows were rejected and replaced by a
+  score transposed around the requested D1/D2/D3 base;
+- sweep grids and near variants remain reports, never listening files; and
+- no limiter was added to make a weak design pass.
+
+The 4x conservative residual spans -42.181 to -0.004 dB. Struck Comb is the
+worst at -0.004 dB; Pedal Monolith (-3.292), Resonant Thump (-2.262), and
+Synthetic Kick (-5.694) are also severe. Hard clipping is intentional but
+does not make these paths alias-clean or sample-rate invariant. Fundamental
+projections for percussive material are window-sensitive and are not pitch
+perception measurements.
+
+### Final listening order and open questions
+
+Use `artifacts/composite-machine-lab/README.md`: hot delayed reference, files
+`02` through `11`, then the six `12_mono_*` diagnostics. The batch is
+intentionally hot; start with playback volume low. Digital level is not
+acoustic SPL.
+
+Human listening must answer:
+
+1. Which files are genuinely powerful rather than merely clipped or loud?
+2. Which one-, two-, or three-mechanism identities are distinguishable and
+   special?
+3. Does Evolving Lattice change tone without perceptual power loss?
+4. Which D1/D2 bodies retain pitch and weight on headphones, speakers, and
+   mono?
+5. Are either thump and the kick purpose-designed musical events, or only hot
+   engineering transients?
+6. Does Struck Comb's identity justify its severe sample-rate residual?
+7. Does Context Relay demonstrate useful combination behavior?
+
+No result is selected, preserved outside the disposable batch, routed into
+production, or claimed musically successful.

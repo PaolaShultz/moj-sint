@@ -139,6 +139,12 @@ At this checkpoint:
   structurally different successor graphs. Its corrected hot presentation now
   adds fixed-gain full-score, D1/D2/D3, D1-pedal, punch-envelope, mono, and raw
   sections. Engineering bounds pass, but the musical verdict is open.
+- The disposable composite presentation has now been replaced by a compact
+  power experiment: one hot delayed reference, ten primary one-to-three-
+  mechanism machines, and six bass-bearing mono diagnostics. Fixed gains,
+  intentional saturation/clipping, a 0.999 ceiling, tone/pitch retention,
+  event, ablation, mono, residual, hash, and generation-cost evidence pass the
+  automated gate. Human listening remains completely open.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -636,15 +642,14 @@ and native evidence.
 
 ## Next action
 
-Listen to `artifacts/composite-machine-lab/` in its README order:
-hot delayed-launch reference, hot synchronized counterfactual, five hot
-full-score candidates, each topology's D1/D2/D3 held files, D1 pedal versions,
-and one punch version per topology. Compare matching mono diagnostics only
-after the stereo identities, then use raw engineering files secondarily.
-Record which complete candidates retain the fused identity, whether D1/D2/D3
-behavior is musically stable, and whether the 3/110/0.55/180 ms source ADSR is
-actually punchy. Stop before selecting a production family, mapping controls,
-extracting the generic graph, or integrating `Engine`.
+Listen to `artifacts/composite-machine-lab/` in its README order: the hot
+delayed-launch orientation, ten compact primary experiments, then the six
+matching mono diagnostics. Start with playback volume low because the batch is
+intentionally hot. Record power versus mere clipping/loudness, identity,
+evolving-tone retention, D1/D2 weight, thump/kick usefulness, Struck Comb's
+value against its severe residual, and Context Relay's combination behavior.
+Stop before selecting a production family, mapping controls, extracting the
+generic graph, or integrating `Engine`.
 
 ## Executed foundation checkpoint
 
@@ -1014,3 +1019,41 @@ Fresh integrated verification:
 - two fresh final 48 kHz generations were byte-identical except volatile
   workstation timing, with aggregate deterministic SHA-256
   `a11fa10d04fb34b8dcbfb8c9268be0d40672133896faa245c245a4ab637c9754`.
+
+## Compact composite power checkpoint
+
+Implemented on 2026-07-23 and awaiting human listening:
+
+- preserved the old reconstruction code and exact 48 kHz raw hashes while
+  replacing only the ignored disposable listening batch;
+- added an isolated `compact_composite` module with ten hardwired machines,
+  each limited to one, two, or three simultaneous mechanisms;
+- covered sustained low, playable mid, evolving, D1 pedal, D2 bass, two
+  distinct thumps, synthetic kick, struck comb, and an eight-event musical
+  context;
+- declared every source gain, stereo width, envelope, pitch drop, drive,
+  saturation/clipping method, 12 Hz pre/post-drive DC control, output gain,
+  and 0.999 ceiling;
+- used one gain policy across all D1/D2/D3 and tone tests with no hidden
+  per-file normalization or analysis-dependent limiter;
+- removed one inaudible Clipped Thump noise layer and strengthened other weak
+  mechanisms until full/onset mute evidence passed;
+- corrected excessive DC and a false absolute-note Context Relay pitch report
+  during critical release review;
+- measured active/event RMS and perceptual proxy against the hot delayed
+  reference, low energy, crest, five event windows, pitch trajectories,
+  decay/tails, clipping proportions, jumps, return to zero, tone/pitch
+  retention, mono, ablations, residuals, and deterministic hashes;
+- retained severe conservative residuals honestly, especially Struck Comb
+  -0.004 dB, Resonant Thump -2.262 dB, Pedal Monolith -3.292 dB, and Synthetic
+  Kick -5.694 dB;
+- produced two byte-identical release batches excluding the volatile cost
+  file, with both reconstruction hashes unchanged; and
+- measured 73.11 seconds of written WAV audio in 4.612 seconds on this
+  workstation, a 15.852x audio-duration/generation ratio and 0.126 seconds per
+  equivalent two-second WAV.
+
+The final ignored batch is `artifacts/composite-machine-lab/`. It contains ten
+primary experiments, one reference, six mono diagnostics, and concise reports.
+It is intentionally hot; digital level is not acoustic SPL. Automated evidence
+does not claim that any sound is powerful, distinctive, special, or musical.

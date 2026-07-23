@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 #[test]
-fn composite_machine_lab_writes_deterministic_complete_quick_batch() {
+fn composite_machine_lab_writes_deterministic_compact_power_batch() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();
     run_lab(first.path());
@@ -15,86 +15,83 @@ fn composite_machine_lab_writes_deterministic_complete_quick_batch() {
     );
 
     let files = deterministic_files(first.path());
-    let wavs: Vec<_> = files
-        .keys()
-        .filter(|name| name.ends_with(".wav"))
-        .cloned()
-        .collect();
-    assert_eq!(wavs.len(), 54, "{wavs:?}");
-    for file in [
-        "01_hot-delayed-launch-reference_stereo.wav",
-        "02_hot-synchronized-counterfactual_stereo.wav",
-        "03_hot-full-score_reduced-heterogeneous-stack_stereo.wav",
-        "04_octave_role-separated-machine_d1_stereo.wav",
-        "04_octave_role-separated-machine_d2_stereo.wav",
-        "04_octave_role-separated-machine_d3_stereo.wav",
-        "05_d1-pedal_harmonic-lattice_stereo.wav",
-        "06_punch_cross-topology-follower_stereo.wav",
-        "07_mono_d1-held_risky-nonlinear-braid.wav",
-        "07_mono_d1-pedal_risky-nonlinear-braid.wav",
-        "07_mono_punch_risky-nonlinear-braid.wav",
-        "08_raw_synchronized-reference_stereo.wav",
-        "08_raw_delayed-launch-estimate_stereo.wav",
-    ] {
-        assert!(files.contains_key(file), "missing {file}");
-        let reader = hound::WavReader::open(first.path().join(file)).unwrap();
+    let primary = [
+        "02_sustained-low_deep-rotor_d1.wav",
+        "03_playable-mid_phase-forge_d3.wav",
+        "04_evolving_evolving-lattice_d2.wav",
+        "05_pedal_pedal-monolith_d1.wav",
+        "06_bass_d2-braid_d2.wav",
+        "07_thump_clipped-thump_d1.wav",
+        "08_thump_resonant-thump_d1.wav",
+        "09_kick_synthetic-kick_d1.wav",
+        "10_struck_struck-comb_d3.wav",
+        "11_context_context-relay.wav",
+    ];
+    for name in [
+        "01_reference_hot-delayed-launch.wav",
+        "12_mono_pedal-monolith_d1.wav",
+        "12_mono_synthetic-kick_d1.wav",
+    ]
+    .into_iter()
+    .chain(primary)
+    {
+        assert!(files.contains_key(name), "missing {name}");
+        let reader = hound::WavReader::open(first.path().join(name)).unwrap();
         assert_eq!(reader.spec().channels, 2);
         assert_eq!(reader.spec().sample_rate, 4_000);
         assert_eq!(reader.spec().sample_format, hound::SampleFormat::Float);
     }
-    for candidate in [
-        "reduced-heterogeneous-stack",
-        "role-separated-machine",
-        "harmonic-lattice",
-        "cross-topology-follower",
-        "risky-nonlinear-braid",
-    ] {
-        for register in ["d1", "d2", "d3"] {
-            let name = format!("04_octave_{candidate}_{register}_stereo.wav");
-            assert!(files.contains_key(&name), "missing {name}");
-        }
-    }
+    let primary_wavs = files
+        .keys()
+        .filter(|name| {
+            name.ends_with(".wav")
+                && name
+                    .split('_')
+                    .next()
+                    .is_some_and(|number| (2..=11).contains(&number.parse::<u8>().unwrap_or(0)))
+        })
+        .count();
+    assert_eq!(primary_wavs, 10);
 
     for report in [
         "README.md",
-        "manifest.tsv",
-        "layer-schedule.tsv",
-        "frequency-timeline.tsv",
+        "primary-manifest.tsv",
+        "settings.tsv",
+        "loudness.tsv",
+        "tone-retention.tsv",
+        "pitch-retention.tsv",
+        "event-metrics.tsv",
         "ablation.tsv",
-        "harmony.tsv",
-        "spectral.tsv",
-        "stereo.tsv",
+        "stereo-mono.tsv",
         "residual.tsv",
-        "topology.tsv",
         "hashes.tsv",
-        "similarity.tsv",
-        "products.tsv",
         "rejections.tsv",
-        "gain-policy.tsv",
-        "octave.tsv",
-        "punch-adsr.tsv",
-        "allocation-evidence.tsv",
-        "audition-similarity.tsv",
-        "audition-residual.tsv",
         "reconstruction-regression.tsv",
-        "processors.tsv",
+        "generation-summary.tsv",
     ] {
         assert!(files.contains_key(report), "missing {report}");
     }
     assert!(first.path().join("workstation-cost.txt").is_file());
+
     let readme = fs::read_to_string(first.path().join("README.md")).unwrap();
-    assert!(readme.contains("synchronized counterfactual"));
-    assert!(readme.contains("delayed-launch estimate"));
-    assert!(readme.contains("unknown"));
+    assert!(readme.contains("intentionally hot"));
+    assert!(readme.contains("start with playback volume low"));
+    assert!(readme.contains("one mechanism"));
+    assert!(readme.contains("three mechanisms"));
     assert!(readme.contains("human listening"));
-    assert!(readme.contains("acoustic SPL"));
-    assert!(readme.contains("hot delayed-launch reference"));
-    assert!(readme.contains("D1/D2/D3"));
-    assert!(readme.contains("punch ADSR"));
-    assert!(readme.contains("raw engineering"));
-    let timeline = fs::read_to_string(first.path().join("frequency-timeline.tsv")).unwrap();
-    assert!(timeline.contains("30\t38:3"));
-    assert!(timeline.contains("delayed-launch-estimate"));
+    assert!(readme.contains("not acoustic SPL"));
+    assert!(readme.contains("mono diagnostics last"));
+
+    let settings = fs::read_to_string(first.path().join("settings.tsv")).unwrap();
+    assert!(settings.contains("hard-clip"));
+    assert!(settings.contains("cubic-saturation"));
+    assert!(settings.contains("rational-saturation"));
+    assert!(settings.contains("pitch-drop-table-oscillator"));
+    let rejections = fs::read_to_string(first.path().join("rejections.tsv")).unwrap();
+    assert!(!rejections.lines().any(|line| line.contains("\treject\t")));
+    let regression =
+        fs::read_to_string(first.path().join("reconstruction-regression.tsv")).unwrap();
+    assert!(regression.contains("quick_mode_determinism_only"));
 }
 
 fn run_lab(output: &Path) {
