@@ -96,6 +96,12 @@ Relay's register moved from 0.27 to 0.62. The final mute differences span
 -22.588 to +0.395 dB; sparse transient layers additionally pass the onset
 ablation.
 
+The first pitch-drop scheduler was also rejected: its curved multiplier did
+not land exactly on the declared base frequency at the last scheduled sample.
+The retained event prepares a linear frequency decrement, clamps exactly to
+the target at the declared boundary, and has a deterministic regression test
+for the boundary and following sample.
+
 Report review also rejected output without final DC control: Evolving Lattice
 and Context Relay initially measured DC +0.083/+0.036. Pre-drive-only and
 ordinary post-filter revisions still left Deep Rotor around -0.027 to -0.015.

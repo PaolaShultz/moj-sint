@@ -472,6 +472,10 @@ Other rejected/revised points:
 
 - weak register/resonator/noise gains were strengthened until mute evidence
   passed; exact iteration values are in `RESEARCH.md`;
+- the first pitch-drop scheduler used a curved multiplier that did not land
+  exactly on the declared base frequency at the final scheduled sample; it was
+  rejected in report review and replaced by a prepared linear frequency
+  decrement whose boundary sample is regression-tested;
 - output without final DC control produced +0.083/+0.036 DC and was rejected;
 - absolute-note Context Relay pitch rows were rejected and replaced by a
   score transposed around the requested D1/D2/D3 base;
