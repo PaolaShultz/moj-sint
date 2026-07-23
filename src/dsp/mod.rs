@@ -1,5 +1,6 @@
 pub mod character;
 pub mod harmonic_selector;
+pub mod hybrid;
 pub mod oscillator;
 pub mod research;
 
