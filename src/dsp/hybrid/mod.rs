@@ -1,6 +1,11 @@
+mod cross_coupled;
+mod dual_body;
 mod primitives;
+mod spectral_shadow;
 
-use primitives::{ImpactEnvelope, PhaseOsc};
+use cross_coupled::CrossCoupledMachine;
+use dual_body::DualResonantBody;
+use spectral_shadow::SpectralShadow;
 use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -33,45 +38,16 @@ pub enum HybridError {
 }
 
 #[derive(Debug)]
-struct ScaffoldVoice {
-    left: PhaseOsc,
-    right: PhaseOsc,
-    impact: ImpactEnvelope,
-}
-
-impl ScaffoldVoice {
-    fn new(sample_rate: f32, frequency_hz: f32, seed: u32) -> Self {
-        let phase = (seed & 0xffff) as f32 / 65_536.0;
-        let mut impact = ImpactEnvelope::new(sample_rate);
-        impact.trigger();
-        Self {
-            left: PhaseOsc::new(sample_rate, frequency_hz, phase),
-            right: PhaseOsc::new(sample_rate, frequency_hz, phase + 0.037),
-            impact,
-        }
-    }
-
-    fn sample(&mut self) -> HybridFrame {
-        let impact = self.impact.sample();
-        let gain = 0.08 * impact.cue + 0.42 * impact.body;
-        HybridFrame {
-            left: gain * self.left.sample(),
-            right: gain * self.right.sample(),
-        }
-    }
-
-    fn reset(&mut self) {
-        self.left.reset();
-        self.right.reset();
-        self.impact.reset();
-        self.impact.trigger();
-    }
+enum HybridState {
+    CrossCoupledMachine(CrossCoupledMachine),
+    SpectralShadow(SpectralShadow),
+    DualResonantBody(DualResonantBody),
 }
 
 #[derive(Debug)]
 pub struct HybridVoice {
     family: HybridFamily,
-    state: ScaffoldVoice,
+    state: HybridState,
 }
 
 impl HybridVoice {
@@ -87,23 +63,47 @@ impl HybridVoice {
         if !frequency_hz.is_finite() || frequency_hz <= 0.0 || frequency_hz >= sample_rate * 0.5 {
             return Err(HybridError::InvalidFrequency);
         }
-        Ok(Self {
-            family,
-            state: ScaffoldVoice::new(sample_rate, frequency_hz, seed),
-        })
+        let state = match family {
+            HybridFamily::CrossCoupledMachine => HybridState::CrossCoupledMachine(
+                CrossCoupledMachine::new(sample_rate, frequency_hz, seed),
+            ),
+            HybridFamily::SpectralShadow => {
+                HybridState::SpectralShadow(SpectralShadow::new(sample_rate, frequency_hz, seed))
+            }
+            HybridFamily::DualResonantBody => HybridState::DualResonantBody(
+                DualResonantBody::new(sample_rate, frequency_hz, seed),
+            ),
+        };
+        Ok(Self { family, state })
     }
 
     #[inline]
     pub fn sample(&mut self) -> HybridFrame {
-        self.state.sample()
+        match &mut self.state {
+            HybridState::CrossCoupledMachine(voice) => voice.sample(),
+            HybridState::SpectralShadow(voice) => voice.sample(),
+            HybridState::DualResonantBody(voice) => voice.sample(),
+        }
     }
 
     pub fn reset(&mut self) {
-        self.state.reset();
+        match &mut self.state {
+            HybridState::CrossCoupledMachine(voice) => voice.reset(),
+            HybridState::SpectralShadow(voice) => voice.reset(),
+            HybridState::DualResonantBody(voice) => voice.reset(),
+        }
     }
 
     pub fn family(&self) -> HybridFamily {
         self.family
+    }
+
+    pub fn movement_rates_hz(&self) -> [f32; 3] {
+        match self.family {
+            HybridFamily::CrossCoupledMachine => [0.61, 0.37, 0.43],
+            HybridFamily::SpectralShadow => [0.19, 0.31, 0.47],
+            HybridFamily::DualResonantBody => [0.17, 0.23, 0.41],
+        }
     }
 }
 
@@ -179,5 +179,85 @@ mod tests {
         assert!(register.width() == 12);
         assert!(delay.minimum_delay() >= 2.0);
         assert!(delay.maximum_delay() < 512.0);
+    }
+
+    fn assert_complete_stereo_voice(family: HybridFamily) -> u64 {
+        let mut voice = HybridVoice::new(family, 48_000.0, 110.0, 0x51a7_9e3d).unwrap();
+        let mut left_energy = 0.0_f64;
+        let mut right_energy = 0.0_f64;
+        let mut mid_energy = 0.0_f64;
+        let mut side_energy = 0.0_f64;
+        let mut cross = 0.0_f64;
+        let mut dc = 0.0_f64;
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        for _ in 0..96_000 {
+            let frame = assert_no_alloc(|| voice.sample());
+            assert!(frame.left.is_finite() && frame.right.is_finite());
+            assert!(frame.left.abs() <= 1.0 && frame.right.abs() <= 1.0);
+            let left = f64::from(frame.left);
+            let right = f64::from(frame.right);
+            let mid = 0.5 * (left + right);
+            let side = 0.5 * (left - right);
+            left_energy += left * left;
+            right_energy += right * right;
+            mid_energy += mid * mid;
+            side_energy += side * side;
+            cross += left * right;
+            dc += mid;
+            hash ^= u64::from(frame.left.to_bits());
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            hash ^= u64::from(frame.right.to_bits());
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        let correlation = cross / (left_energy * right_energy).sqrt();
+        assert!(mid_energy > 10.0, "family={family:?} mid={mid_energy}");
+        assert!(
+            side_energy / mid_energy > 0.005,
+            "family={family:?} side/mid={}",
+            side_energy / mid_energy
+        );
+        assert!(correlation < 0.995, "family={family:?} corr={correlation}");
+        assert!(dc.abs() / 96_000.0 < 5e-4, "family={family:?} dc={dc}");
+        voice.reset();
+        let reset = voice.sample();
+        let mut fresh = HybridVoice::new(family, 48_000.0, 110.0, 0x51a7_9e3d).unwrap();
+        assert_eq!(reset, fresh.sample());
+        hash
+    }
+
+    #[test]
+    fn cross_coupled_machine_is_a_complete_stereo_voice() {
+        assert_complete_stereo_voice(HybridFamily::CrossCoupledMachine);
+        let rates = HybridVoice::new(
+            HybridFamily::CrossCoupledMachine,
+            48_000.0,
+            110.0,
+            7,
+        )
+        .unwrap()
+        .movement_rates_hz();
+        assert!(rates[0] != rates[1] && rates[1] != rates[2]);
+    }
+
+    #[test]
+    fn spectral_shadow_is_a_complete_stereo_voice() {
+        assert_complete_stereo_voice(HybridFamily::SpectralShadow);
+    }
+
+    #[test]
+    fn dual_resonant_body_is_a_complete_stereo_voice() {
+        assert_complete_stereo_voice(HybridFamily::DualResonantBody);
+    }
+
+    #[test]
+    fn complete_voice_topologies_are_deterministically_distinct() {
+        let hashes = [
+            assert_complete_stereo_voice(HybridFamily::CrossCoupledMachine),
+            assert_complete_stereo_voice(HybridFamily::SpectralShadow),
+            assert_complete_stereo_voice(HybridFamily::DualResonantBody),
+        ];
+        assert_ne!(hashes[0], hashes[1]);
+        assert_ne!(hashes[1], hashes[2]);
+        assert_ne!(hashes[0], hashes[2]);
     }
 }

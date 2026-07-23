@@ -122,6 +122,7 @@ impl RegisterOsc {
         self.state = self.initial_state;
     }
 
+    #[cfg(test)]
     pub(super) fn width(&self) -> u8 {
         self.width
     }
@@ -253,8 +254,11 @@ impl<const N: usize> MovingDelay<N> {
     pub(super) fn sample(&mut self, input: f32, movement: f32) -> f32 {
         let delay = self.base + self.depth * movement.clamp(-1.0, 1.0);
         let mut position = self.write as f32 - delay;
-        if position < 0.0 {
+        while position < 0.0 {
             position += N as f32;
+        }
+        while position >= N as f32 {
+            position -= N as f32;
         }
         let first = position as usize;
         let second = if first + 1 == N { 0 } else { first + 1 };
@@ -274,10 +278,12 @@ impl<const N: usize> MovingDelay<N> {
         self.write = 0;
     }
 
+    #[cfg(test)]
     pub(super) fn minimum_delay(&self) -> f32 {
         self.base - self.depth
     }
 
+    #[cfg(test)]
     pub(super) fn maximum_delay(&self) -> f32 {
         self.base + self.depth
     }
@@ -311,6 +317,56 @@ impl DcBlocker {
     pub(super) fn reset(&mut self) {
         self.previous_input = 0.0;
         self.previous_output = 0.0;
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct DelayResonator<const N: usize> {
+    buffer: [f32; N],
+    write: usize,
+    delay: f32,
+    feedback: f32,
+    damping: f32,
+    lowpass: f32,
+}
+
+impl<const N: usize> DelayResonator<N> {
+    pub(super) fn new(delay: f32, feedback: f32, damping: f32) -> Self {
+        Self {
+            buffer: [0.0; N],
+            write: 0,
+            delay: delay.clamp(2.0, N as f32 - 2.0),
+            feedback: feedback.clamp(0.0, 0.995),
+            damping: damping.clamp(0.01, 0.99),
+            lowpass: 0.0,
+        }
+    }
+
+    #[inline]
+    pub(super) fn sample(&mut self, input: f32, cross: f32) -> f32 {
+        let mut position = self.write as f32 - self.delay;
+        if position < 0.0 {
+            position += N as f32;
+        }
+        let first = position as usize;
+        let second = if first + 1 == N { 0 } else { first + 1 };
+        let fraction = position - first as f32;
+        let delayed =
+            self.buffer[first] + fraction * (self.buffer[second] - self.buffer[first]);
+        self.lowpass += self.damping * (delayed - self.lowpass);
+        self.buffer[self.write] =
+            soft_clip(input + self.feedback * self.lowpass + cross);
+        self.write += 1;
+        if self.write == N {
+            self.write = 0;
+        }
+        delayed
+    }
+
+    pub(super) fn reset(&mut self) {
+        self.buffer = [0.0; N];
+        self.write = 0;
+        self.lowpass = 0.0;
     }
 }
 
