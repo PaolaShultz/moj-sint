@@ -192,7 +192,7 @@ fn write_readme(path: &Path) -> std::io::Result<()> {
     )?;
     writeln!(
         output,
-        "For each MIDI note 36, 60, and 84, compare nonlinear PM, excited comb, spatial micro-delay, spectral traversal, and integer swarm. All files are stereo 32-bit float at 48 kHz and were matched to RMS 0.06 under a 0.98 peak ceiling.\n"
+        "For each MIDI note 36, 60, and 84, compare nonlinear PM, excited comb, spatial micro-delay, spectral traversal, and integer swarm. All files are two-channel 32-bit float at 48 kHz and were matched to RMS 0.06 under a 0.98 peak ceiling. Only spatial micro-delay generates distinct left and right signals; the other four sources are dual-mono.\n"
     )?;
     writeln!(
         output,

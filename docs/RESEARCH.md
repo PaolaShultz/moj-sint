@@ -394,8 +394,9 @@ not establish that direct evaluation is generally preferable for nonlinear DSP.
 BLAMP was not implemented because the graph has no known fold/reset
 discontinuity to correct.
 
-The nine loudness-matched 48 kHz stereo listening files covered dry, moderate,
-and strong conditions at notes 36, 60, and 84. Active-window RMS was
+The nine loudness-matched 48 kHz two-channel listening files were dual-mono and
+covered dry, moderate, and strong conditions at notes 36, 60, and 84.
+Active-window RMS was
 0.079769-0.079980, peak was 0.139552-0.143008, maximum absolute DC was
 0.000000196, and every row retained the fitted fundamental. The user rejected
 the complete gate: it sounded like one weak source under similar treatments,
@@ -588,8 +589,10 @@ logging, locks, processes, or clocks occur there. Delay arrays and integer
 state are fixed per source so later per-voice ownership remains possible, but
 the prototypes are not production voices and establish no voice-count budget.
 
-The disposable release batch contains 15 stereo 32-bit-float, 48 kHz WAVs:
-one file for each family at MIDI 36, 60, and 84. All target RMS values are
+The disposable release batch contains 15 two-channel 32-bit-float, 48 kHz WAVs:
+one file for each family at MIDI 36, 60, and 84. Nonlinear PM, excited comb,
+spectral traversal, and integer swarm are dual-mono; only spatial micro-delay
+generates different left and right samples. All target RMS values are
 0.060000 except excited-comb note 84 at 0.059116 under the common 0.979 peak
 ceiling. Peak spans 0.085294-0.979000 and maximum absolute DC is 0.000229049.
 Every row is finite and the reported fundamental remains within 30 dB of its
@@ -633,6 +636,14 @@ finally moving along the right path and is worth continuing. No candidate was
 accepted, rejected, ranked, integrated, or assigned a macro. The next session
 will continue exploring genuinely different fundamentals under the user's
 guidance rather than narrowing prematurely around these five representatives.
+
+The user's later clarification is that fixed-width integer VCOs and machine
+operations were intended as quirky, efficient mechanisms that can be inserted
+into many hybrid signal paths: as exciters, modulators, address generators,
+coupling state, or contrasting voices. The first gate's 24-machine integer
+swarm was an overly literal standalone interpretation. Retain it as one
+measured negative/partial result, but do not treat “all-integer swarm” as the
+intended family boundary or repeat a bank of otherwise similar machines.
 
 The ignored batch was deleted after that verdict, as required by the disposable
 experiment policy; the generator, tests, durable measurements, and negative

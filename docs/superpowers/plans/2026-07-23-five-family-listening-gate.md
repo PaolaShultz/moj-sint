@@ -6,6 +6,8 @@
 
 **Architecture:** A new `dsp::research` module owns five independent, fixed-state scalar sources behind a small `ResearchSource` enum that emits stereo frames without allocation. A separate `five-family-lab` binary renders and measures those sources only; it does not route them through `Engine`, presets, or stable macros. Deterministic reports and 15 loudness-matched WAVs live under ignored `artifacts/`.
 
+**Recorded channel layout:** The frame and WAV containers are two-channel, but nonlinear PM, excited comb, spectral traversal, and integer swarm copy one mono value to both channels. Only spatial micro-delay generates distinct left and right signals.
+
 **Tech Stack:** Stable scalar Rust 1.97.1, fixed-size arrays, existing `assert_no_alloc` and `hound`, deterministic offline analysis, Cargo audit/deny and AArch64 compile checks.
 
 ---
@@ -101,7 +103,6 @@
 - Modify: `docs/HANDOFF.md`
 - Modify: `docs/superpowers/plans/2026-07-23-five-family-listening-gate.md`
 
-- [x] Record only measured topology, hypotheses, measurements, limitations, filenames, deterministic evidence, and the open human verdict. State that no family, macro, Pi performance, polyphony, spatial translation, or sound quality is accepted.
+- [x] Record only measured topology, hypotheses, measurements, limitations, filenames, deterministic evidence, and the later human verdict. State that no family, macro, Pi performance, polyphony, spatial translation, or sound quality is accepted.
 - [x] Run `cargo fmt --check`, `cargo test --all-targets --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo build --release`, `cargo audit`, `cargo deny check`, `cargo check --target aarch64-unknown-linux-gnu`, and `git diff --check`. Only the accepted `winnow` duplicate warning may remain.
-- [x] Stop for human listening. Provide the ignored artifact directory and listening order. Do not select a winner, integrate into `Engine`, assign macros, preserve artifacts elsewhere, touch JACK/ALSA/SHR-DAW, push, or claim headphone/speaker/mono acceptance.
-
+- [x] Stop for human listening. Provide the ignored artifact directory and listening order. Afterward, record the user's directional but non-selecting verdict without integrating into `Engine`, assigning macros, preserving artifacts elsewhere, touching JACK/ALSA/SHR-DAW, or claiming headphone/speaker/mono acceptance.

@@ -116,7 +116,8 @@ workstation cost. A two-tone post-mix probe records what intermodulation would
 be introduced by the deferred placement; it does not place the production
 nonlinearity after the mixer.
 
-The first listening gate contains exactly nine loudness-matched stereo WAVs:
+The first listening gate contains exactly nine loudness-matched dual-mono,
+two-channel WAVs:
 dry, moderate, and intentionally strong settings at MIDI notes 36, 60, and 84.
 All use `SHAPE=0.5`, `COLOR=0.5`, one voice, and `COUPLE=0` for dry. Filenames
 state note and condition. Automated evidence can reject instability, aliasing,

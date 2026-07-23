@@ -475,9 +475,9 @@ intentionally speculative ideas into seven testable Moj Sint experiment
 families. Continue from that register rather than reducing the next phase to
 vintage emulation.
 
-## Next experimental phase: five-family listening gate
+## Completed experimental phase: five-family listening gate
 
-The user approved a genuinely varied listening gate built from five separate
+The user approved and completed a genuinely varied listening gate built from five separate
 sound-generation hypotheses. These are not five parameter settings in one
 graph, and the first implementation should not force all five into the
 production `Engine`. Prototype them as disposable monophonic offline research
@@ -558,8 +558,8 @@ simultaneous notes are actually safe.
 
 The architecture above was presented in chat and then revised at the user's
 request to include the controller target. The revised high-level architecture
-is accepted. There is no unresolved design-approval blocker. The fresh session
-should proceed without reopening settled questions such as installation
+is accepted. There is no unresolved high-level design-approval blocker. Later
+sessions should proceed without reopening settled questions such as installation
 authorization, ALSA-versus-JACK output, external-process integration, or the
 13-control target.
 
@@ -581,7 +581,7 @@ The settled high-level choices are:
 - Raspberry Pi 5 / 2 GB / 64-bit OS primary target; and
 - x86_64 Linux development compatibility.
 
-## Fresh-session continuation prompt
+## Current continuation prompt
 
 Use this short prompt after resetting; this handoff contains the detailed
 context and should not be copied back into the new prompt:
@@ -596,44 +596,36 @@ bandlimited-oscillator evidence, and source/licensing register as settled
 context. Do not recheck SHR-DAW unless an actively changing host contract is
 directly relevant.
 
-This phase is mono-first sound research, not a permanent monophonic lock and
-not yet a polyphony milestone. The shared-phase harmonic selector and parallel
-character layer already failed human listening because they sounded like weak
-versions of one basic source. Do not revive them through parameter tweaks,
-additional output processing, or batches of related saw/sine variants.
+This phase is mono-first sound-identity research, not a permanent monophonic
+lock and not yet a polyphony milestone. The shared-phase harmonic selector and
+parallel character layer failed human listening because they sounded like weak
+versions of one basic source. The completed five-family gate then compared
+nonlinear PM, excited comb, psychoacoustic micro-delay, authored spectral
+traversal, and a fixed-width integer swarm. The user judged the overall
+direction promising but still far from the intended instrument. No family was
+accepted, rejected, ranked, integrated, or assigned a macro.
 
-Design a disposable offline listening gate with one bounded representative
-from each of the five approved families in “Next experimental phase:
-five-family listening gate”: nonlinear PM/complex oscillator, excited
-comb/resonant source, psychoacoustic micro-delay spatial-motion source,
-spectral traversal, and a small-register integer machine/oscillator swarm.
-Research all five first and state a distinct perceptual hypothesis for each.
-Keep the prototypes isolated from the production Engine until the user has
-listened; do not implement five permanent architectures at once or clone a
-legendary synth.
+Do not regenerate or repeat that batch by default, and do not select the least
+bad representative. Begin by collecting the user's more specific reaction and
+design the next disposable gate around genuinely different fundamentals,
+topologies, and smart cross-mechanism connections. Keep prototypes isolated
+from the production Engine until automated evidence and human listening both
+pass. Parameter positions, several processed versions of one source, or a swarm
+of otherwise equivalent voices do not count as separate listening mechanisms.
 
-Keep the DSP scalar, deterministic, finite, smoothed, and allocation-free.
-Use test-first development for every render path. Measure alias/error where
-oscillation or nonlinearity creates it, harmonic/spectral distribution,
-peak/RMS/DC, pitch retention, useful control travel, rapid movement,
-determinism, allocation, and workstation cost. For the micro-delay candidate,
-also measure mono fold-down, inter-channel correlation, side-to-mid energy,
-delay/modulation bounds, and discontinuity-free delay movement. Generate
-clearly named, loudness-matched low/middle/high-note listening artifacts and
-leave all musical usefulness and spatial-effect acceptance to the user.
+Treat fixed-width integer oscillation, wrapping, shifts, rotates, carry, and
+related machine behavior as composable sound mechanisms that may excite,
+modulate, perturb, address, or couple with other sources. Do not assume they
+must form one self-contained all-integer instrument or a same-mechanism swarm.
+Stereo identity is also part of the next design: distinguish stereo generation,
+stereo resonant structures, cross-coupled filters or combs, and spatial
+processing from a mono source merely copied to two output channels.
 
-For the integer-machine candidate, define register widths and every overflow,
-shift, rotate, and conversion rule explicitly. Test finite/bounded output,
-repeat periods and accidental lockups, pitch relationships, DC, aliasing,
-determinism, allocation, and cost. Start in portable scalar Rust. Do not add
-assembly, SIMD, or architecture gates until measurement proves a need.
-
-Several comb lengths, modulation rates, delay offsets, wet levels, or stereo
-widths do not count as separate listening variations. The comb network must
-act as a source; the psychoacoustic network must aim at controlled space and
-mid-image or midband pulsation without becoming an ordinary chorus, flanger,
-or echo. Verify the spatial candidate on headphones, speakers, and mono only
-when the user explicitly performs or authorizes that listening setup.
+Keep the DSP scalar, deterministic, finite, smoothed, and allocation-free. Use
+test-first development for every render path. Oscillator and nonlinear changes
+need alias/error evidence. Stereo candidates also need per-channel activity,
+mid/side energy, correlation, mono fold-down, symmetry/asymmetry checks, and
+human headphone/speaker/mono listening. Generated batches remain disposable.
 
 Preserve per-voice state so later polyphony remains possible, but do not expand
 voice count or claim a safe count until the selected complex topology is
@@ -649,13 +641,14 @@ to preserve a specific result.
 
 ## Next action
 
-Reset into the continuation prompt above, research the five approved source
-families, and build the smallest disposable monophonic comparison that gives
-the user one honest representative of each. Stop for human listening before
-selecting a family, integrating it into `Engine`, or assigning stable macros.
-The existing `SHAPE`/`COLOR` listening gate remains open, so do not call those
-routes musically useful without user acceptance. Do not rediscover SHR-DAW's
-established JACK/ALSA/process contract.
+Audit the completed gate's actual stereo behavior and reconcile it with the
+user's listening recollection. Then agree on a small second-gate design built
+from structurally different hybrid mechanisms and deliberate stereo
+topologies. Stop for human listening before selecting a family, integrating it
+into `Engine`, or assigning stable macros. The existing `SHAPE`/`COLOR`
+listening gate remains open, so do not call those routes musically useful
+without user acceptance. Do not rediscover SHR-DAW's established
+JACK/ALSA/process contract.
 
 ## Executed foundation checkpoint
 
@@ -665,7 +658,8 @@ Completed later on 2026-07-22 and merged into local `main`:
 - installed user-local stable Rust, rustfmt, Clippy, cargo-audit, and cargo-deny;
 - created a pure Rust library, strict version-1 `.mojsint` preset, thirteen
   stable control identities, reference sine/ADSR, fixed voice engine, and
-  deterministic stereo float WAV renderer/validator CLI;
+  deterministic two-channel float WAV renderer/validator CLI; the production
+  engine currently writes the same mono mix to both channels;
 - enforced no allocation inside `Engine::render_block` in tests;
 - rechecked SHR-DAW main at
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40`;
@@ -708,7 +702,8 @@ Completed later on 2026-07-22:
 - routed `SHAPE` through the corrected morph and `COLOR` through a tracked
   harmonic-dark to direct-bright path, both with 10 ms smoothing and bounded
   level compensation;
-- generated, measured, and later removed 27 stereo 32-bit float WAVs at 48 kHz
+- generated, measured, and later removed 27 dual-mono, two-channel 32-bit float
+  WAVs at 48 kHz
   for notes 36/60/84 and the complete low/mid/high `SHAPE`/`COLOR` matrix;
   listening-render peak spans
   0.132612 to 0.178935, RMS spans 0.046470 to 0.110782, and maximum absolute DC
@@ -826,7 +821,7 @@ Pi claim was added.
 
 ## Five-family listening-gate checkpoint
 
-Completed on 2026-07-23 and left open for human listening:
+Completed and reviewed on 2026-07-23:
 
 - researched nonlinear PM, excited combs, precedence/micro-delay perception,
   spectral traversal, and small-register sound machines from primary or
@@ -839,7 +834,9 @@ Completed on 2026-07-23 and left open for human listening:
   routes, JACK/ALSA work, or SHR-DAW;
 - implemented one fixed scalar representative per family with per-source state,
   deterministic reset, finite/bounded output, and allocation-free sample paths;
-- generated exactly 15 stereo 32-bit-float 48 kHz files for MIDI 36/60/84,
+- generated exactly 15 two-channel 32-bit-float 48 kHz files for MIDI 36/60/84;
+  twelve were dual-mono and only the three spatial-micro-delay files generated
+  different left and right signals,
   matched to RMS 0.06 except the crest-limited high comb at 0.059116, with peak
   0.085294-0.979000 and maximum absolute DC 0.000229049;
 - measured harmonic distributions, fitted fundamental/pitch retention,

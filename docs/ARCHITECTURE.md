@@ -19,10 +19,14 @@ offline note specification ---------------+
 `Engine::render_block` uses preallocated voices, caller-owned output buffers,
 and a borrowed event slice. Tests using `assert_no_alloc` guard both candidate
 oscillator sample paths and the complete block boundary, including rapid macro
-events.
+events. The current production engine writes the same mono mix to both output
+buffers; two JACK ports and two-channel WAV metadata do not yet imply stereo
+sound generation.
 
-The current scalar voice combines the evidence-selected generic integrated-
-wavetable oscillator with one experimental per-voice parallel character layer.
+The current scalar voice still contains the evidence-selected generic
+integrated-wavetable oscillator and the rejected per-voice parallel character
+layer. The latter remains implementation residue for reproducibility, not an
+accepted factory sound or macro mapping.
 Shared 2,049-point antiderivative tables represent a saw and square target; each
 voice performs linear table lookup, one-sample differentiation, and phase-
 increment normalization. The untouched `SHAPE`/`COLOR` result is the dry
@@ -59,7 +63,8 @@ direct disposable lab generator, but it is no longer in the voice render path.
   Fourier references. Its `alias_error_db` is explicitly a conservative sum
   of alias energy and amplitude/phase deviation after DC removal and fitted
   gain, not a perceptual score.
-- `offline`: deterministic note rendering and stereo float WAV output.
+- `offline`: deterministic two-channel float WAV output, currently dual-mono
+  when rendering `Engine`.
 - `dsp::research`: five disposable, monophonic, allocation-free scalar source
   states used only by the five-family listening gate. They are not variants of
   the production voice and are not reachable from `Engine` or presets.
@@ -71,19 +76,24 @@ direct disposable lab generator, but it is no longer in the voice render path.
 The separate `five-family-lab` binary renders those research sources into an
 explicit output directory. Its mechanisms are nonlinear PM, excited comb,
 four-path spatial micro-delay, authored additive spectral traversal, and a
-24-machine fixed-width integer swarm. Construction prepares phase rotations,
-filter coefficients, delay bounds, and fixed state; every sample path is
-allocation-free and bounded. The binary performs file I/O and timing outside
-the sample path and is not a live host.
+24-machine fixed-width integer swarm. Only the micro-delay representative
+generates distinct left and right signals; the other four are copied to both
+channels. Construction prepares phase rotations, filter coefficients, delay
+bounds, and fixed state; every sample path is allocation-free and bounded. The
+binary performs file I/O and timing outside the sample path and is not a live
+host.
 
 ## Deliberate deferrals
 
 The stable macro names exist. `SHAPE`/`COLOR` have measured routes whose human
 listening gate remains open. The selector's `EDGE`/`COUPLE` mapping was rejected
-and retired from the engine. Their new parallel-character mapping has automated
-evidence and a nine-file listening gate, but is not accepted as useful or as a
-factory sound until the user listens. The other five timbral macro routes, more
-distinctive oscillator/output systems, modulation, full control-usefulness
-thresholds, live JACK/ALSA adapters, factory presets, and Pi profiling each need
-their own measured, test-first milestone. No SIMD or architecture-specific path
-should precede profiling on the Pi.
+and retired from the engine. The replacement parallel-character mapping also
+failed human listening because it presented the same weak source under small
+treatments; it is not an accepted factory sound or mapping. The completed
+five-family research gate remains isolated from `Engine` and selected no
+successor. The next milestone is a second mono-first sound-identity gate with
+deliberate stereo topology, not more output treatments of the current dry
+source. The other five timbral macro routes, modulation, full
+control-usefulness thresholds, live JACK/ALSA adapters, factory presets, and Pi
+profiling each need their own measured, test-first milestone. No SIMD or
+architecture-specific path should precede profiling on the Pi.
