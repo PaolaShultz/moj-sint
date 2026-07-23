@@ -56,8 +56,9 @@ struck comb to +16.465/+12.992 dB for the resonant thump. This establishes a
 digital loudness floor only. The proxy is a high-pass/high-frequency-weighted
 measurement, not calibrated LUFS or acoustic SPL.
 
-Tone sweeps reuse one gain policy and report only 0.026-0.502 dB RMS span and
-0.027-0.462 dB perceptual-proxy span. D1/D2/D3 rows remain finite and bounded.
+Tone sweeps reuse one gain policy and report only 0.002522-0.502115 dB RMS
+span and 0.034589-0.461135 dB perceptual-proxy span. D1/D2/D3 rows remain
+finite and bounded.
 Context Relay now transposes its complete eight-event score around the
 requested base note; an earlier report revision incorrectly reused the
 absolute D2-centered score for every pitch row and was rejected.

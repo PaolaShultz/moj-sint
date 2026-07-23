@@ -454,8 +454,9 @@ Lattice 9.647%, Pedal Monolith 28.478%, D2 Braid 29.208%, Clipped Thump
 8.015%, Resonant Thump 6.231%, Synthetic Kick 4.854%, Struck Comb 0%, and
 Context Relay 27.806%.
 
-Minimum/median/maximum tone sweeps retain RMS within 0.026-0.502 dB and the
-perceptual proxy within 0.027-0.462 dB. D1/D2/D3 use one fixed gain policy.
+Minimum/median/maximum tone sweeps retain RMS within 0.002522-0.502115 dB and
+the perceptual proxy within 0.034589-0.461135 dB. D1/D2/D3 use one fixed gain
+policy.
 All bass-bearing primary mono folds lose at most 0.001 dB; the widest file,
 Struck Comb, loses 0.048 dB. Low side/mid is at most 0.0181 and no projected
 fundamental loses level after fold.
