@@ -299,6 +299,57 @@ pub fn measure_target_levels(samples: &[f32], sample_rate: f32, notes: [u8; 3]) 
     })
 }
 
+pub fn measure_frequency_levels(
+    samples: &[f32],
+    sample_rate: f32,
+    frequencies: [f32; 3],
+) -> [f64; 3] {
+    let mono: Vec<f32> = samples
+        .chunks_exact(2)
+        .map(|frame| 0.5 * (frame[0] + frame[1]))
+        .collect();
+    frequencies.map(|frequency| {
+        amplitude_db(project_amplitude(&mono, sample_rate, frequency))
+    })
+}
+
+pub fn measure_hybrid_alias_error(
+    family: HybridFamily,
+    note: u8,
+    sample_count: usize,
+) -> Result<f64, HybridRenderError> {
+    if sample_count < 64 {
+        return Err(HybridRenderError::InvalidSamples);
+    }
+    const FACTOR: usize = 8;
+    const SAMPLE_RATE: f32 = 48_000.0;
+    const WARMUP: usize = 2_048;
+    let frequency = midi_frequency(note);
+    let seed = 0xa11a_5000 ^ u32::from(note);
+    let mut target = HybridVoice::new(family, SAMPLE_RATE, frequency, seed)?;
+    let mut reference =
+        HybridVoice::new(family, SAMPLE_RATE * FACTOR as f32, frequency, seed)?;
+    for _ in 0..WARMUP {
+        target.sample();
+    }
+    for _ in 0..WARMUP * FACTOR {
+        reference.sample();
+    }
+    let mut target_samples = Vec::with_capacity(sample_count);
+    let mut reference_samples = Vec::with_capacity(sample_count);
+    for _ in 0..sample_count {
+        let frame = target.sample();
+        target_samples.push(0.5 * (frame.left + frame.right));
+        let mut sum = 0.0;
+        for _ in 0..FACTOR {
+            let frame = reference.sample();
+            sum += 0.5 * (frame.left + frame.right);
+        }
+        reference_samples.push(sum / FACTOR as f32);
+    }
+    Ok(fitted_residual_db(&target_samples, &reference_samples))
+}
+
 fn project_amplitude(samples: &[f32], sample_rate: f32, frequency: f32) -> f64 {
     let mut sine = 0.0_f64;
     let mut cosine = 0.0_f64;
@@ -308,6 +359,44 @@ fn project_amplitude(samples: &[f32], sample_rate: f32, frequency: f32) -> f64 {
         cosine += f64::from(*sample) * phase.cos();
     }
     2.0 * (sine * sine + cosine * cosine).sqrt() / samples.len() as f64
+}
+
+fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
+    let target_dc =
+        target.iter().map(|sample| f64::from(*sample)).sum::<f64>() / target.len() as f64;
+    let reference_dc = reference
+        .iter()
+        .map(|sample| f64::from(*sample))
+        .sum::<f64>()
+        / reference.len() as f64;
+    let mut dot = 0.0;
+    let mut reference_energy = 0.0;
+    let mut target_energy = 0.0;
+    for (&target, &reference) in target.iter().zip(reference) {
+        let target = f64::from(target) - target_dc;
+        let reference = f64::from(reference) - reference_dc;
+        dot += target * reference;
+        reference_energy += reference * reference;
+        target_energy += target * target;
+    }
+    let gain = if reference_energy > 0.0 {
+        dot / reference_energy
+    } else {
+        0.0
+    };
+    let residual_energy = target
+        .iter()
+        .zip(reference)
+        .map(|(&target, &reference)| {
+            let residual =
+                (f64::from(target) - target_dc) - gain * (f64::from(reference) - reference_dc);
+            residual * residual
+        })
+        .sum::<f64>();
+    10.0
+        * (residual_energy / target_energy.max(1.0e-24))
+            .max(1.0e-24)
+            .log10()
 }
 
 fn amplitude_db(amplitude: f64) -> f64 {
@@ -405,6 +494,17 @@ mod tests {
                     first.metrics.target_levels_db
                 );
             }
+        }
+    }
+
+    #[test]
+    fn conservative_alias_evidence_is_deterministic_for_every_hybrid() {
+        for family in HybridFamily::ALL {
+            let first = super::measure_hybrid_alias_error(family, 60, 2_048).unwrap();
+            let second = super::measure_hybrid_alias_error(family, 60, 2_048).unwrap();
+            assert_eq!(first, second);
+            assert!(first.is_finite(), "family={family:?} residual={first}");
+            assert!(first <= 3.0, "family={family:?} residual={first}");
         }
     }
 }
