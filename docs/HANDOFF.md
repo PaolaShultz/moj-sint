@@ -126,6 +126,12 @@ At this checkpoint:
   from the intended instrument; no family is selected and none is routed into
   `Engine` or stable macros. The reviewed 15-file batch was deleted under the
   experimental-output policy.
+- A second isolated gate now implements three complete, structurally different
+  hybrid voices with genuine stereo plus single-note, held-chord,
+  four-chord-progression, and explicit mono-fold auditions. Automated evidence
+  passes the predeclared finite, level, DC, stereo, mono, and target-note
+  bounds, but human listening is still open. Nothing is selected, mapped, or
+  routed into the production `Engine`.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -598,65 +604,37 @@ context and should not be copied back into the new prompt:
 Continue Moj Sint in `/home/shome/p/moj-sint` from the current clean `main`.
 Record `git rev-parse --short HEAD` before changing files.
 
-Read `docs/HANDOFF.md` and `docs/RESEARCH.md` completely before planning or
-changing files. Treat the existing integration contract, 13 controls,
-bandlimited-oscillator evidence, and source/licensing register as settled
-context. Do not recheck SHR-DAW unless an actively changing host contract is
-directly relevant.
+Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, `docs/BASS_IMPACT_RESEARCH.md`, and
+`docs/MICRO_MACHINE_ROUTING.md` before changing files. The current listening
+gate contains three complete hybrid stereo voices: cross-coupled machine,
+spectral shadow, and dual resonant body. Each has single-note, held-chord,
+four-chord progression, and explicit mono-fold files under the ignored
+`artifacts/final-hybrid-sound-lab/` batch.
 
-This phase is mono-first sound-identity research, not a permanent monophonic
-lock and not yet a polyphony milestone. The shared-phase harmonic selector and
-parallel character layer failed human listening because they sounded like weak
-versions of one basic source. The completed five-family gate then compared
-nonlinear PM, excited comb, psychoacoustic micro-delay, authored spectral
-traversal, and a fixed-width integer swarm. The user judged the overall
-direction promising but still far from the intended instrument. No family was
-accepted, rejected, ranked, integrated, or assigned a macro.
+Begin with the user's headphone, speaker, and mono verdict. Do not select the
+least bad result or route anything into `Engine`, presets, or stable macros
+without explicit human acceptance. Preserve the dual-resonant body's severe
+MIDI-36 high-rate residual as a known limitation. If a family is promising,
+identify which source, register, nonlinear, resonant, and stereo connections
+actually create its identity before extracting reusable typed micro-machines.
+If none is promising, document the rejection and delete the batch.
 
-Do not regenerate or repeat that batch by default, and do not select the least
-bad representative. Begin by collecting the user's more specific reaction and
-design the next disposable gate around genuinely different fundamentals,
-topologies, and smart cross-mechanism connections. Keep prototypes isolated
-from the production Engine until automated evidence and human listening both
-pass. Parameter positions, several processed versions of one source, or a swarm
-of otherwise equivalent voices do not count as separate listening mechanisms.
-
-Treat fixed-width integer oscillation, wrapping, shifts, rotates, carry, and
-related machine behavior as composable sound mechanisms that may excite,
-modulate, perturb, address, or couple with other sources. Do not assume they
-must form one self-contained all-integer instrument or a same-mechanism swarm.
-Stereo identity is also part of the next design: distinguish stereo generation,
-stereo resonant structures, cross-coupled filters or combs, and spatial
-processing from a mono source merely copied to two output channels.
-
-Keep the DSP scalar, deterministic, finite, smoothed, and allocation-free. Use
-test-first development for every render path. Oscillator and nonlinear changes
-need alias/error evidence. Stereo candidates also need per-channel activity,
-mid/side energy, correlation, mono fold-down, symmetry/asymmetry checks, and
-human headphone/speaker/mono listening. Generated batches remain disposable.
-
-Preserve per-voice state so later polyphony remains possible, but do not expand
-voice count or claim a safe count until the selected complex topology is
-benchmarked natively on the Raspberry Pi with callback/headroom evidence. Do
-not implement the live JACK/ALSA host, modify SHR-DAW, start JACK, connect
-hardware, add SIMD, copy third-party DSP/presets/samples, or claim Pi
-performance in this phase. Finish documentation and the repository verification
-matrix required by `AGENTS.md`. Keep every generated batch under ignored
-`artifacts/` or a fresh temporary directory. After the user's verdict,
-document the conclusion and delete the batch unless the user explicitly asks
-to preserve a specific result.
+Treat integer state as a composable mechanism, not an obligation to build an
+all-integer machine. Keep new listening variations structurally different,
+scalar, deterministic, finite, and allocation-free, with alias/error and true
+stereo/mono evidence. Do not modify SHR-DAW, touch JACK/hardware, add SIMD,
+claim Pi performance, or expand production polyphony without explicit scope
+and native evidence.
 ```
 
 ## Next action
 
-Audit the completed gate's actual stereo behavior and reconcile it with the
-user's listening recollection. Then agree on a small second-gate design built
-from structurally different hybrid mechanisms and deliberate stereo
-topologies. Stop for human listening before selecting a family, integrating it
-into `Engine`, or assigning stable macros. The existing `SHAPE`/`COLOR`
-listening gate remains open, so do not call those routes musically useful
-without user acceptance. Do not rediscover SHR-DAW's established
-JACK/ALSA/process contract.
+Listen to the twelve-file final hybrid batch on headphones, speakers, and in
+mono. Compare the three complete topologies first in their progression files,
+then use chord and single-note files to diagnose harmony and source identity,
+and use progression-mono only for collapse behavior. Record a verdict per
+family and per useful connection. Stop before selecting a production family,
+mapping controls, extracting the generic graph, or integrating `Engine`.
 
 ## Executed foundation checkpoint
 
@@ -877,3 +855,48 @@ prematurely converging on these five representatives. The spatial candidate
 has not been accepted on headphones, speakers, or mono; automated metrics
 cannot make that decision. The reviewed ignored batch was deleted after the
 verdict, while the reproducible generator, tests, and durable evidence remain.
+
+## Complete hybrid stereo/chord checkpoint
+
+Implemented on 2026-07-23 and awaiting human listening:
+
+- converted the visceral-bass research into three complete voices rather than
+  isolated starter oscillators: cross-coupled machine, spectral shadow, and
+  dual resonant body;
+- used a single small-register mechanism as an exciter, perturbation, or
+  address/coupling source inside each mixed topology instead of repeating the
+  rejected all-integer swarm interpretation;
+- added genuine stereo generation through unequal resonant/filter state,
+  bounded cross-coupling, and independently moving channel delays;
+- added exactly three independently seeded voices for chord conditions, with
+  nonlinear processing inside each voice before the linear mix;
+- rendered single MIDI 38, held MIDI 50/53/57, a four-segment three-note
+  progression, and an explicit mono-fold diagnostic for every family;
+- added deterministic reports for peak/RMS/DC/crest, onset/body windows,
+  harmony targets, difference products, correlation, side/mid energy, mono
+  survival, movement rates, topology identity, scalar workstation cost, and
+  conservative 8x high-rate residual;
+- measured release peaks of 0.153129-0.283571, maximum absolute DC
+  0.000029871, genuine-stereo correlations of 0.651742-0.944257, and side/mid
+  ratios of 0.031072-0.213552; every chord target remains far inside the
+  predeclared 36 dB relative rejection bound;
+- retained the dual-resonant body's MIDI-36 residual of -2.889 dB as a severe
+  negative engineering result. The other residuals are also descriptive, not
+  proof of inaudibility or quality; and
+- kept `Engine`, presets, stable macros, JACK/ALSA, SHR-DAW, production
+  polyphony, and architecture-specific code unchanged; and
+- passed fresh `cargo fmt --check`, all-target/all-feature tests (71 library,
+  one five-family CLI, one hybrid CLI, and six existing CLI tests), Clippy with
+  warnings denied, release build, `cargo audit` over 35 crate dependencies,
+  `cargo deny check`, AArch64 compile check, and `git diff --check`. Two fresh
+  release generations were byte-identical except for the declared volatile
+  workstation timing report. The manifest report SHA-256 is
+  `b1b3d720b1e791d6170f1fe8836b21d2192657dcb9ce794a4043c803a554cd10`.
+  `cargo deny` retains only the accepted `winnow` 0.7/1.0 duplicate warning
+  inside `toml`.
+
+Automated evidence establishes bounded, reproducible audition material; it
+does not establish “kidney-cutting” impact, translation, a useful macro, or a
+desirable sound. The ignored batch remains available only until the user gives
+the headphone/speaker/mono verdict. After that verdict, document conclusions
+and delete rejected output unless the user explicitly requests preservation.

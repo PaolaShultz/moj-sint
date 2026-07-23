@@ -56,6 +56,22 @@ fn hybrid_sound_lab_writes_deterministic_complete_listening_gate() {
     assert!(readme.contains("not Raspberry Pi evidence"));
     let manifest = fs::read_to_string(first.path().join("manifest.tsv")).unwrap();
     assert_eq!(manifest.lines().count(), 13);
+    let products = fs::read_to_string(first.path().join("products.tsv")).unwrap();
+    assert!(products.starts_with("file\tapplicable\t"));
+    assert!(
+        products
+            .lines()
+            .find(|line| line.starts_with("cross-coupled-machine_single.wav\t"))
+            .unwrap()
+            .contains("\tfalse\t")
+    );
+    assert!(
+        products
+            .lines()
+            .find(|line| line.starts_with("cross-coupled-machine_chord.wav\t"))
+            .unwrap()
+            .contains("\ttrue\t")
+    );
 }
 
 fn run_lab(output: &Path) {

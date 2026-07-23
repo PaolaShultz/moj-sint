@@ -11,6 +11,51 @@ The perception, nonlinear/resonant engineering, chord, stereo, evidence, and
 safe-listening research for the three planned complete hybrid voices is in
 [`BASS_IMPACT_RESEARCH.md`](BASS_IMPACT_RESEARCH.md).
 
+### 2026-07-23 complete hybrid stereo/chord gate
+
+The research was converted into three isolated complete voice topologies rather
+than a bank of starter oscillators or several treatments of one dry source:
+
+- **Cross-coupled machine:** a short impact/body envelope, nonlinear
+  phase-coupled carrier, sparse harmonic spine, one explicit register
+  mechanism, phase-shifted subharmonic, split-band nonlinear paths,
+  cross-resonators, and unequal independently moving stereo delays.
+- **Spectral shadow:** four Moj Sint-authored partial states, smoothed
+  register-address perturbation, a divided lower shadow, asymmetric nonlinear
+  channel states, bounded cross-coupling, and independent slow stereo motion.
+- **Dual resonant body:** deterministic onset noise, a quiet pitch-bearing
+  exciter, sparse carry/borrow events, unequal low/high resonant bodies with
+  nonlinear feedback treatment, bounded cross-feedback, and separate moving
+  body delays.
+
+Each family has single-note, held three-note chord, four-chord progression, and
+explicit mono-fold renders. The chord topology instantiates three independent
+voices with deterministic seeds, performs nonlinear processing inside each
+voice, and only then mixes linearly. Target-note projections in every chord
+segment remain close to one another and comfortably inside the predeclared
+36 dB rejection boundary. Difference-product projections are descriptive, not
+a perceptual score; they are inapplicable to the single-note rows.
+
+Fresh 48 kHz release evidence reports finite 32-bit-float samples, peaks
+0.153129-0.283571, absolute DC no greater than 0.000029871, and genuine-stereo
+correlations of 0.651742-0.944257. Stereo side/mid ratios are
+0.031072-0.213552; explicit mono diagnostics produce correlation 1, side/mid
+zero, and zero difference signal. The three internal slow-rate sets are
+different and complete multiple cycles in the long audition conditions.
+
+The conservative 8x reference residual is not a pass/fail audibility metric.
+It measures -13.091/-12.831/-14.272 dB for the cross-coupled voice,
+-10.851/-8.386/-11.237 dB for spectral shadow, and
+-2.889/-11.124/-13.883 dB for dual resonant body at MIDI 36/60/84. The
+dual-body low-note result is severe and is retained as a negative engineering
+finding. None of these results is described as alias-clean or
+sample-rate-invariant.
+
+The files are normalized workstation audition material, not acoustic SPL,
+true-peak, tactile-impact, headphone, speaker, mono-listening, Raspberry Pi, or
+callback evidence. Human listening still decides whether any complete voice
+has the desired identity or whether all three should be rejected or revised.
+
 ## Oscillators and nonlinear DSP
 
 - Vesa Välimäki, Jussi Pekonen, and Juhan Nam, “Perceptually Informed

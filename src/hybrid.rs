@@ -2,12 +2,7 @@ use crate::dsp::hybrid::{HybridError, HybridFamily, HybridFrame, HybridVoice};
 use std::f32::consts::TAU;
 use thiserror::Error;
 
-pub const PROGRESSION: [[u8; 3]; 4] = [
-    [50, 53, 57],
-    [46, 50, 53],
-    [48, 52, 55],
-    [45, 48, 52],
-];
+pub const PROGRESSION: [[u8; 3]; 4] = [[50, 53, 57], [46, 50, 53], [48, 52, 55], [45, 48, 52]];
 const HELD_CHORD: [u8; 3] = [50, 53, 57];
 const SINGLE_NOTE: u8 = 38;
 
@@ -143,7 +138,7 @@ pub fn render_hybrid(spec: HybridRenderSpec) -> Result<HybridRender, HybridRende
                     spec.family,
                     sample_rate,
                     notes,
-                    0x5eed_1000 ^ index as u32 * 0x9e37,
+                    0x5eed_1000 ^ (index as u32 * 0x9e37),
                 )?;
                 let start = samples.len();
                 render_ensemble(&mut samples, &mut ensemble, spec.sample_rate, 4.0);
@@ -254,13 +249,8 @@ pub fn measure_hybrid(
     }
     let rms = (energy / samples.len() as f64).sqrt();
     let mono_rms = (mid_energy / frames as f64).sqrt();
-    let target_levels_db = target_notes.map(|note| {
-        amplitude_db(project_amplitude(
-            &mono,
-            sample_rate,
-            midi_frequency(note),
-        ))
-    });
+    let target_levels_db = target_notes
+        .map(|note| amplitude_db(project_amplitude(&mono, sample_rate, midi_frequency(note))));
     Ok(HybridMetrics {
         peak,
         rms,
@@ -290,13 +280,7 @@ pub fn measure_target_levels(samples: &[f32], sample_rate: f32, notes: [u8; 3]) 
         .chunks_exact(2)
         .map(|frame| 0.5 * (frame[0] + frame[1]))
         .collect();
-    notes.map(|note| {
-        amplitude_db(project_amplitude(
-            &mono,
-            sample_rate,
-            midi_frequency(note),
-        ))
-    })
+    notes.map(|note| amplitude_db(project_amplitude(&mono, sample_rate, midi_frequency(note))))
 }
 
 pub fn measure_frequency_levels(
@@ -308,9 +292,7 @@ pub fn measure_frequency_levels(
         .chunks_exact(2)
         .map(|frame| 0.5 * (frame[0] + frame[1]))
         .collect();
-    frequencies.map(|frequency| {
-        amplitude_db(project_amplitude(&mono, sample_rate, frequency))
-    })
+    frequencies.map(|frequency| amplitude_db(project_amplitude(&mono, sample_rate, frequency)))
 }
 
 pub fn measure_hybrid_alias_error(
@@ -327,8 +309,7 @@ pub fn measure_hybrid_alias_error(
     let frequency = midi_frequency(note);
     let seed = 0xa11a_5000 ^ u32::from(note);
     let mut target = HybridVoice::new(family, SAMPLE_RATE, frequency, seed)?;
-    let mut reference =
-        HybridVoice::new(family, SAMPLE_RATE * FACTOR as f32, frequency, seed)?;
+    let mut reference = HybridVoice::new(family, SAMPLE_RATE * FACTOR as f32, frequency, seed)?;
     for _ in 0..WARMUP {
         target.sample();
     }
@@ -393,10 +374,9 @@ fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
             residual * residual
         })
         .sum::<f64>();
-    10.0
-        * (residual_energy / target_energy.max(1.0e-24))
-            .max(1.0e-24)
-            .log10()
+    10.0 * (residual_energy / target_energy.max(1.0e-24))
+        .max(1.0e-24)
+        .log10()
 }
 
 fn amplitude_db(amplitude: f64) -> f64 {
@@ -413,9 +393,7 @@ pub fn midi_frequency(note: u8) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        HybridCondition, HybridEnsemble, HybridRenderSpec, PROGRESSION, render_hybrid,
-    };
+    use super::{HybridCondition, HybridEnsemble, HybridRenderSpec, PROGRESSION, render_hybrid};
     use crate::dsp::hybrid::{HybridFamily, HybridVoice};
     use assert_no_alloc::assert_no_alloc;
 

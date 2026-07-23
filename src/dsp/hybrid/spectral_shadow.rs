@@ -1,7 +1,7 @@
 use super::HybridFrame;
 use super::primitives::{
-    AllPass, DcBlocker, ImpactEnvelope, MovingDelay, OnePoleSplit, PhaseOsc,
-    RegisterOsc, soft_asymmetric,
+    AllPass, DcBlocker, ImpactEnvelope, MovingDelay, OnePoleSplit, PhaseOsc, RegisterOsc,
+    soft_asymmetric,
 };
 
 const PARTIALS: usize = 10;
@@ -103,7 +103,9 @@ impl SpectralShadow {
         let left_base = body * (0.55 * main + 0.19 * left_low + 0.16 * left_character) + onset;
         let right_base = body * (0.55 * main + 0.19 * right_low + 0.16 * right_character) - onset;
         let left_space = self.left_delay.sample(left_base, self.left_motion.sample());
-        let right_space = self.right_delay.sample(right_base, self.right_motion.sample());
+        let right_space = self
+            .right_delay
+            .sample(right_base, self.right_motion.sample());
         HybridFrame {
             left: self
                 .left_dc

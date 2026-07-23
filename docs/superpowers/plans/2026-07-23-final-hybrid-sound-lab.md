@@ -35,7 +35,7 @@ modulation, and low-band side/mid ranges.
 - Create: `src/dsp/hybrid/primitives.rs`
 - Modify: `src/dsp/mod.rs`
 
-- [ ] **Step 1: Write failing API and primitive tests**
+- [x] **Step 1: Write failing API and primitive tests**
 
 Add tests requiring:
 
@@ -59,7 +59,7 @@ reconstruction, stable all-pass state, fixed-delay bounds, moving-delay
 continuity, resonator feedback below unity, finite nonlinear helpers, and no
 allocation inside every primitive sample method.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -70,7 +70,7 @@ cargo test dsp::hybrid::tests -- --nocapture
 Expected: compilation fails because `dsp::hybrid` and `HybridVoice` do not
 exist.
 
-- [ ] **Step 3: Implement the minimal shared boundary**
+- [x] **Step 3: Implement the minimal shared boundary**
 
 Define:
 
@@ -99,7 +99,7 @@ odd and asymmetric soft drive, generated-component extraction, and a soft
 high-band gate. All coefficient preparation and `sin_cos` calls occur in
 constructors.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run:
 
@@ -109,7 +109,7 @@ cargo test dsp::hybrid::tests -- --nocapture
 
 Expected: primitive/API tests pass with no allocation.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```sh
 git add src/dsp/hybrid src/dsp/mod.rs
@@ -122,7 +122,7 @@ git commit -m "feat: add fixed-state hybrid DSP boundary"
 - Create: `src/dsp/hybrid/cross_coupled.rs`
 - Modify: `src/dsp/hybrid/mod.rs`
 
-- [ ] **Step 1: Write failing topology tests**
+- [x] **Step 1: Write failing topology tests**
 
 Require deterministic reset; finite samples bounded by `1.0`; retained base
 pitch; upper onset preceding the body rise; a centered fundamental plus sparse
@@ -133,7 +133,7 @@ cross-coupled resonator pairs; distinct L/R samples; the predeclared stereo and
 mono bounds; maximum adjacent jump below the declared bound; and
 allocation-free sampling.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```sh
 cargo test dsp::hybrid::tests::cross_coupled -- --nocapture
@@ -141,7 +141,7 @@ cargo test dsp::hybrid::tests::cross_coupled -- --nocapture
 
 Expected: failure because the family is not constructed.
 
-- [ ] **Step 3: Implement the complete voice**
+- [x] **Step 3: Implement the complete voice**
 
 Implement the approved flow:
 
@@ -157,7 +157,7 @@ low + high + sub -> asymmetric L/R resonator pairs with safe cross-feedback
 Use one register mechanism, not an array/swarm. Keep a centered component for
 mono survival but set gains so it cannot make L/R effectively identical.
 
-- [ ] **Step 4: Run focused and hybrid tests**
+- [x] **Step 4: Run focused and hybrid tests**
 
 ```sh
 cargo test dsp::hybrid::tests::cross_coupled -- --nocapture
@@ -166,7 +166,7 @@ cargo test dsp::hybrid::tests -- --nocapture
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```sh
 git add src/dsp/hybrid
@@ -179,7 +179,7 @@ git commit -m "feat: add cross-coupled machine voice"
 - Create: `src/dsp/hybrid/spectral_shadow.rs`
 - Modify: `src/dsp/hybrid/mod.rs`
 
-- [ ] **Step 1: Write failing topology tests**
+- [x] **Step 1: Write failing topology tests**
 
 Require four authored spectral states, exact prepared partial rotations,
 high-note partial guarding, smoothed fixed-width address perturbation, a
@@ -190,13 +190,13 @@ virtual-bass-spine evidence, retained fundamental, true stereo/mono survival,
 and allocation-free bounded sampling. In chord mode the real `f0/2` shadow
 must use the reduced headroom-safe level declared by the implementation.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```sh
 cargo test dsp::hybrid::tests::spectral_shadow -- --nocapture
 ```
 
-- [ ] **Step 3: Implement the complete voice**
+- [x] **Step 3: Implement the complete voice**
 
 Implement:
 
@@ -213,14 +213,14 @@ main + shadow -> asymmetric nonlinear L/R filter pair
 Normalize authored frames during construction and taper partials before
 Nyquist. Do not copy commercial wavetables or presets.
 
-- [ ] **Step 4: Run focused and hybrid tests**
+- [x] **Step 4: Run focused and hybrid tests**
 
 ```sh
 cargo test dsp::hybrid::tests::spectral_shadow -- --nocapture
 cargo test dsp::hybrid::tests -- --nocapture
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```sh
 git add src/dsp/hybrid
@@ -233,7 +233,7 @@ git commit -m "feat: add spectral shadow voice"
 - Create: `src/dsp/hybrid/dual_body.rs`
 - Modify: `src/dsp/hybrid/mod.rs`
 
-- [ ] **Step 1: Write failing topology tests**
+- [x] **Step 1: Write failing topology tests**
 
 Require deterministic onset noise; a quiet pitch-bearing nonlinear exciter;
 sparse explicit carry/borrow events; two unequal resonant bodies; low-body
@@ -244,13 +244,13 @@ energy below the transition limit before the following segment settles; no
 runaway/lockup; true stereo/mono survival; and allocation-free bounded
 sampling.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```sh
 cargo test dsp::hybrid::tests::dual_body -- --nocapture
 ```
 
-- [ ] **Step 3: Implement the complete voice**
+- [x] **Step 3: Implement the complete voice**
 
 Implement:
 
@@ -269,14 +269,14 @@ moving body delay L   independently moving body delay R
 Keep each feedback coefficient below its tested energy limit and DC-block the
 final channels.
 
-- [ ] **Step 4: Run focused and hybrid tests**
+- [x] **Step 4: Run focused and hybrid tests**
 
 ```sh
 cargo test dsp::hybrid::tests::dual_body -- --nocapture
 cargo test dsp::hybrid::tests -- --nocapture
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```sh
 git add src/dsp/hybrid
@@ -289,7 +289,7 @@ git commit -m "feat: add dual resonant body voice"
 - Create: `src/hybrid.rs`
 - Modify: `src/lib.rs`
 
-- [ ] **Step 1: Write failing ensemble tests**
+- [x] **Step 1: Write failing ensemble tests**
 
 Define test-facing types:
 
@@ -315,13 +315,13 @@ finite bounded output, per-voice nonlinear processing followed by a linear
 mix, non-silent mono fold, two deterministic alternative seed sets in
 engineering tests, and allocation-free three-voice ensemble sampling.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```sh
 cargo test hybrid::tests::ensemble -- --nocapture
 ```
 
-- [ ] **Step 3: Implement scheduling and rendering**
+- [x] **Step 3: Implement scheduling and rendering**
 
 Implement fixed `HybridEnsemble` storage for three voices and offline rendering
 for:
@@ -340,13 +340,13 @@ durations. Apply short deterministic chord-transition ramps and offline fades.
 For `ProgressionMono`, write the same mid signal to both output channels only
 after measuring the original stereo progression.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 ```sh
 cargo test hybrid::tests::ensemble -- --nocapture
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```sh
 git add src/hybrid.rs src/lib.rs
@@ -358,7 +358,7 @@ git commit -m "feat: add hybrid chord audition flow"
 **Files:**
 - Modify: `src/hybrid.rs`
 
-- [ ] **Step 1: Write failing measurement tests**
+- [x] **Step 1: Write failing measurement tests**
 
 Require deterministic metrics for sample peak, four-times interpolated peak
 (explicitly not ITU-R true peak), active RMS, DC, crest factor, maximum jump,
@@ -372,13 +372,13 @@ cross-note IMD. Require eight-times conservative residual evidence at MIDI
 36/60/84 for every family, with severe integer/sample-rate residual retained
 rather than converted into a passing score.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```sh
 cargo test hybrid::tests::measure -- --nocapture
 ```
 
-- [ ] **Step 3: Implement measurement helpers**
+- [x] **Step 3: Implement measurement helpers**
 
 Add `HybridMetrics`, onset/body timing, simple documented band-energy
 measurement, chord-segment note projections, note-pair/chord residual tables,
@@ -387,14 +387,14 @@ render/box-decimation/gain-fit residual, topology comparison hashes, and scalar
 timing hooks. Offline code may allocate; `HybridVoice::sample` and
 `HybridEnsemble::sample` may not.
 
-- [ ] **Step 4: Run measurement and all hybrid tests**
+- [x] **Step 4: Run measurement and all hybrid tests**
 
 ```sh
 cargo test hybrid::tests -- --nocapture
 cargo test dsp::hybrid::tests -- --nocapture
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```sh
 git add src/hybrid.rs
@@ -407,7 +407,7 @@ git commit -m "feat: measure hybrid stereo and harmony"
 - Create: `src/bin/hybrid-sound-lab.rs`
 - Create: `tests/hybrid_sound_cli.rs`
 
-- [ ] **Step 1: Write the failing CLI integration test**
+- [x] **Step 1: Write the failing CLI integration test**
 
 Invoke:
 
@@ -430,7 +430,7 @@ except volatile cost. The README must distinguish sample peak from the
 non-standard interpolated peak, true stereo from the mono-fold diagnostics,
 waveform design from playback SPL, and state that no sound is accepted.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```sh
 cargo test --test hybrid_sound_cli -- --nocapture
@@ -438,20 +438,20 @@ cargo test --test hybrid_sound_cli -- --nocapture
 
 Expected: failure because the binary does not exist.
 
-- [ ] **Step 3: Implement the lab CLI**
+- [x] **Step 3: Implement the lab CLI**
 
 Render all conditions, loudness-match comparable musical conditions under a
 conservative peak ceiling, write WAVs and reports, and provide the documented
 headphone/speaker/mono listening order. Keep all output under the caller's
 explicit directory.
 
-- [ ] **Step 4: Verify deterministic CLI output**
+- [x] **Step 4: Verify deterministic CLI output**
 
 ```sh
 cargo test --test hybrid_sound_cli -- --nocapture
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```sh
 git add src/bin/hybrid-sound-lab.rs tests/hybrid_sound_cli.rs
@@ -467,7 +467,7 @@ git commit -m "feat: render final hybrid sound lab"
 - Modify: `docs/superpowers/plans/2026-07-23-final-hybrid-sound-lab.md`
 - Generate only under: `artifacts/final-hybrid-sound-lab/`
 
-- [ ] **Step 1: Generate two fresh release batches**
+- [x] **Step 1: Generate two fresh release batches**
 
 ```sh
 cargo run --release --bin hybrid-sound-lab -- render /tmp/moj-sint-hybrid-a
@@ -477,7 +477,7 @@ cargo run --release --bin hybrid-sound-lab -- render /tmp/moj-sint-hybrid-b
 Compare recursive hashes excluding only `workstation-cost.txt`. Investigate any
 difference before proceeding.
 
-- [ ] **Step 2: Review release evidence**
+- [x] **Step 2: Review release evidence**
 
 Check every report for finite output, bounded peaks, DC, onset/body timing,
 crest factor, chord-note retention, non-harmonic products, actual L/R
@@ -486,7 +486,7 @@ coverage, feedback decay, alias residual, deterministic hashes, and distinct
 topology evidence. Fix defects test-first; do not tune musical taste from
 metrics alone.
 
-- [ ] **Step 3: Run the full repository matrix**
+- [x] **Step 3: Run the full repository matrix**
 
 ```sh
 cargo fmt --check
@@ -501,7 +501,7 @@ git diff --check
 
 Only the already accepted duplicate `winnow` warning may remain.
 
-- [ ] **Step 4: Record measured facts**
+- [x] **Step 4: Record measured facts**
 
 Update architecture, research, and handoff with topology, exact measurements,
 limitations, deterministic evidence, chord flow, and open human verdict. State

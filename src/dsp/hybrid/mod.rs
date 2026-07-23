@@ -38,6 +38,10 @@ pub enum HybridError {
 }
 
 #[derive(Debug)]
+// These disposable research voices deliberately keep their delay/resonator
+// storage inline. Boxing the largest variants would trade predictable fixed
+// state for heap allocation and pointer indirection at this DSP boundary.
+#[allow(clippy::large_enum_variant)]
 enum HybridState {
     CrossCoupledMachine(CrossCoupledMachine),
     SpectralShadow(SpectralShadow),
@@ -70,9 +74,11 @@ impl HybridVoice {
             HybridFamily::SpectralShadow => {
                 HybridState::SpectralShadow(SpectralShadow::new(sample_rate, frequency_hz, seed))
             }
-            HybridFamily::DualResonantBody => HybridState::DualResonantBody(
-                DualResonantBody::new(sample_rate, frequency_hz, seed),
-            ),
+            HybridFamily::DualResonantBody => HybridState::DualResonantBody(DualResonantBody::new(
+                sample_rate,
+                frequency_hz,
+                seed,
+            )),
         };
         Ok(Self { family, state })
     }
@@ -114,20 +120,18 @@ mod tests {
 
     #[test]
     fn hybrid_api_rejects_invalid_configuration_and_resets_deterministically() {
-        assert!(HybridVoice::new(
-            HybridFamily::CrossCoupledMachine,
-            0.0,
-            220.0,
-            0x1234_5678
-        )
-        .is_err());
-        assert!(HybridVoice::new(
-            HybridFamily::CrossCoupledMachine,
-            48_000.0,
-            24_000.0,
-            0x1234_5678
-        )
-        .is_err());
+        assert!(
+            HybridVoice::new(HybridFamily::CrossCoupledMachine, 0.0, 220.0, 0x1234_5678).is_err()
+        );
+        assert!(
+            HybridVoice::new(
+                HybridFamily::CrossCoupledMachine,
+                48_000.0,
+                24_000.0,
+                0x1234_5678
+            )
+            .is_err()
+        );
 
         let mut voice = HybridVoice::new(
             HybridFamily::CrossCoupledMachine,
@@ -149,8 +153,8 @@ mod tests {
     #[test]
     fn prepared_primitives_are_bounded_explicit_and_allocation_free() {
         use super::primitives::{
-            AllPass, DcBlocker, ImpactEnvelope, MovingDelay, OnePoleSplit, PhaseOsc,
-            RegisterOsc, soft_asymmetric, soft_clip,
+            AllPass, DcBlocker, ImpactEnvelope, MovingDelay, OnePoleSplit, PhaseOsc, RegisterOsc,
+            soft_asymmetric, soft_clip,
         };
 
         let mut oscillator = PhaseOsc::new(48_000.0, 220.0, 0.125);
@@ -228,14 +232,9 @@ mod tests {
     #[test]
     fn cross_coupled_machine_is_a_complete_stereo_voice() {
         assert_complete_stereo_voice(HybridFamily::CrossCoupledMachine);
-        let rates = HybridVoice::new(
-            HybridFamily::CrossCoupledMachine,
-            48_000.0,
-            110.0,
-            7,
-        )
-        .unwrap()
-        .movement_rates_hz();
+        let rates = HybridVoice::new(HybridFamily::CrossCoupledMachine, 48_000.0, 110.0, 7)
+            .unwrap()
+            .movement_rates_hz();
         assert!(rates[0] != rates[1] && rates[1] != rates[2]);
     }
 

@@ -1,8 +1,7 @@
 use moj_sint::dsp::hybrid::{HybridFamily, HybridVoice};
 use moj_sint::hybrid::{
-    HybridCondition, HybridRenderSpec, PROGRESSION, measure_frequency_levels,
-    measure_hybrid, measure_hybrid_alias_error, measure_target_levels, midi_frequency,
-    render_hybrid,
+    HybridCondition, HybridRenderSpec, PROGRESSION, measure_frequency_levels, measure_hybrid,
+    measure_hybrid_alias_error, measure_target_levels, midi_frequency, render_hybrid,
 };
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
@@ -45,7 +44,7 @@ fn render_lab(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     writeln!(
         impact,
-        "file\ttime_to_peak_ms\tearly_0_5ms_rms\tbody_20_40ms_rms\tmaximum_jump"
+        "file\tearly_peak_0_10ms_ms\tearly_0_5ms_rms\tbody_20_40ms_rms\tmaximum_jump"
     )?;
     writeln!(
         stereo,
@@ -57,7 +56,7 @@ fn render_lab(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     writeln!(
         products,
-        "file\tdifference1_hz\tdifference2_hz\tdifference3_hz\tlevel1_db\tlevel2_db\tlevel3_db"
+        "file\tapplicable\tdifference1_hz\tdifference2_hz\tdifference3_hz\tlevel1_db\tlevel2_db\tlevel3_db"
     )?;
 
     for family in HybridFamily::ALL {
@@ -105,17 +104,9 @@ fn render_lab(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             writeln!(
                 stereo,
                 "{filename}\t{:.6}\t{:.6}\t{:.6}\t{:.6}",
-                metrics.correlation,
-                metrics.side_to_mid,
-                metrics.mono_rms,
-                metrics.difference_rms
+                metrics.correlation, metrics.side_to_mid, metrics.mono_rms, metrics.difference_rms
             )?;
-            write_harmony_rows(
-                &mut harmony,
-                &filename,
-                condition,
-                &render.samples,
-            )?;
+            write_harmony_rows(&mut harmony, &filename, condition, &render.samples)?;
             write_product_row(&mut products, &filename, notes, &render.samples)?;
         }
     }
@@ -151,8 +142,7 @@ fn write_harmony_rows(
             for (index, notes) in PROGRESSION.iter().copied().enumerate() {
                 let start = 2 * index * segment_frames;
                 let end = start + 2 * segment_frames;
-                let levels =
-                    measure_target_levels(&samples[start..end], SAMPLE_RATE as f32, notes);
+                let levels = measure_target_levels(&samples[start..end], SAMPLE_RATE as f32, notes);
                 writeln!(
                     output,
                     "{filename}\t{index}\t{}\t{}\t{}\t{:.3}\t{:.3}\t{:.3}",
@@ -179,6 +169,9 @@ fn write_product_row(
     notes: [u8; 3],
     samples: &[f32],
 ) -> std::io::Result<()> {
+    if notes[0] == notes[1] && notes[1] == notes[2] {
+        return writeln!(output, "{filename}\tfalse\tNA\tNA\tNA\tNA\tNA\tNA");
+    }
     let frequencies = notes.map(midi_frequency);
     let differences = [
         (frequencies[1] - frequencies[0]).abs(),
@@ -188,14 +181,14 @@ fn write_product_row(
     let levels = measure_frequency_levels(samples, SAMPLE_RATE as f32, differences);
     writeln!(
         output,
-        "{filename}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}",
+        "{filename}\ttrue\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}",
         differences[0], differences[1], differences[2], levels[0], levels[1], levels[2]
     )
 }
 
 fn impact_metrics(samples: &[f32]) -> (f64, f64, f64) {
     let frames = samples.len() / 2;
-    let window = frames.min((0.1 * SAMPLE_RATE as f32) as usize);
+    let window = frames.min((0.01 * SAMPLE_RATE as f32) as usize);
     let mut peak = 0.0;
     let mut peak_index = 0;
     for (index, frame) in samples.chunks_exact(2).take(window).enumerate() {

@@ -1,7 +1,7 @@
 use super::HybridFrame;
 use super::primitives::{
-    DcBlocker, DelayResonator, ImpactEnvelope, MovingDelay, PhaseOsc, RegisterOsc,
-    soft_asymmetric, soft_clip,
+    DcBlocker, DelayResonator, ImpactEnvelope, MovingDelay, PhaseOsc, RegisterOsc, soft_asymmetric,
+    soft_clip,
 };
 
 #[derive(Debug)]
@@ -70,17 +70,14 @@ impl DualResonantBody {
         } else {
             0.0
         };
-        let tonal = impact.body
-            * (0.12 * self.carrier.sample() + 0.045 * self.upper.sample());
+        let tonal = impact.body * (0.12 * self.carrier.sample() + 0.045 * self.upper.sample());
         let event = if machine.carry || machine.borrow {
             0.055 * machine.value
         } else {
             0.0
         };
         let excitation = tonal + 0.18 * noise + event;
-        let low_a = self
-            .low_a
-            .sample(excitation, 0.035 * self.previous_high);
+        let low_a = self.low_a.sample(excitation, 0.035 * self.previous_high);
         let low_b = self
             .low_b
             .sample(0.38 * excitation, 0.021 * self.previous_high);
@@ -95,12 +92,14 @@ impl DualResonantBody {
         self.previous_low = low_body;
         self.previous_high = high_body;
         let center = 0.42 * excitation + 0.28 * low_body;
-        let left_space = self
-            .left_delay
-            .sample(0.58 * low_body + 0.42 * high_body, self.left_motion.sample());
-        let right_space = self
-            .right_delay
-            .sample(0.63 * low_body - 0.37 * high_body, self.right_motion.sample());
+        let left_space = self.left_delay.sample(
+            0.58 * low_body + 0.42 * high_body,
+            self.left_motion.sample(),
+        );
+        let right_space = self.right_delay.sample(
+            0.63 * low_body - 0.37 * high_body,
+            self.right_motion.sample(),
+        );
         HybridFrame {
             left: self
                 .left_dc

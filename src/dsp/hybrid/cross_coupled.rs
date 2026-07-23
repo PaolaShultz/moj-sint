@@ -1,7 +1,7 @@
 use super::HybridFrame;
 use super::primitives::{
-    AllPass, DcBlocker, DelayResonator, ImpactEnvelope, MovingDelay, OnePoleSplit,
-    PhaseOsc, RegisterOsc, soft_asymmetric, soft_clip,
+    AllPass, DcBlocker, DelayResonator, ImpactEnvelope, MovingDelay, OnePoleSplit, PhaseOsc,
+    RegisterOsc, soft_asymmetric, soft_clip,
 };
 
 #[derive(Debug)]
@@ -47,13 +47,7 @@ impl CrossCoupledMachine {
             pulse_motion: PhaseOsc::new(sample_rate, 0.61, phase + 0.11),
             stereo_left_motion: PhaseOsc::new(sample_rate, 0.37, phase + 0.29),
             stereo_right_motion: PhaseOsc::new(sample_rate, 0.43, phase + 0.71),
-            register: RegisterOsc::new(
-                12,
-                sample_rate,
-                frequency,
-                seed as u16 ^ 0x6d2b,
-                5,
-            ),
+            register: RegisterOsc::new(12, sample_rate, frequency, seed as u16 ^ 0x6d2b, 5),
             impact,
             split: OnePoleSplit::new(sample_rate, (3.5 * frequency).clamp(180.0, 1_200.0)),
             sub_phase: AllPass::new(0.47),
@@ -102,10 +96,12 @@ impl CrossCoupledMachine {
         self.previous_right_body = right_body;
         let left_move = self.stereo_left_motion.sample();
         let right_move = self.stereo_right_motion.sample();
-        let left_space = self.left_delay.sample(left_body + 0.12 * high_generated, left_move);
-        let right_space =
-            self.right_delay
-                .sample(right_body - 0.10 * high_generated, right_move);
+        let left_space = self
+            .left_delay
+            .sample(left_body + 0.12 * high_generated, left_move);
+        let right_space = self
+            .right_delay
+            .sample(right_body - 0.10 * high_generated, right_move);
         HybridFrame {
             left: self
                 .left_dc

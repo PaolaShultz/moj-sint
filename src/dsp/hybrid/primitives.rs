@@ -29,10 +29,8 @@ impl PhaseOsc {
     #[inline]
     pub(super) fn sample(&mut self) -> f32 {
         let output = self.sine;
-        let next_sine =
-            self.sine * self.rotation_cosine + self.cosine * self.rotation_sine;
-        self.cosine =
-            self.cosine * self.rotation_cosine - self.sine * self.rotation_sine;
+        let next_sine = self.sine * self.rotation_cosine + self.cosine * self.rotation_sine;
+        self.cosine = self.cosine * self.rotation_cosine - self.sine * self.rotation_sine;
         self.sine = next_sine;
         output
     }
@@ -263,8 +261,7 @@ impl<const N: usize> MovingDelay<N> {
         let first = position as usize;
         let second = if first + 1 == N { 0 } else { first + 1 };
         let fraction = position - first as f32;
-        let output =
-            self.buffer[first] + fraction * (self.buffer[second] - self.buffer[first]);
+        let output = self.buffer[first] + fraction * (self.buffer[second] - self.buffer[first]);
         self.buffer[self.write] = input;
         self.write += 1;
         if self.write == N {
@@ -307,8 +304,7 @@ impl DcBlocker {
 
     #[inline]
     pub(super) fn sample(&mut self, input: f32) -> f32 {
-        let output =
-            input - self.previous_input + self.coefficient * self.previous_output;
+        let output = input - self.previous_input + self.coefficient * self.previous_output;
         self.previous_input = input;
         self.previous_output = output;
         output
@@ -351,11 +347,9 @@ impl<const N: usize> DelayResonator<N> {
         let first = position as usize;
         let second = if first + 1 == N { 0 } else { first + 1 };
         let fraction = position - first as f32;
-        let delayed =
-            self.buffer[first] + fraction * (self.buffer[second] - self.buffer[first]);
+        let delayed = self.buffer[first] + fraction * (self.buffer[second] - self.buffer[first]);
         self.lowpass += self.damping * (delayed - self.lowpass);
-        self.buffer[self.write] =
-            soft_clip(input + self.feedback * self.lowpass + cross);
+        self.buffer[self.write] = soft_clip(input + self.feedback * self.lowpass + cross);
         self.write += 1;
         if self.write == N {
             self.write = 0;
