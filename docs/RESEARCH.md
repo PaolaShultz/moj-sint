@@ -5,6 +5,25 @@ Equations and described topologies may guide an independent implementation;
 third-party source code, presets, and samples must not be copied without a
 separate license review.
 
+## 2026-07-23 composite-machine discovery
+
+The complete reconstruction, exact pitch inventory, corrected delayed-launch
+interpretation, five successor topologies, three engineering iterations,
+ablation evidence, residual limitations, typed-routing implications, and open
+listening gate are recorded in
+[`COMPOSITE_MACHINE_RESEARCH.md`](COMPOSITE_MACHINE_RESEARCH.md).
+
+The central correction is that the twelve player processes did not start
+synchronously. The 30-voice first-four-second inventory is exact only for the
+sample-aligned counterfactual. Historical offsets are unknowable from the
+WAVs; the lab's 0-4110 ms stagger is a controlled estimate.
+
+Iteration A rejected a near-duplicate risky junction. Iteration B rejected
+excess junction products. Iteration C retains a distinct three-progression
+pairwise exchange whose isolated difference products have 31.281 dB margin
+below the weakest chord target. This is engineering acceptance only, not a
+musical verdict.
+
 ## 2026-07-23 visceral bass design research
 
 The perception, nonlinear/resonant engineering, chord, stereo, evidence, and

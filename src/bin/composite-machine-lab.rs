@@ -1,7 +1,8 @@
 use moj_sint::composite_machine::{
     CompositeCandidate, CompositeMachine, CompositeMetrics, CompositeRender, measure_ablations,
-    measure_composite, measure_composite_residual, measure_product_levels, measure_projection,
-    midi_frequency, render_composite, sample_similarity,
+    measure_composite, measure_composite_residual, measure_junction_product_levels,
+    measure_junction_residual, measure_product_levels, measure_projection, midi_frequency,
+    render_composite, sample_similarity,
 };
 use moj_sint::dsp::hybrid::HybridFamily;
 use std::fs::{self, File};
@@ -349,21 +350,31 @@ fn write_products(
     let mut file = writer(output, "products.tsv")?;
     writeln!(
         file,
-        "candidate\tjunction_applicable\tdifference1_hz\tdifference2_hz\tdifference3_hz\tlevel1_db\tlevel2_db\tlevel3_db"
+        "candidate\tmeasurement\tdifference1_hz\tdifference2_hz\tdifference3_hz\tlevel1_db\tlevel2_db\tlevel3_db"
     )?;
     for (candidate, stereo, _) in renders {
         let frames = (4 * sample_rate as usize).min(stereo.samples.len() / 2);
-        let levels = measure_product_levels(
-            &stereo.samples[..2 * frames],
-            sample_rate as f32,
-            [50, 53, 57],
-        );
+        let (measurement, levels) = if *candidate == CompositeCandidate::RiskyNonlinearBraid {
+            (
+                "junction_minus_linear_control",
+                measure_junction_product_levels(*candidate, sample_rate).map_err(io_other)?,
+            )
+        } else {
+            (
+                "total_output_descriptive",
+                measure_product_levels(
+                    &stereo.samples[..2 * frames],
+                    sample_rate as f32,
+                    [50, 53, 57],
+                ),
+            )
+        };
         let frequencies = [midi_frequency(50), midi_frequency(53), midi_frequency(57)];
         writeln!(
             file,
             "{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{:.3}\t{:.3}\t{:.3}",
             candidate.slug(),
-            candidate == &CompositeCandidate::RiskyNonlinearBraid,
+            measurement,
             frequencies[1] - frequencies[0],
             frequencies[2] - frequencies[1],
             frequencies[2] - frequencies[0],
@@ -377,16 +388,29 @@ fn write_products(
 
 fn write_residual(output: &Path, sample_rate: u32) -> std::io::Result<()> {
     let mut file = writer(output, "residual.tsv")?;
-    writeln!(file, "candidate\tresidual_db\treference\tframes")?;
+    writeln!(
+        file,
+        "candidate\tcomposite_residual_db\tjunction_residual_db\treference\tframes"
+    )?;
     let frames = if sample_rate == 48_000 { 4_096 } else { 512 };
     for candidate in CompositeCandidate::ALL {
         let residual =
             measure_composite_residual(candidate, sample_rate, frames).map_err(io_other)?;
+        let junction_residual = if candidate == CompositeCandidate::RiskyNonlinearBraid {
+            measure_junction_residual(candidate, sample_rate, frames).map_err(io_other)?
+        } else {
+            f64::NAN
+        };
         writeln!(
             file,
-            "{}\t{:.3}\t8x_box_decimated_conservative_residual\t{}",
+            "{}\t{:.3}\t{}\t8x_box_decimated_conservative_residual\t{}",
             candidate.slug(),
             residual,
+            if junction_residual.is_finite() {
+                format!("{junction_residual:.3}")
+            } else {
+                "NA".to_owned()
+            },
             frames
         )?;
     }
@@ -499,6 +523,29 @@ fn write_rejections(
             stereo.metrics.mono_to_stereo,
             0.5,
         )?;
+        if *candidate == CompositeCandidate::RiskyNonlinearBraid {
+            let frames = (4 * sample_rate as usize).min(stereo.samples.len() / 2);
+            let first_segment = &stereo.samples[..2 * frames];
+            let weakest_target = [50, 53, 57]
+                .map(|note| {
+                    measure_projection(first_segment, sample_rate as f32, midi_frequency(note))
+                })
+                .into_iter()
+                .fold(f64::INFINITY, f64::min);
+            let strongest_product = measure_junction_product_levels(*candidate, sample_rate)
+                .map_err(io_other)?
+                .into_iter()
+                .fold(f64::NEG_INFINITY, f64::max);
+            let margin = weakest_target - strongest_product;
+            rejection_row(
+                &mut file,
+                candidate,
+                "junction_product_margin_db",
+                margin >= 30.0,
+                margin,
+                30.0,
+            )?;
+        }
     }
     for first in 2..renders.len() {
         for second in first + 1..renders.len() {

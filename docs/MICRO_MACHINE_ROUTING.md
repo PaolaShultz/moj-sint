@@ -175,3 +175,36 @@ This sequence preserves the enormous routing possibility without committing
 the live instrument to abstractions that have not yet produced worthwhile
 sound.
 
+## 2026-07-23 composite evidence
+
+The composite-machine lab hardwired two typed connection patterns and found
+them active under automated evidence:
+
+```text
+AudioStereo -> Mid -> EnvelopeMeasurement
+EnvelopeMeasurement -> bounded ControlGain
+EnvelopeMeasurement -> bounded StereoSideScale
+```
+
+The follower traversed 0.75-1.25 and mute tests show all three source,
+destination, and side-response layers materially affect output.
+
+The risky original candidate also tested:
+
+```text
+AudioMono x AudioMono -> ProductAudio
+ProductAudio -> internal DC control -> bounded StereoMatrix
+```
+
+Its first revision was near-identical to another graph and its second produced
+excess difference products. The retained hardwired revision has isolated
+junction products 31.281 dB below the weakest scheduled target, but its
+isolated 8x residual is still -3.670 dB. This is evidence that product
+junctions require a distinct port/type, linear-control subtraction, DC state,
+and explicit product/residual reports. It is not evidence that the node is
+musically useful.
+
+The scheduler also validates candidate concepts for a future score/event
+boundary: deterministic seed/phase policy, sample-offset start, prepared gain,
+2x2 stereo matrix, and named layer probe. Do not extract these nodes or build
+the compiler until the user identifies audible value in the final batch.

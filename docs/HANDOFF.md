@@ -132,6 +132,12 @@ At this checkpoint:
   passes the predeclared finite, level, DC, stereo, mono, and target-note
   bounds, but human listening is still open. Nothing is selected, mapped, or
   routed into the production `Engine`.
+- The first strongly positive listening direction came from accidentally
+  combining all twelve hybrid files in separately launched player processes.
+  A new isolated composite-machine lab reconstructs a synchronized
+  counterfactual, a clearly labeled delayed-launch estimate, and five
+  structurally different successor graphs. Three engineering iterations pass
+  the predeclared bounds, but the musical verdict is open.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -629,12 +635,14 @@ and native evidence.
 
 ## Next action
 
-Listen to the twelve-file final hybrid batch on headphones, speakers, and in
-mono. Compare the three complete topologies first in their progression files,
-then use chord and single-note files to diagnose harmony and source identity,
-and use progression-mono only for collapse behavior. Record a verdict per
-family and per useful connection. Stop before selecting a production family,
-mapping controls, extracting the generic graph, or integrating `Engine`.
+Listen to `artifacts/composite-machine-lab/` in its README order:
+synchronized counterfactual, delayed-launch estimate, reduced stack,
+role-separated machine, harmonic lattice, cross-topology follower, and risky
+nonlinear braid. Only then compare matching mono diagnostics. Record which
+complete candidates retain the fused identity and whether the follower,
+role separation, harmonic lattice, mono duplication, or nonlinear exchange is
+audibly useful. Stop before selecting a production family, mapping controls,
+extracting the generic graph, or integrating `Engine`.
 
 ## Executed foundation checkpoint
 
@@ -900,3 +908,49 @@ does not establish “kidney-cutting” impact, translation, a useful macro, or 
 desirable sound. The ignored batch remains available only until the user gives
 the headphone/speaker/mono verdict. After that verdict, document conclusions
 and delete rejected output unless the user explicitly requests preservation.
+
+## Composite-machine checkpoint
+
+Completed on 2026-07-23 and awaiting human listening:
+
+- corrected the accident model: the real files were spawned in separate
+  processes with noticeable, unknown delays, so the 30-voice first-four-second
+  inventory applies only to a synchronized counterfactual;
+- implemented an exact internal twelve-schedule synchronized reference and a
+  clearly labeled 0-4110 ms delayed-launch estimate;
+- verified the synchronized render against the old twelve-WAV sum at
+  -90.31 dB peak and -130.35 dB RMS difference;
+- implemented reduced-stack, role-separated, harmonic-lattice,
+  cross-topology-follower, and risky pairwise-exchange machines;
+- rejected a 0.984317-correlated risky revision, then rejected a second
+  revision whose difference products had only 9.5 dB target margin;
+- retained a third risky revision whose isolated junction products have
+  31.281 dB margin, while honestly retaining its severe -3.670 dB isolated
+  high-rate residual;
+- measured peaks 0.066021-0.289289, maximum absolute DC 0.000006314,
+  correlations 0.753955-0.966233, side/mid 0.029964-0.147105, low-band
+  side/mid 0.026599-0.103616, and mono/stereo RMS 0.933681-0.985347;
+- found no inert final layer and no final candidate pair above 0.765512
+  correlation; and
+- kept `Engine`, presets, stable macros, JACK/ALSA, SHR-DAW, production
+  polyphony, and the generic graph compiler unchanged.
+
+The complete inventory, iterations, evidence, limitations, and typed-port
+suggestions are in `docs/COMPOSITE_MACHINE_RESEARCH.md`. The ignored final
+batch is `artifacts/composite-machine-lab/`. Automated bounds do not establish
+that any candidate preserves the accidental magic.
+
+Fresh integrated verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 79 library tests, one composite
+  CLI test, one five-family CLI test, one hybrid CLI test, and six offline CLI
+  tests passed with zero failures;
+- Clippy with warnings denied and release build: exit 0;
+- `cargo audit`: 35 locked crate dependencies scanned with no vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- AArch64 target check: exit 0, compile evidence only; and
+- two fresh release generations were byte-identical except volatile
+  workstation timing, with aggregate deterministic SHA-256
+  `73974529034c7bce2882cd1e792c142c0a1ac6bf31746b47bbc5cddcb084920c`.

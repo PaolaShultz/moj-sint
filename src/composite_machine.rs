@@ -227,6 +227,9 @@ pub struct CompositeMachine {
     follower_state: f32,
     last_follower_control: f32,
     last_junction: f32,
+    junction_dc_state: [f32; 2],
+    junction_dc_alpha: f32,
+    junction_enabled: bool,
     muted_layer: Option<usize>,
 }
 
@@ -262,6 +265,9 @@ impl CompositeMachine {
             follower_state: 0.0,
             last_follower_control: 0.75,
             last_junction: 0.0,
+            junction_dc_state: [0.0; 2],
+            junction_dc_alpha: 1.0 - (-std::f32::consts::TAU * 8.0 / sample_rate as f32).exp(),
+            junction_enabled: true,
             muted_layer,
         })
     }
@@ -299,19 +305,44 @@ impl CompositeMachine {
                     1.0
                 };
             let gain = layer.spec.mix_gain * follower_gain;
-            output.left += gain
-                * (layer.spec.matrix[0][0] * frame.left + layer.spec.matrix[0][1] * frame.right);
-            output.right += gain
-                * (layer.spec.matrix[1][0] * frame.left + layer.spec.matrix[1][1] * frame.right);
+            let matrix_left =
+                layer.spec.matrix[0][0] * frame.left + layer.spec.matrix[0][1] * frame.right;
+            let matrix_right =
+                layer.spec.matrix[1][0] * frame.left + layer.spec.matrix[1][1] * frame.right;
+            if self.candidate == CompositeCandidate::CrossTopologyFollower && index == 2 {
+                let mid = 0.5 * (matrix_left + matrix_right);
+                let side = 0.5 * (matrix_left - matrix_right);
+                let side_gain = 0.65 + 1.4 * (follower_control - 0.75);
+                output.left += gain * (mid + side_gain * side);
+                output.right += gain * (mid - side_gain * side);
+            } else {
+                output.left += gain * matrix_left;
+                output.right += gain * matrix_right;
+            }
         }
         self.last_junction = 0.0;
-        if self.candidate == CompositeCandidate::RiskyNonlinearBraid {
-            let first_mid = 0.5 * (raw[0].left + raw[0].right);
-            let third_mid = 0.5 * (raw[2].left + raw[2].right);
-            let junction = (2.4 * first_mid * third_mid).clamp(-0.06, 0.06);
-            output.left += junction;
-            output.right -= 0.32 * junction;
-            self.last_junction = junction;
+        if self.candidate == CompositeCandidate::RiskyNonlinearBraid && self.junction_enabled {
+            let a = 0.5 * (raw[0].left + raw[0].right);
+            let b = 0.5 * (raw[1].left + raw[1].right);
+            let c = 0.5 * (raw[2].left + raw[2].right);
+            let ab = a * b;
+            let bc = b * c;
+            let ca = c * a;
+            let center = 0.06 * (ab + bc + ca);
+            let side = 0.045 * (ab - bc);
+            let junction = [
+                (center + side).clamp(-0.06, 0.06),
+                (center - side).clamp(-0.06, 0.06),
+            ];
+            let mut high_passed = [0.0; 2];
+            for channel in 0..2 {
+                self.junction_dc_state[channel] +=
+                    self.junction_dc_alpha * (junction[channel] - self.junction_dc_state[channel]);
+                high_passed[channel] = junction[channel] - self.junction_dc_state[channel];
+            }
+            output.left += high_passed[0];
+            output.right += high_passed[1];
+            self.last_junction = high_passed[0];
         }
         self.frame_index = self.frame_index.saturating_add(1);
         output
@@ -322,6 +353,7 @@ impl CompositeMachine {
         self.follower_state = 0.0;
         self.last_follower_control = 0.75;
         self.last_junction = 0.0;
+        self.junction_dc_state = [0.0; 2];
     }
 
     pub fn candidate(&self) -> CompositeCandidate {
@@ -383,7 +415,7 @@ impl CompositeMachine {
                 "cross envelope measurement controls spectral gain"
             }
             CompositeCandidate::RiskyNonlinearBraid => {
-                "dry heterogeneous anchor+bounded multiplicative junction"
+                "three progression bodies+pairwise exchange junction+internal DC control"
             }
         }
     }
@@ -614,23 +646,23 @@ fn candidate_layer_specs(candidate: CompositeCandidate) -> Vec<LayerSpec> {
         CompositeCandidate::RiskyNonlinearBraid => vec![
             custom_spec(
                 HybridFamily::CrossCoupledMachine,
-                Score::Drone,
-                "cross-junction-source",
-                0.22,
+                Score::Progression,
+                "cross-pairwise-source",
+                0.10,
                 MID_FOCUS_MATRIX,
             ),
             custom_spec(
                 HybridFamily::SpectralShadow,
-                Score::LongHeldChord,
-                "spectral-dry-anchor",
-                0.22,
+                Score::Progression,
+                "spectral-pairwise-source",
+                0.10,
                 IDENTITY_MATRIX,
             ),
             custom_spec(
                 HybridFamily::DualResonantBody,
                 Score::Progression,
-                "dual-junction-source",
-                0.19,
+                "dual-pairwise-source",
+                0.10,
                 OPEN_MATRIX,
             ),
         ],
@@ -1100,6 +1132,53 @@ pub fn measure_composite_residual(
     Ok(fitted_residual_db(&target_samples, &reference_samples))
 }
 
+pub fn measure_junction_residual(
+    candidate: CompositeCandidate,
+    sample_rate: u32,
+    sample_count: usize,
+) -> Result<f64, CompositeError> {
+    const FACTOR: usize = 8;
+    let mut target = CompositeMachine::new(candidate, sample_rate)?;
+    let mut reference = CompositeMachine::new(candidate, sample_rate * FACTOR as u32)?;
+    let mut target_samples = Vec::with_capacity(sample_count);
+    let mut reference_samples = Vec::with_capacity(sample_count);
+    for _ in 0..sample_count {
+        target.sample();
+        target_samples.push(target.last_junction());
+        let mut reference_sum = 0.0;
+        for _ in 0..FACTOR {
+            reference.sample();
+            reference_sum += reference.last_junction();
+        }
+        reference_samples.push(reference_sum / FACTOR as f32);
+    }
+    Ok(fitted_residual_db(&target_samples, &reference_samples))
+}
+
+pub fn measure_junction_product_levels(
+    candidate: CompositeCandidate,
+    sample_rate: u32,
+) -> Result<[f64; 3], CompositeError> {
+    let mut with_junction = CompositeMachine::new(candidate, sample_rate)?;
+    let mut linear_control = with_junction.clone();
+    linear_control.junction_enabled = false;
+    let frames = (4 * sample_rate as usize)
+        .min(with_junction.duration_frames())
+        .min(linear_control.duration_frames());
+    let mut difference = Vec::with_capacity(2 * frames);
+    for _ in 0..frames {
+        let nonlinear = with_junction.sample();
+        let linear = linear_control.sample();
+        difference.push(nonlinear.left - linear.left);
+        difference.push(nonlinear.right - linear.right);
+    }
+    Ok(measure_product_levels(
+        &difference,
+        sample_rate as f32,
+        [50, 53, 57],
+    ))
+}
+
 pub fn measure_product_levels(samples: &[f32], sample_rate: f32, notes: [u8; 3]) -> [f64; 3] {
     let frequencies = notes.map(midi_frequency);
     crate::hybrid::measure_frequency_levels(
@@ -1325,5 +1404,39 @@ mod tests {
         let products =
             super::measure_product_levels(&render.samples[..8_000 * 2], 8_000.0, [50, 53, 57]);
         assert!(products.iter().all(|level| level.is_finite()));
+    }
+
+    #[test]
+    fn rejected_risky_revision_is_replaced_by_a_distinct_pairwise_exchange() {
+        let similarity = super::candidate_similarity(
+            CompositeCandidate::RoleSeparatedMachine,
+            CompositeCandidate::RiskyNonlinearBraid,
+            4_000,
+        )
+        .unwrap();
+        assert!(similarity.abs() < 0.90, "similarity={similarity}");
+        let residual =
+            super::measure_junction_residual(CompositeCandidate::RiskyNonlinearBraid, 2_000, 512)
+                .unwrap();
+        assert!(residual.is_finite());
+        assert!(residual <= 3.0);
+    }
+
+    #[test]
+    fn risky_junction_products_stay_below_the_dry_chord_targets() {
+        let render =
+            super::render_composite(CompositeCandidate::RiskyNonlinearBraid, 8_000, false).unwrap();
+        let first_segment = &render.samples[..2 * 4 * 8_000];
+        let targets = [50, 53, 57]
+            .map(|note| super::measure_projection(first_segment, 8_000.0, midi_frequency(note)));
+        let weakest_target = targets.iter().copied().fold(f64::INFINITY, f64::min);
+        let products =
+            super::measure_junction_product_levels(CompositeCandidate::RiskyNonlinearBraid, 8_000)
+                .unwrap();
+        let strongest_product = products.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        assert!(
+            strongest_product <= weakest_target - 30.0,
+            "products={products:?} targets={targets:?}"
+        );
     }
 }
