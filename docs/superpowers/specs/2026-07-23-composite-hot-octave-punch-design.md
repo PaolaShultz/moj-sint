@@ -82,8 +82,8 @@ The envelope is applied to each scheduled D1 pedal source before stereo
 matrixing and composite summing. References are never enveloped. The
 engineering sweep covers distinct bounded settings across attack 1-5 ms,
 decay 70-160 ms, sustain 0.55-0.75, and release 100-250 ms. It rejects settings
-that breach the hot peak contract, fail continuity, or fail to create measured
-onset-to-sustain contrast. Exactly one retained setting is rendered per
+that breach the hot peak contract, fail continuity, or fail to reach a measured
+onset-to-sustain ratio of at least 1.05. Exactly one retained setting is rendered per
 topology; metrics do not call it punchy.
 
 Reports include 10/50/100/250 ms RMS and peak, onset-to-sustain ratio, measured

@@ -258,3 +258,130 @@ The precise next action is to record which complete candidates retain the
 accident's fused identity and which individual connections are audibly useful.
 Only then decide whether to preserve a specific result, extract typed nodes, or
 route any mechanism toward production.
+
+## 2026-07-23 hot audition, octave, bass, and punch correction
+
+### Cause and consequence of the old level mismatch
+
+The previous listening set was not level controlled. Every source layer was
+prepared from its own whole-file RMS, candidate mix gains were selected for
+headroom, and the final report again measured whole files. Delayed starts,
+inactive score intervals, and tails therefore lowered some rows independently.
+The synchronized reference also accumulated twelve schedules coherently at
+sample zero, which was not how the separately launched player accident began.
+
+The synchronized raw reference measured 0.070910 RMS, 7.088 dB above the
+0.031355 delayed-launch estimate. Its advantage over reduced, role-separated,
+harmonic-lattice, follower, and risky candidates was respectively 7.900,
+8.347, 8.795, 9.204, and 12.052 dB. Relative to the more relevant delayed
+estimate, those candidates were only 0.812, 1.259, 1.707, 2.116, and 4.964 dB
+lower. The old order therefore strongly biased first impressions toward the
+synchronized counterfactual.
+
+### Declared output contract and prepared gains
+
+The hot audition path measures the same 4.25-8.00 second musically active
+window for every full-score render. Its target is 0.12 stereo RMS, with
+0.10-0.14 accepted when one shared octave gain must expose register
+differences. The hard sample-peak ceiling is 0.75. Gain is one explicit
+constant multiplication after raw synthesis. There is no limiter, compressor,
+clipper, per-file normalizer, peak maximizer, or emergency make-up stage.
+
+| Topology | Full score | Held D1/D2/D3 | D1 pedal | Punch |
+| --- | ---: | ---: | ---: | ---: |
+| synchronized reference | 1.731418 (+4.768 dB) | n/a | n/a | n/a |
+| delayed-launch estimate | 2.881948 (+9.194 dB) | n/a | n/a | n/a |
+| reduced stack | 3.979082 (+11.996 dB) | 3.520000 (+10.931 dB) | 3.498000 (+10.876 dB) | 4.114000 (+12.285 dB) |
+| role-separated | 4.638279 (+13.327 dB) | 4.110000 (+12.277 dB) | 3.678000 (+11.312 dB) | 4.493000 (+13.051 dB) |
+| harmonic lattice | 4.906858 (+13.816 dB) | 3.640000 (+11.222 dB) | 3.760000 (+11.504 dB) | 4.609000 (+13.272 dB) |
+| cross-topology follower | 5.123818 (+14.192 dB) | 3.760000 (+11.504 dB) | 3.974000 (+11.985 dB) | 5.030000 (+14.031 dB) |
+| risky braid | 6.633916 (+16.435 dB) | 10.100000 (+20.086 dB) | 4.729000 (+13.495 dB) | 6.665000 (+16.476 dB) |
+
+Full-score hot active RMS is 0.120000 within report precision and peaks are
+0.431441-0.522820. D1 pedal active RMS is 0.122867-0.134671 with peaks
+0.475787-0.531482. Punch active RMS is 0.114396-0.125566 with peaks
+0.505186-0.581495. Raw renders and hashes remain separately available; the
+synchronized and delayed raw hashes are sample-identical to the preceding
+batch.
+
+Digital level is not acoustic SPL and is not evidence of safe playback volume.
+The hot batch must still be auditioned from a comfortable low monitor or
+headphone setting.
+
+### Same-topology octave and bass evidence
+
+The five candidates were rendered as held MIDI 26 D1 (36.708099 Hz), MIDI 38
+D2 (73.416199 Hz), and MIDI 50 D3 (146.832382 Hz). One fixed gain per topology
+is reused across all three registers:
+
+| Topology | D1 active RMS | D2 active RMS | D3 active RMS |
+| --- | ---: | ---: | ---: |
+| reduced stack | 0.125621 | 0.111266 | 0.100298 |
+| role-separated | 0.119816 | 0.100051 | 0.117123 |
+| harmonic lattice | 0.139794 | 0.130912 | 0.126510 |
+| follower | 0.123321 | 0.100187 | 0.117170 |
+| risky braid | 0.131109 | 0.100067 | 0.119978 |
+
+No octave is independently normalized. Peaks are 0.353137-0.542087.
+Correlation is 0.576155-0.966702, side/mid is 0.026448-0.290644,
+low-band side/mid is 0.021902-0.450904, and mono fold loss is only
+0.113-1.108 dB. The held renderer explicitly retains the dynamic follower and
+pairwise nonlinear/DC-control mechanisms; an intermediate implementation that
+omitted them made role-separated and follower rows more than 0.999 correlated
+and was rejected. Final held pair similarities remain below 0.974.
+
+The octave results expose rather than conceal weak pitch behavior. In
+particular, risky-braid D1 measures its nominal 36.7 Hz projection at
+-60.520 dB while its octave and third-harmonic projections are -23.399 and
+-23.209 dB. That is severe weak-fundamental bass behavior, not a successful D1
+claim. Across octave rows, the conservative worst-constituent 8x residual is
+-1.862 to -0.341 dB. These very high residuals, the earlier dual-body
+MIDI-36 result, and the full-score residuals remain known alias/sample-rate
+limitations. They are not evidence of inaudibility.
+
+Every full musical candidate also has one explicit D1 pedal source. The punch
+version envelopes that source before its stereo matrix and composite sum; it
+does not envelope or normalize the master mix. Matching D1 held, pedal, and
+punch mono diagnostics are placed after all stereo listening files.
+
+### Research ADSR sweep
+
+The sample-accurate research ADSR owns prepared integer stage lengths, remains
+finite and bounded in [0, 1], retriggers deterministically from zero, and
+releases continuously from its current level. Allocation tests cover its
+sample path. It does not alter either reconstruction reference.
+
+The formal sweep tested:
+
+- 1/70/0.55/100 ms, rejected because onset-to-sustain ratio was
+  0.950-0.954, below 1.05;
+- 3/110/0.55/180 ms, retained as the bounded engineering candidate; and
+- 5/160/0.75/250 ms, rejected because the ratio was 0.939-0.942.
+
+An earlier 3/110/0.65/180 revision was also rejected during report review:
+its 48 kHz ratio was only about 0.98, so it mostly lowered the source rather
+than establishing the required onset/body contrast.
+
+For the retained setting, onset-to-sustain ratio is 1.094-1.098, maximum
+sample jump is 0.0225-0.0339 in the isolated hot probe, release-event jump is
+0.000250-0.011936, and measured attack/decay settling are 3/113 ms. The report
+also retains 10/50/100/250 ms RMS and peak, low-band transient RMS,
+fundamental-through-decay change, 180 ms tail, peak, and crest values.
+Measurements may establish bounded contrast; they cannot declare the result
+musically punchy.
+
+### Final disposable batch and open decision
+
+The ignored batch now contains 54 WAVs in eight README sections: hot delayed
+reference, hot synchronized counterfactual, five hot full-score candidates,
+fifteen D1/D2/D3 held files, five D1 pedal versions, five punch versions,
+fifteen mono diagnostics, and seven raw engineering renders. Reports cover
+gain policy, octave behavior, ADSR sweep, allocation, residuals, similarity,
+hashes, stereo/mono, bands, projections, reconstruction regression, forbidden
+processors, and workstation cost.
+
+The exact next human decision is whether any topology retains the fused
+accidental identity at controlled level; whether its D1 behavior is musically
+usable on headphones, speakers, and mono; and whether the single retained
+envelope produces desirable punch. No topology, octave behavior, or ADSR has
+been musically accepted.

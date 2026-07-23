@@ -24,6 +24,45 @@ pairwise exchange whose isolated difference products have 31.281 dB margin
 below the weakest chord target. This is engineering acceptance only, not a
 musical verdict.
 
+### 2026-07-23 level, octave, bass, and punch correction
+
+The first composite batch was not a fair listening comparison. Whole-file
+layer preparation plus whole-file final metering let launch silence, score
+activity, and tails affect candidates differently, while the synchronized
+twelve-schedule counterfactual accumulated coherently at sample zero. It was
+7.088 dB louder than the delayed estimate and 7.900-12.052 dB louder than the
+five candidates.
+
+The replacement audition path preserves raw synthesis and hashes, measures the
+same 4.25-8.00 second active body, and applies one declared constant output
+gain per topology/audition kind. Hot target RMS is 0.12, accepted range is
+0.10-0.14 for shared-register policy, and hard peak is 0.75. No limiting,
+compression, clipping, per-file normalization, or maximization is present.
+The delayed estimate is the primary reference; synchronization is explicitly a
+counterfactual.
+
+Same-topology held renders now cover MIDI 26/38/50 at
+36.708099/73.416199/146.832382 Hz. One gain is shared across each topology's
+three registers. Active RMS is 0.100051-0.139794 and peaks are
+0.353137-0.542087. The risky D1 nominal fundamental is only -60.520 dB while
+its octave/third are about -23.4/-23.2 dB, so the hot level does not conceal
+its weak bass pitch. Worst constituent high-rate residual is -1.862 to
+-0.341 dB and remains severe.
+
+The isolated research ADSR sweep rejected 1/70/0.55/100 and
+5/160/0.75/250 ms because onset-to-sustain ratios stayed below 1.05. An
+intermediate 3/110/0.65/180 revision also measured only about 0.98. The retained
+engineering candidate is 3 ms attack, 110 ms decay, 0.55 sustain, and 180 ms
+release; its ratio is 1.094-1.098. It operates on each scheduled D1 source
+before composite summing and is deterministic, bounded, finite, continuous,
+and allocation-free in sampling tests. None of those facts establishes
+musical punch.
+
+The complete evidence, exact gain table, stereo/mono findings, known
+limitations, and human listening order are in
+[`COMPOSITE_MACHINE_RESEARCH.md`](COMPOSITE_MACHINE_RESEARCH.md). Digital level
+is not acoustic SPL or safe playback-volume evidence.
+
 ## 2026-07-23 visceral bass design research
 
 The perception, nonlinear/resonant engineering, chord, stereo, evidence, and

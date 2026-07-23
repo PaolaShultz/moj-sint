@@ -16,6 +16,12 @@ const MAX_LAYERS: usize = 12;
 const IDENTITY_MATRIX: [[f32; 2]; 2] = [[1.0, 0.0], [0.0, 1.0]];
 const MID_FOCUS_MATRIX: [[f32; 2]; 2] = [[0.86, 0.14], [0.14, 0.86]];
 const OPEN_MATRIX: [[f32; 2]; 2] = [[1.04, -0.04], [-0.04, 1.04]];
+pub const ACTIVE_BODY_START_SECONDS: f64 = 4.25;
+pub const ACTIVE_BODY_END_SECONDS: f64 = 8.0;
+pub const HOT_TARGET_RMS: f64 = 0.12;
+pub const HOT_MINIMUM_RMS: f64 = 0.10;
+pub const HOT_MAXIMUM_RMS: f64 = 0.14;
+pub const HOT_PEAK_CEILING: f64 = 0.75;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CompositeCandidate {
@@ -57,6 +63,223 @@ impl CompositeCandidate {
             Self::CrossTopologyFollower => "cross-topology-follower",
             Self::RiskyNonlinearBraid => "risky-nonlinear-braid",
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OutputGainPolicy {
+    pub linear: f32,
+    pub decibels: f64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AuditionKind {
+    HeldOctave,
+    BassPedal,
+    Punch,
+}
+
+pub fn audition_gain_policy(candidate: CompositeCandidate, kind: AuditionKind) -> OutputGainPolicy {
+    let linear = match kind {
+        // These tables are deliberately independent of pitch. They are
+        // calibrated from the complete three-register set, never per file.
+        AuditionKind::HeldOctave => match candidate {
+            CompositeCandidate::ReducedHeterogeneousStack => 3.52,
+            CompositeCandidate::RoleSeparatedMachine => 4.11,
+            CompositeCandidate::HarmonicLattice => 3.64,
+            CompositeCandidate::CrossTopologyFollower => 3.76,
+            CompositeCandidate::RiskyNonlinearBraid => 10.10,
+            _ => gain_policy(candidate).linear,
+        },
+        AuditionKind::BassPedal => match candidate {
+            CompositeCandidate::ReducedHeterogeneousStack => 3.498,
+            CompositeCandidate::RoleSeparatedMachine => 3.678,
+            CompositeCandidate::HarmonicLattice => 3.76,
+            CompositeCandidate::CrossTopologyFollower => 3.974,
+            CompositeCandidate::RiskyNonlinearBraid => 4.729,
+            _ => gain_policy(candidate).linear,
+        },
+        AuditionKind::Punch => match candidate {
+            CompositeCandidate::ReducedHeterogeneousStack => 4.114,
+            CompositeCandidate::RoleSeparatedMachine => 4.493,
+            CompositeCandidate::HarmonicLattice => 4.609,
+            CompositeCandidate::CrossTopologyFollower => 5.03,
+            CompositeCandidate::RiskyNonlinearBraid => 6.665,
+            _ => gain_policy(candidate).linear,
+        },
+    };
+    OutputGainPolicy {
+        linear,
+        decibels: 20.0 * f64::from(linear).log10(),
+    }
+}
+
+pub fn gain_policy(candidate: CompositeCandidate) -> OutputGainPolicy {
+    let linear = match candidate {
+        CompositeCandidate::SynchronizedReference => 1.731_418_3,
+        CompositeCandidate::DelayedLaunchEstimate => 2.881_948,
+        CompositeCandidate::ReducedHeterogeneousStack => 3.979_082,
+        CompositeCandidate::RoleSeparatedMachine => 4.638_279,
+        CompositeCandidate::HarmonicLattice => 4.906_858,
+        CompositeCandidate::CrossTopologyFollower => 5.123_818,
+        CompositeCandidate::RiskyNonlinearBraid => 6.633_916_4,
+    };
+    OutputGainPolicy {
+        linear,
+        decibels: 20.0 * f64::from(linear).log10(),
+    }
+}
+
+#[derive(Clone, Copy, Debug, Error, PartialEq)]
+pub enum ResearchAdsrError {
+    #[error("ADSR times must be finite and positive")]
+    InvalidTime,
+    #[error("ADSR sustain must be finite and between zero and one")]
+    InvalidSustain,
+    #[error("ADSR sample rate must be positive")]
+    InvalidSampleRate,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ResearchAdsrConfig {
+    pub attack_seconds: f32,
+    pub decay_seconds: f32,
+    pub sustain_level: f32,
+    pub release_seconds: f32,
+}
+
+impl ResearchAdsrConfig {
+    pub fn new(
+        attack_seconds: f32,
+        decay_seconds: f32,
+        sustain_level: f32,
+        release_seconds: f32,
+    ) -> Result<Self, ResearchAdsrError> {
+        if !attack_seconds.is_finite()
+            || attack_seconds <= 0.0
+            || !decay_seconds.is_finite()
+            || decay_seconds <= 0.0
+            || !release_seconds.is_finite()
+            || release_seconds <= 0.0
+        {
+            return Err(ResearchAdsrError::InvalidTime);
+        }
+        if !sustain_level.is_finite() || !(0.0..=1.0).contains(&sustain_level) {
+            return Err(ResearchAdsrError::InvalidSustain);
+        }
+        Ok(Self {
+            attack_seconds,
+            decay_seconds,
+            sustain_level,
+            release_seconds,
+        })
+    }
+}
+
+pub fn retained_punch_config() -> ResearchAdsrConfig {
+    ResearchAdsrConfig {
+        attack_seconds: 0.003,
+        decay_seconds: 0.110,
+        sustain_level: 0.55,
+        release_seconds: 0.180,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ResearchAdsrStage {
+    Idle,
+    Attack,
+    Decay,
+    Sustain,
+    Release,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ResearchAdsr {
+    config: ResearchAdsrConfig,
+    attack_samples: u32,
+    decay_samples: u32,
+    release_samples: u32,
+    stage: ResearchAdsrStage,
+    stage_sample: u32,
+    level: f32,
+    release_start: f32,
+}
+
+impl ResearchAdsr {
+    pub fn new(sample_rate: u32, config: ResearchAdsrConfig) -> Result<Self, ResearchAdsrError> {
+        if sample_rate == 0 {
+            return Err(ResearchAdsrError::InvalidSampleRate);
+        }
+        let to_samples = |seconds: f32| ((seconds * sample_rate as f32).round() as u32).max(1);
+        Ok(Self {
+            config,
+            attack_samples: to_samples(config.attack_seconds),
+            decay_samples: to_samples(config.decay_seconds),
+            release_samples: to_samples(config.release_seconds),
+            stage: ResearchAdsrStage::Idle,
+            stage_sample: 0,
+            level: 0.0,
+            release_start: 0.0,
+        })
+    }
+
+    pub fn note_on(&mut self) {
+        self.stage = ResearchAdsrStage::Attack;
+        self.stage_sample = 0;
+        self.level = 0.0;
+        self.release_start = 0.0;
+    }
+
+    pub fn note_off(&mut self) {
+        if self.stage != ResearchAdsrStage::Idle {
+            self.stage = ResearchAdsrStage::Release;
+            self.stage_sample = 0;
+            self.release_start = self.level;
+        }
+    }
+
+    #[inline]
+    pub fn sample(&mut self) -> f32 {
+        match self.stage {
+            ResearchAdsrStage::Idle => self.level = 0.0,
+            ResearchAdsrStage::Attack => {
+                self.stage_sample += 1;
+                self.level = self.stage_sample as f32 / self.attack_samples as f32;
+                if self.stage_sample >= self.attack_samples {
+                    self.level = 1.0;
+                    self.stage = ResearchAdsrStage::Decay;
+                    self.stage_sample = 0;
+                }
+            }
+            ResearchAdsrStage::Decay => {
+                self.stage_sample += 1;
+                let progress = self.stage_sample as f32 / self.decay_samples as f32;
+                self.level = 1.0 - (1.0 - self.config.sustain_level) * progress;
+                if self.stage_sample >= self.decay_samples {
+                    self.level = self.config.sustain_level;
+                    self.stage = ResearchAdsrStage::Sustain;
+                    self.stage_sample = 0;
+                }
+            }
+            ResearchAdsrStage::Sustain => self.level = self.config.sustain_level,
+            ResearchAdsrStage::Release => {
+                self.stage_sample += 1;
+                let progress = self.stage_sample as f32 / self.release_samples as f32;
+                self.level = self.release_start * (1.0 - progress);
+                if self.stage_sample >= self.release_samples {
+                    self.level = 0.0;
+                    self.stage = ResearchAdsrStage::Idle;
+                    self.stage_sample = 0;
+                }
+            }
+        }
+        self.level = self.level.clamp(0.0, 1.0);
+        self.level
+    }
+
+    pub fn level(&self) -> f32 {
+        self.level
     }
 }
 
@@ -526,6 +749,51 @@ pub struct CompositeRender {
     pub metrics: CompositeMetrics,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct HotCompositeRender {
+    pub samples: Vec<f32>,
+    pub metrics: CompositeMetrics,
+    pub active_body_rms: f64,
+    pub raw_hash: u64,
+    pub gain: OutputGainPolicy,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct AuditionRender {
+    pub samples: Vec<f32>,
+    pub metrics: CompositeMetrics,
+    pub active_body_rms: f64,
+    pub raw_rms: f64,
+    pub raw_peak: f64,
+    pub raw_hash: u64,
+    pub gain: OutputGainPolicy,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PunchMetrics {
+    pub window_rms: [f64; 4],
+    pub window_peak: [f64; 4],
+    pub onset_to_sustain_ratio: f64,
+    pub attack_time_ms: f64,
+    pub decay_settling_ms: f64,
+    pub maximum_jump: f64,
+    pub low_band_transient_rms: f64,
+    pub fundamental_decay_change_db: f64,
+    pub release_continuity_jump: f64,
+    pub tail_duration_ms: f64,
+    pub peak: f64,
+    pub crest_factor: f64,
+    pub finite: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PunchSweepRow {
+    pub config: ResearchAdsrConfig,
+    pub metrics: PunchMetrics,
+    pub retained: bool,
+    pub status: &'static str,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AblationRow {
     pub layer_index: usize,
@@ -855,6 +1123,392 @@ pub fn render_composite(
     mono: bool,
 ) -> Result<CompositeRender, CompositeError> {
     render_composite_with_mute(candidate, sample_rate, mono, None)
+}
+
+pub fn render_hot_composite(
+    candidate: CompositeCandidate,
+    sample_rate: u32,
+) -> Result<HotCompositeRender, CompositeError> {
+    let raw = render_composite(candidate, sample_rate, false)?;
+    let raw_hash = raw.metrics.sample_hash;
+    let gain = gain_policy(candidate);
+    let samples: Vec<f32> = raw
+        .samples
+        .iter()
+        .map(|sample| sample * gain.linear)
+        .collect();
+    let metrics = measure_composite(&samples, sample_rate as f32);
+    let active_body_rms = window_rms(
+        &samples,
+        sample_rate,
+        ACTIVE_BODY_START_SECONDS,
+        ACTIVE_BODY_END_SECONDS,
+    );
+    Ok(HotCompositeRender {
+        samples,
+        metrics,
+        active_body_rms,
+        raw_hash,
+        gain,
+    })
+}
+
+pub fn render_held_candidate(
+    candidate: CompositeCandidate,
+    note: u8,
+    sample_rate: u32,
+) -> Result<AuditionRender, CompositeError> {
+    let raw_samples = render_held_candidate_raw(candidate, note, sample_rate)?;
+    Ok(prepare_audition_render(
+        raw_samples,
+        sample_rate,
+        audition_gain_policy(candidate, AuditionKind::HeldOctave),
+        0.25,
+        3.75,
+    ))
+}
+
+pub fn render_bass_candidate(
+    candidate: CompositeCandidate,
+    sample_rate: u32,
+    punch: bool,
+) -> Result<AuditionRender, CompositeError> {
+    let kind = if punch {
+        AuditionKind::Punch
+    } else {
+        AuditionKind::BassPedal
+    };
+    let raw_samples =
+        render_bass_candidate_raw(candidate, sample_rate, punch.then(retained_punch_config))?;
+    Ok(prepare_audition_render(
+        raw_samples,
+        sample_rate,
+        audition_gain_policy(candidate, kind),
+        ACTIVE_BODY_START_SECONDS,
+        ACTIVE_BODY_END_SECONDS,
+    ))
+}
+
+fn render_bass_candidate_raw(
+    candidate: CompositeCandidate,
+    sample_rate: u32,
+    punch_config: Option<ResearchAdsrConfig>,
+) -> Result<Vec<f32>, CompositeError> {
+    let mut raw = render_composite(candidate, sample_rate, false)?.samples;
+    let frames = raw.len() / 2;
+    let family = candidate_layer_specs(candidate)
+        .first()
+        .map(|spec| spec.family)
+        .unwrap_or(HybridFamily::CrossCoupledMachine);
+    let mut pedal = HybridVoice::new(
+        family,
+        sample_rate as f32,
+        midi_frequency(26),
+        0xd100_0000 ^ candidate as u32,
+    )
+    .map_err(HybridRenderError::from)?;
+    let mut envelope = punch_config
+        .map(|config| ResearchAdsr::new(sample_rate, config))
+        .transpose()
+        .map_err(|_| CompositeError::InvalidSampleRate)?;
+    let segment_frames = 4 * sample_rate as usize;
+    let gate_frames = 3 * sample_rate as usize / 4;
+    let fade_frames = ((0.02 * sample_rate as f32).round() as usize).max(1);
+    for frame_index in 0..frames {
+        let envelope_gain = if let Some(envelope) = &mut envelope {
+            let segment_frame = frame_index % segment_frames;
+            if segment_frame == 0 {
+                envelope.note_on();
+            } else if segment_frame == gate_frames {
+                envelope.note_off();
+            }
+            envelope.sample()
+        } else {
+            (frame_index as f32 / fade_frames as f32)
+                .min(1.0)
+                .min(((frames - 1 - frame_index) as f32 / fade_frames as f32).min(1.0))
+        };
+        let frame = pedal.sample();
+        let mid_left = 0.86 * frame.left + 0.14 * frame.right;
+        let mid_right = 0.14 * frame.left + 0.86 * frame.right;
+        raw[2 * frame_index] += 0.18 * envelope_gain * mid_left;
+        raw[2 * frame_index + 1] += 0.18 * envelope_gain * mid_right;
+    }
+    Ok(raw)
+}
+
+pub fn punch_sweep(
+    candidate: CompositeCandidate,
+    sample_rate: u32,
+) -> Result<Vec<PunchSweepRow>, CompositeError> {
+    let settings = [
+        ResearchAdsrConfig::new(0.001, 0.070, 0.55, 0.100).expect("fixed sweep setting is valid"),
+        retained_punch_config(),
+        ResearchAdsrConfig::new(0.005, 0.160, 0.75, 0.250).expect("fixed sweep setting is valid"),
+    ];
+    let mut rows = Vec::with_capacity(settings.len());
+    let mut selected = None;
+    let mut best_score = f64::INFINITY;
+    for (index, config) in settings.into_iter().enumerate() {
+        let metrics = measure_isolated_punch(candidate, sample_rate, config)?;
+        let bounded = metrics.finite
+            && metrics.peak <= HOT_PEAK_CEILING
+            && metrics.maximum_jump <= 0.1
+            && metrics.release_continuity_jump <= 0.1
+            && metrics.onset_to_sustain_ratio >= 1.05;
+        let score = 400.0 * f64::from((config.attack_seconds - 0.003).abs())
+            + 4.0 * f64::from((config.decay_seconds - 0.110).abs())
+            + 2.0 * f64::from((config.sustain_level - 0.55).abs())
+            + 2.0 * f64::from((config.release_seconds - 0.180).abs())
+            + (1.0 - metrics.onset_to_sustain_ratio).max(0.0);
+        if bounded && score < best_score {
+            best_score = score;
+            selected = Some(index);
+        }
+        rows.push(PunchSweepRow {
+            config,
+            metrics,
+            retained: false,
+            status: if bounded {
+                "bounded_not_selected"
+            } else {
+                "rejected_engineering_bound"
+            },
+        });
+    }
+    if let Some(index) = selected {
+        rows[index].retained = true;
+        rows[index].status = "retained_engineering_candidate";
+    }
+    Ok(rows)
+}
+
+fn measure_isolated_punch(
+    candidate: CompositeCandidate,
+    sample_rate: u32,
+    config: ResearchAdsrConfig,
+) -> Result<PunchMetrics, CompositeError> {
+    if sample_rate == 0 {
+        return Err(CompositeError::InvalidSampleRate);
+    }
+    let family = candidate_layer_specs(candidate)
+        .first()
+        .map(|spec| spec.family)
+        .unwrap_or(HybridFamily::CrossCoupledMachine);
+    let mut voice = HybridVoice::new(
+        family,
+        sample_rate as f32,
+        midi_frequency(26),
+        0xadd5_0026 ^ candidate as u32,
+    )
+    .map_err(HybridRenderError::from)?;
+    let mut envelope =
+        ResearchAdsr::new(sample_rate, config).map_err(|_| CompositeError::InvalidSampleRate)?;
+    envelope.note_on();
+    let frames = 2 * sample_rate as usize;
+    let gate_frame = 3 * sample_rate as usize / 4;
+    let gain = audition_gain_policy(candidate, AuditionKind::Punch).linear * 0.18;
+    let mut samples = Vec::with_capacity(2 * frames);
+    for frame_index in 0..frames {
+        if frame_index == gate_frame {
+            envelope.note_off();
+        }
+        let env = envelope.sample();
+        let frame = voice.sample();
+        samples.push(gain * env * (0.86 * frame.left + 0.14 * frame.right));
+        samples.push(gain * env * (0.14 * frame.left + 0.86 * frame.right));
+    }
+    let metrics = measure_composite(&samples, sample_rate as f32);
+    let windows_ms = [10_u32, 50, 100, 250];
+    let mut window_rms_values = [0.0; 4];
+    let mut window_peak_values = [0.0; 4];
+    for (index, milliseconds) in windows_ms.into_iter().enumerate() {
+        let end = ((milliseconds as usize * sample_rate as usize) / 1_000).max(1);
+        let window = &samples[..2 * end.min(frames)];
+        window_rms_values[index] =
+            window_rms(window, sample_rate, 0.0, f64::from(milliseconds) / 1_000.0);
+        window_peak_values[index] = window
+            .iter()
+            .map(|sample| f64::from(sample.abs()))
+            .fold(0.0, f64::max);
+    }
+    let sustain_start = sample_rate as usize / 4;
+    let sustain_end = 3 * sample_rate as usize / 5;
+    let sustain_rms = window_rms(
+        &samples,
+        sample_rate,
+        sustain_start as f64 / f64::from(sample_rate),
+        sustain_end as f64 / f64::from(sample_rate),
+    );
+    let onset_to_sustain_ratio = window_rms_values[2] / sustain_rms.max(1.0e-12);
+    let transient_end = (sample_rate as usize / 4).min(frames);
+    let transient = measure_composite(&samples[..2 * transient_end], sample_rate as f32);
+    let early_start = sample_rate as usize / 20;
+    let early_end = sample_rate as usize / 10;
+    let early_fundamental = measure_projection(
+        &samples[2 * early_start..2 * early_end],
+        sample_rate as f32,
+        midi_frequency(26),
+    );
+    let sustain_fundamental = measure_projection(
+        &samples[2 * sustain_start..2 * sustain_end],
+        sample_rate as f32,
+        midi_frequency(26),
+    );
+    let before_release = &samples[2 * (gate_frame - 1)..2 * gate_frame];
+    let after_release = &samples[2 * gate_frame..2 * (gate_frame + 1)];
+    let release_continuity_jump = before_release
+        .iter()
+        .zip(after_release)
+        .map(|(before, after)| f64::from((*after - *before).abs()))
+        .fold(0.0, f64::max);
+    Ok(PunchMetrics {
+        window_rms: window_rms_values,
+        window_peak: window_peak_values,
+        onset_to_sustain_ratio,
+        attack_time_ms: 1_000.0 * f64::from(config.attack_seconds),
+        decay_settling_ms: 1_000.0 * f64::from(config.attack_seconds + config.decay_seconds),
+        maximum_jump: metrics.maximum_jump,
+        low_band_transient_rms: transient.low_rms,
+        fundamental_decay_change_db: (early_fundamental - sustain_fundamental).abs(),
+        release_continuity_jump,
+        tail_duration_ms: 1_000.0 * f64::from(config.release_seconds),
+        peak: metrics.peak,
+        crest_factor: metrics.crest_factor,
+        finite: metrics.finite,
+    })
+}
+
+fn render_held_candidate_raw(
+    candidate: CompositeCandidate,
+    note: u8,
+    sample_rate: u32,
+) -> Result<Vec<f32>, CompositeError> {
+    if sample_rate == 0 {
+        return Err(CompositeError::InvalidSampleRate);
+    }
+    let specs = candidate_layer_specs(candidate);
+    let frames = 4 * sample_rate as usize;
+    let mut voices = Vec::with_capacity(specs.len());
+    for (index, spec) in specs.iter().enumerate() {
+        voices.push(
+            HybridVoice::new(
+                spec.family,
+                sample_rate as f32,
+                midi_frequency(note),
+                0x0c7a_0000 ^ u32::from(note) ^ (index as u32 * 0x9e37),
+            )
+            .map_err(HybridRenderError::from)?,
+        );
+    }
+    let mut samples = Vec::with_capacity(2 * frames);
+    let mut follower_state = 0.0_f32;
+    let mut junction_dc_state = [0.0_f32; 2];
+    let junction_dc_alpha = 1.0 - (-std::f32::consts::TAU * 8.0 / sample_rate as f32).exp();
+    for frame_index in 0..frames {
+        let fade_frames = (0.02 * sample_rate as f32).round() as usize;
+        let fade = (frame_index as f32 / fade_frames.max(1) as f32)
+            .min(1.0)
+            .min(((frames - 1 - frame_index) as f32 / fade_frames.max(1) as f32).min(1.0));
+        let mut raw = [HybridFrame::default(); MAX_LAYERS];
+        for (index, voice) in voices.iter_mut().enumerate() {
+            raw[index] = voice.sample();
+        }
+        let follower_control = if candidate == CompositeCandidate::CrossTopologyFollower {
+            let measurement = (0.5 * (raw[0].left + raw[0].right)).abs();
+            let coefficient = if measurement > follower_state {
+                0.012
+            } else {
+                0.0007
+            };
+            follower_state += coefficient * (measurement - follower_state);
+            (0.75 + 7.0 * follower_state).clamp(0.75, 1.25)
+        } else {
+            1.0
+        };
+        let mut output = HybridFrame::default();
+        for (index, spec) in specs.iter().enumerate() {
+            let frame = raw[index];
+            let matrix_left = spec.matrix[0][0] * frame.left + spec.matrix[0][1] * frame.right;
+            let matrix_right = spec.matrix[1][0] * frame.left + spec.matrix[1][1] * frame.right;
+            let gain = spec.mix_gain
+                * if candidate == CompositeCandidate::CrossTopologyFollower && index == 1 {
+                    follower_control
+                } else {
+                    1.0
+                };
+            if candidate == CompositeCandidate::CrossTopologyFollower && index == 2 {
+                let mid = 0.5 * (matrix_left + matrix_right);
+                let side = 0.5 * (matrix_left - matrix_right);
+                let side_gain = 0.65 + 1.4 * (follower_control - 0.75);
+                output.left += gain * (mid + side_gain * side);
+                output.right += gain * (mid - side_gain * side);
+            } else {
+                output.left += gain * matrix_left;
+                output.right += gain * matrix_right;
+            }
+        }
+        if candidate == CompositeCandidate::RiskyNonlinearBraid {
+            let a = 0.5 * (raw[0].left + raw[0].right);
+            let b = 0.5 * (raw[1].left + raw[1].right);
+            let c = 0.5 * (raw[2].left + raw[2].right);
+            let center = 0.06 * (a * b + b * c + c * a);
+            let side = 0.045 * (a * b - b * c);
+            let junction = [center + side, center - side];
+            for channel in 0..2 {
+                junction_dc_state[channel] +=
+                    junction_dc_alpha * (junction[channel] - junction_dc_state[channel]);
+            }
+            output.left += junction[0] - junction_dc_state[0];
+            output.right += junction[1] - junction_dc_state[1];
+        }
+        samples.push(fade * output.left);
+        samples.push(fade * output.right);
+    }
+    Ok(samples)
+}
+
+fn prepare_audition_render(
+    raw_samples: Vec<f32>,
+    sample_rate: u32,
+    gain: OutputGainPolicy,
+    active_start: f64,
+    active_end: f64,
+) -> AuditionRender {
+    let raw_metrics = measure_composite(&raw_samples, sample_rate as f32);
+    let samples: Vec<f32> = raw_samples
+        .iter()
+        .map(|sample| sample * gain.linear)
+        .collect();
+    let metrics = measure_composite(&samples, sample_rate as f32);
+    AuditionRender {
+        active_body_rms: window_rms(&samples, sample_rate, active_start, active_end),
+        samples,
+        metrics,
+        raw_rms: raw_metrics.rms,
+        raw_peak: raw_metrics.peak,
+        raw_hash: raw_metrics.sample_hash,
+        gain,
+    }
+}
+
+pub fn window_rms(samples: &[f32], sample_rate: u32, start: f64, end: f64) -> f64 {
+    if sample_rate == 0 || samples.len() % 2 != 0 || !start.is_finite() || end <= start {
+        return 0.0;
+    }
+    let frames = samples.len() / 2;
+    let start_frame = ((start * f64::from(sample_rate)).round() as usize).min(frames);
+    let end_frame = ((end * f64::from(sample_rate)).round() as usize).min(frames);
+    if start_frame >= end_frame {
+        return 0.0;
+    }
+    let window = &samples[2 * start_frame..2 * end_frame];
+    (window
+        .iter()
+        .map(|sample| f64::from(*sample).powi(2))
+        .sum::<f64>()
+        / window.len() as f64)
+        .sqrt()
 }
 
 fn render_composite_with_mute(
@@ -1243,7 +1897,12 @@ pub fn midi_frequency(note: u8) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{CompositeCandidate, CompositeMachine, delayed_launch_offsets, midi_frequency};
+    use super::{
+        AuditionKind, CompositeCandidate, CompositeMachine, HOT_PEAK_CEILING, ResearchAdsr,
+        ResearchAdsrConfig, audition_gain_policy, delayed_launch_offsets, gain_policy,
+        midi_frequency, punch_sweep, render_bass_candidate, render_held_candidate,
+        render_hot_composite, retained_punch_config,
+    };
     use assert_no_alloc::assert_no_alloc;
 
     #[test]
@@ -1438,5 +2097,202 @@ mod tests {
             strongest_product <= weakest_target - 30.0,
             "products={products:?} targets={targets:?}"
         );
+    }
+
+    #[test]
+    fn hot_output_contract_uses_explicit_gains_without_changing_raw_references() {
+        let expected_raw_hashes = [
+            (
+                CompositeCandidate::SynchronizedReference,
+                0xbe3e_a0fd_d66b_4472,
+            ),
+            (
+                CompositeCandidate::DelayedLaunchEstimate,
+                0xc919_cb57_920c_520f,
+            ),
+        ];
+        for (candidate, expected_hash) in expected_raw_hashes {
+            let raw = super::render_composite(candidate, 48_000, false).unwrap();
+            assert_eq!(raw.metrics.sample_hash, expected_hash);
+            let policy = gain_policy(candidate);
+            assert!(policy.linear.is_finite() && policy.linear > 0.0);
+            let hot = render_hot_composite(candidate, 48_000).unwrap();
+            assert!(hot.metrics.finite);
+            assert!(hot.metrics.peak <= 0.75, "{candidate:?}: {:?}", hot.metrics);
+            assert!(
+                (0.10..=0.14).contains(&hot.active_body_rms),
+                "{candidate:?}: {}",
+                hot.active_body_rms
+            );
+            assert_eq!(raw.metrics.sample_hash, hot.raw_hash);
+            assert!(
+                raw.samples
+                    .iter()
+                    .zip(&hot.samples)
+                    .all(|(raw, hot)| *hot == *raw * policy.linear),
+                "candidate={candidate:?} contains an undeclared final processor"
+            );
+        }
+    }
+
+    #[test]
+    fn research_adsr_is_sample_accurate_deterministic_bounded_and_allocation_free() {
+        let config = ResearchAdsrConfig::new(0.003, 0.100, 0.65, 0.180).unwrap();
+        let mut first = ResearchAdsr::new(1_000, config).unwrap();
+        let mut second = ResearchAdsr::new(1_000, config).unwrap();
+        first.note_on();
+        second.note_on();
+        let mut values = Vec::new();
+        for _ in 0..150 {
+            let a = assert_no_alloc(|| first.sample());
+            let b = second.sample();
+            assert_eq!(a, b);
+            assert!(a.is_finite() && (0.0..=1.0).contains(&a));
+            values.push(a);
+        }
+        assert_eq!(values[2], 1.0);
+        assert!((values[102] - 0.65).abs() < 1.0e-6);
+
+        first.note_off();
+        let before = first.level();
+        let released = assert_no_alloc(|| first.sample());
+        assert!(released <= before);
+        assert!(before - released <= before / 180.0 + 1.0e-6);
+        for _ in 1..180 {
+            first.sample();
+        }
+        assert_eq!(first.level(), 0.0);
+
+        first.note_on();
+        assert!((first.sample() - 1.0 / 3.0).abs() < 1.0e-6);
+        first.note_on();
+        assert!((first.sample() - 1.0 / 3.0).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn octave_renders_keep_one_candidate_gain_across_d1_d2_d3() {
+        let expected = [
+            (26, 36.708_096_f32),
+            (38, 73.416_19_f32),
+            (50, 146.832_38_f32),
+        ];
+        for (note, frequency) in expected {
+            assert!((midi_frequency(note) - frequency).abs() < 1.0e-4);
+        }
+        for candidate in CompositeCandidate::FINAL_CANDIDATES {
+            let policy = audition_gain_policy(candidate, AuditionKind::HeldOctave);
+            let mut hashes = Vec::new();
+            for (note, _) in expected {
+                let raw = super::render_held_candidate_raw(candidate, note, 48_000).unwrap();
+                let render = render_held_candidate(candidate, note, 48_000).unwrap();
+                assert_eq!(render.gain, policy);
+                assert!(render.metrics.finite);
+                assert!(render.metrics.peak <= HOT_PEAK_CEILING);
+                assert!(render.raw_rms > 0.0);
+                assert!(
+                    (super::HOT_MINIMUM_RMS..=super::HOT_MAXIMUM_RMS)
+                        .contains(&render.active_body_rms),
+                    "candidate={candidate:?} note={note} active={}",
+                    render.active_body_rms
+                );
+                assert!(
+                    raw.iter()
+                        .zip(&render.samples)
+                        .all(|(raw, hot)| *hot == *raw * policy.linear),
+                    "candidate={candidate:?} note={note} contains an undeclared final processor"
+                );
+                hashes.push(render.metrics.sample_hash);
+            }
+            hashes.sort_unstable();
+            hashes.dedup();
+            assert_eq!(hashes.len(), 3, "candidate={candidate:?}");
+        }
+    }
+
+    #[test]
+    fn octave_topologies_preserve_follower_and_nonlinear_identity() {
+        for note in [26, 38, 50] {
+            let role = render_held_candidate(CompositeCandidate::RoleSeparatedMachine, note, 8_000)
+                .unwrap();
+            let follower =
+                render_held_candidate(CompositeCandidate::CrossTopologyFollower, note, 8_000)
+                    .unwrap();
+            let risky = render_held_candidate(CompositeCandidate::RiskyNonlinearBraid, note, 8_000)
+                .unwrap();
+            let role_follower = super::sample_similarity(&role.samples, &follower.samples).abs();
+            let follower_risky = super::sample_similarity(&follower.samples, &risky.samples).abs();
+            assert!(role_follower < 0.985);
+            assert!(follower_risky < 0.99);
+        }
+    }
+
+    #[test]
+    fn d1_pedal_and_punch_are_finite_hot_and_deterministic() {
+        let retained = retained_punch_config();
+        assert_eq!(
+            retained,
+            ResearchAdsrConfig::new(0.003, 0.110, 0.55, 0.180).unwrap()
+        );
+        for candidate in CompositeCandidate::FINAL_CANDIDATES {
+            let bass = render_bass_candidate(candidate, 48_000, false).unwrap();
+            let punch = render_bass_candidate(candidate, 48_000, true).unwrap();
+            let repeated = render_bass_candidate(candidate, 48_000, true).unwrap();
+            assert_eq!(punch.samples, repeated.samples);
+            for render in [&bass, &punch] {
+                assert!(render.metrics.finite);
+                assert!(render.metrics.peak <= HOT_PEAK_CEILING);
+                assert!(
+                    (super::HOT_MINIMUM_RMS..=super::HOT_MAXIMUM_RMS)
+                        .contains(&render.active_body_rms),
+                    "candidate={candidate:?} active={}",
+                    render.active_body_rms
+                );
+            }
+            assert_ne!(bass.metrics.sample_hash, punch.metrics.sample_hash);
+        }
+    }
+
+    #[test]
+    fn punch_envelope_changes_only_the_scheduled_source_before_sum() {
+        let candidate = CompositeCandidate::RoleSeparatedMachine;
+        let raw = super::render_composite(candidate, 8_000, false).unwrap();
+        let punch =
+            super::render_bass_candidate_raw(candidate, 8_000, Some(retained_punch_config()))
+                .unwrap();
+        let active_frame = 400;
+        assert_ne!(
+            &raw.samples[2 * active_frame..2 * active_frame + 2],
+            &punch[2 * active_frame..2 * active_frame + 2]
+        );
+        let idle_frame = 2 * 8_000;
+        assert_eq!(
+            &raw.samples[2 * idle_frame..2 * idle_frame + 2],
+            &punch[2 * idle_frame..2 * idle_frame + 2]
+        );
+    }
+
+    #[test]
+    fn punch_sweep_reports_required_transient_and_release_evidence() {
+        let rows = punch_sweep(CompositeCandidate::RoleSeparatedMachine, 48_000).unwrap();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows.iter().filter(|row| row.retained).count(), 1);
+        let retained = rows.iter().find(|row| row.retained).unwrap();
+        assert_eq!(retained.config, retained_punch_config());
+        for row in rows {
+            assert!(row.metrics.finite);
+            assert!(row.metrics.maximum_jump.is_finite());
+            assert!(row.metrics.onset_to_sustain_ratio.is_finite());
+            assert!(row.metrics.low_band_transient_rms > 0.0);
+            assert!(row.metrics.fundamental_decay_change_db.is_finite());
+            assert!(row.metrics.release_continuity_jump.is_finite());
+            assert!(row.metrics.tail_duration_ms > 0.0);
+            assert!(
+                row.metrics
+                    .window_rms
+                    .iter()
+                    .chain(&row.metrics.window_peak)
+                    .all(|value| value.is_finite())
+            );
+        }
     }
 }

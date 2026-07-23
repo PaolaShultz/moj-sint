@@ -136,8 +136,9 @@ At this checkpoint:
   combining all twelve hybrid files in separately launched player processes.
   A new isolated composite-machine lab reconstructs a synchronized
   counterfactual, a clearly labeled delayed-launch estimate, and five
-  structurally different successor graphs. Three engineering iterations pass
-  the predeclared bounds, but the musical verdict is open.
+  structurally different successor graphs. Its corrected hot presentation now
+  adds fixed-gain full-score, D1/D2/D3, D1-pedal, punch-envelope, mono, and raw
+  sections. Engineering bounds pass, but the musical verdict is open.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -636,12 +637,13 @@ and native evidence.
 ## Next action
 
 Listen to `artifacts/composite-machine-lab/` in its README order:
-synchronized counterfactual, delayed-launch estimate, reduced stack,
-role-separated machine, harmonic lattice, cross-topology follower, and risky
-nonlinear braid. Only then compare matching mono diagnostics. Record which
-complete candidates retain the fused identity and whether the follower,
-role separation, harmonic lattice, mono duplication, or nonlinear exchange is
-audibly useful. Stop before selecting a production family, mapping controls,
+hot delayed-launch reference, hot synchronized counterfactual, five hot
+full-score candidates, each topology's D1/D2/D3 held files, D1 pedal versions,
+and one punch version per topology. Compare matching mono diagnostics only
+after the stereo identities, then use raw engineering files secondarily.
+Record which complete candidates retain the fused identity, whether D1/D2/D3
+behavior is musically stable, and whether the 3/110/0.55/180 ms source ADSR is
+actually punchy. Stop before selecting a production family, mapping controls,
 extracting the generic graph, or integrating `Engine`.
 
 ## Executed foundation checkpoint
@@ -954,3 +956,61 @@ Fresh integrated verification:
 - two fresh release generations were byte-identical except volatile
   workstation timing, with aggregate deterministic SHA-256
   `73974529034c7bce2882cd1e792c142c0a1ac6bf31746b47bbc5cddcb084920c`.
+
+## Hot composite, octave, bass, and punch checkpoint
+
+Implemented on 2026-07-23 and awaiting human listening:
+
+- diagnosed the unfair old presentation: synchronized raw RMS 0.070910 was
+  7.088 dB above the delayed-launch estimate and 7.900-12.052 dB above the
+  five candidates;
+- preserved every raw engineering render and locked the synchronized/delayed
+  48 kHz hashes at `be3ea0fdd66b4472` and `c919cb57920c520f`;
+- added a 0.12 active-body RMS target, 0.10-0.14 shared-register range, 0.75
+  sample-peak ceiling, one explicit fixed gain per topology/audition kind, and
+  no limiter, compression, clipping, maximization, or per-file normalization;
+- made delayed launch the primary hot reference and synchronized accumulation
+  the second-position counterfactual;
+- rendered every surviving topology at D1/D2/D3 with one shared topology gain,
+  preserving the dynamic follower and nonlinear junction rather than reducing
+  octave files to equivalent linear stacks;
+- measured octave active RMS 0.100051-0.139794, peak
+  0.353137-0.542087, correlation 0.576155-0.966702, low-band side/mid
+  0.021902-0.450904, and mono loss 0.113-1.108 dB;
+- exposed risky-braid D1's nominal fundamental at only -60.520 dB against
+  roughly -23.4 dB octave/third projections, so hot gain does not disguise
+  its weak bass pitch;
+- added one explicit D1 pedal source to every musical candidate and a
+  sample-accurate, deterministic, bounded, allocation-free research ADSR on
+  that source before summing;
+- rejected 1/70/0.55/100 and 5/160/0.75/250 ms sweep settings for
+  onset-to-sustain ratios below 1.05, rejected an intermediate
+  3/110/0.65/180 revision near 0.98, and retained 3/110/0.55/180 ms as the
+  bounded engineering candidate at ratio 1.094-1.098;
+- generated a 54-WAV ignored listening set in eight controlled README
+  sections plus complete gain, octave, ADSR, allocation, residual, similarity,
+  stereo/mono, hash, processor, and cost reports; and
+- kept production `Engine`, presets, stable macros, JACK/ALSA, SHR-DAW, Pi
+  claims, and the typed graph compiler unchanged.
+
+Digital level is not acoustic SPL or safe playback evidence. Automated metrics
+do not establish fused identity, bass quality, spatial translation, or musical
+punch. The exact next gate is the README-ordered human headphone, speaker, and
+mono pass.
+
+Fresh integrated verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 86 library tests, one composite
+  CLI test, one five-family CLI test, one hybrid CLI test, and six offline CLI
+  tests passed with zero failures;
+- Clippy with warnings denied and release build: exit 0;
+- `cargo audit`: 35 locked crate dependencies scanned with no vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- AArch64 target check: exit 0, compile evidence only;
+- synchronized and delayed raw reconstruction hashes remained exactly
+  `be3ea0fdd66b4472` and `c919cb57920c520f`; and
+- two fresh final 48 kHz generations were byte-identical except volatile
+  workstation timing, with aggregate deterministic SHA-256
+  `a11fa10d04fb34b8dcbfb8c9268be0d40672133896faa245c245a4ab637c9754`.

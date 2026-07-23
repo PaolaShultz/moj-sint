@@ -81,8 +81,12 @@ direct disposable lab generator, but it is no longer in the voice render path.
 - `composite_machine`: isolated offline-only preparation and fixed-sample
   mixing of heterogeneous hybrid layers. It owns sample-accurate starts,
   prepared gains, stereo matrices, mute probes, a bounded cross-family
-  follower, and one explicitly measured nonlinear junction. It is not
-  reachable from `Engine`, presets, or stable macros.
+  follower, and one explicitly measured nonlinear junction. Its audition
+  extension preserves raw renders, applies declared fixed hot-output gains,
+  renders the same candidate mechanisms at D1/D2/D3 with one gain per
+  topology, adds explicit D1 pedal sources, and owns a sample-accurate
+  fixed-state research ADSR before source summing. It is not reachable from
+  `Engine`, presets, or stable macros.
 - `main`: non-real-time `validate` and `render` commands.
 
 The separate `five-family-lab` binary renders those research sources into an
@@ -105,12 +109,16 @@ All nonlinear voice processing occurs before the linear three-note mix so the
 chord report can distinguish per-note identity from post-mix intermodulation.
 
 The separate `composite-machine-lab` binary renders two reconstruction
-references and five structurally different composite machines plus explicit
-mono diagnostics. The synchronized reference is a counterfactual; the actual
-player processes had unknown, noticeable launch delays. The deterministic
-delayed estimate spans 0-4110 ms and is not claimed as historical fact.
-Construction internally synthesizes and prepares every layer; the sample loop
-never launches or rereads WAVs. Full analysis and iteration evidence are in
+references and five structurally different composite machines. Its final
+listening layout places the hot delayed estimate first, the hot synchronized
+counterfactual second, then full-score, octave, D1-pedal, punch, mono, and raw
+diagnostic sections. The synchronized reference is a counterfactual; the
+actual player processes had unknown, noticeable launch delays. The
+deterministic delayed estimate spans 0-4110 ms and is not claimed as
+historical fact. Construction internally synthesizes and prepares every layer;
+the sample loop never launches or rereads WAVs. Hot gain is fixed and explicit;
+there is no limiter, compressor, clipper, maximizer, or per-file
+normalization. Full analysis and iteration evidence are in
 `COMPOSITE_MACHINE_RESEARCH.md`.
 
 ## Deliberate deferrals
@@ -125,7 +133,9 @@ successor. The complete hybrid stereo/chord gate is now implemented and also
 remains isolated pending human headphone, speaker, and mono listening. Its
 automated bounds do not select a family or establish a useful stable route.
 The first positive combined listening accident now has a bounded composite
-lab, but its two references and five candidates remain under the human gate.
+lab with a corrected level-controlled presentation, octave/bass diagnostics,
+and one bounded research-envelope candidate, but its two references and five
+candidates remain under the human gate. Digital level is not acoustic SPL.
 The future typed micro-machine graph is specified in
 `MICRO_MACHINE_ROUTING.md`, but extraction starts only after listening reveals
 which nodes and connections deserve reuse. The other five timbral macro routes,
