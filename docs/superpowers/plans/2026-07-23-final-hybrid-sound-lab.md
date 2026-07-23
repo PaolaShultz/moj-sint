@@ -508,7 +508,7 @@ limitations, deterministic evidence, chord flow, and open human verdict. State
 that no family, macro, Pi performance, safe polyphony, headphone/speaker
 translation, or final sound is accepted.
 
-- [ ] **Step 5: Produce the disposable user batch**
+- [x] **Step 5: Produce the disposable user batch**
 
 ```sh
 cargo run --release --bin hybrid-sound-lab -- render artifacts/final-hybrid-sound-lab
@@ -517,7 +517,7 @@ cargo run --release --bin hybrid-sound-lab -- render artifacts/final-hybrid-soun
 Give the user the absolute path and listening order. Do not preserve it
 elsewhere or delete it before the user's verdict.
 
-- [ ] **Step 6: Commit the durable implementation and docs**
+- [x] **Step 6: Commit the durable implementation and docs**
 
 ```sh
 git add src tests docs
