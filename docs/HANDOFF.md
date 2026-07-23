@@ -459,6 +459,14 @@ for Rust DSP, source curation, persistent project knowledge, benchmarking,
 dependency auditing, and Raspberry Pi deployment. Do not install speculative
 or abandoned integrations merely because they exist.
 
+The future typed micro-machine routing direction is recorded in
+`docs/MICRO_MACHINE_ROUTING.md`. It describes a versioned experiment graph that
+can connect audio, phase, integer-word, trigger, measurement, feedback, and
+stereo nodes, then compile them outside real time into fixed preallocated
+execution state. Do not build the generic graph before the complete hybrid
+listening work identifies which primitives and connections are genuinely
+useful.
+
 Potential skill gaps identified so far:
 
 - Rust real-time audio and DSP engineering;

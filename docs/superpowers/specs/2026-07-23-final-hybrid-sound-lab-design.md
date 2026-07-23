@@ -236,8 +236,10 @@ explicitly requests preservation of a specific result.
 
 - Integration into production `Engine`;
 - stable macro mappings and preset format changes;
+- the typed micro-machine graph compiler and TOML experiment format described
+  in `docs/MICRO_MACHINE_ROUTING.md`; the hardwired hybrid gate must first show
+  which nodes and connections deserve extraction;
 - live JACK/ALSA host and SHR-DAW integration;
 - voice-count expansion or four-note product claims;
 - Raspberry Pi performance, latency, headroom, and sound-quality claims;
 - SIMD, architecture-specific code, and assembly.
-
