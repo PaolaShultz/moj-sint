@@ -1084,8 +1084,24 @@ Implemented on 2026-07-24 and awaiting human listening:
   -3.706 dB; and
 - generated two byte-identical release batches except volatile workstation
   timing, with deterministic aggregate SHA-256
-  `598744ae2602a000688cc0844ed3e53be83efccd7aeadb8771952d75c24660c6`.
+  `5001495920bb0fd23034ee9b91b13b6e87bb5470b326ed2c36982158ed716ddc`.
 
 The current ignored batch is `artifacts/original-hybrid-subset-mix/`. These
 metrics reject obvious defects but do not establish musical value. Nothing is
 selected, preserved in Git, mapped to controls, or integrated into `Engine`.
+
+Fresh integrated verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 93 library tests, 11 compact
+  contract tests, four lab integration tests, and six offline CLI tests passed
+  with zero failures;
+- Clippy with warnings denied and the release build: exit 0;
+- `cargo audit`: 35 locked crate dependencies scanned with no vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- AArch64 target check: exit 0, compile evidence only;
+- synchronized and delayed raw reconstruction hashes remained exactly
+  `be3ea0fdd66b4472` and `c919cb57920c520f`; and
+- the final ignored directory contains exactly the reference plus seven
+  passing candidate WAVs and no rejected WAV.

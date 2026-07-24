@@ -557,7 +557,7 @@ limitations, not alias-clean or sample-rate-invariant claims.
 
 Two fresh release batches are byte-identical except
 `workstation-cost.txt`. Their deterministic aggregate SHA-256 is
-`598744ae2602a000688cc0844ed3e53be83efccd7aeadb8771952d75c24660c6`.
+`5001495920bb0fd23034ee9b91b13b6e87bb5470b326ed2c36982158ed716ddc`.
 The raw reconstruction hashes remain `be3ea0fdd66b4472` synchronized and
 `c919cb57920c520f` delayed.
 
