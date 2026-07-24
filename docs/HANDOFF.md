@@ -1136,3 +1136,19 @@ The only ignored artifact directory is
 `artifacts/coherent-hybrid-composites/`. Automated evidence rejects obvious
 defects but does not establish musical value. Nothing is selected, preserved
 in Git, mapped to controls, or integrated into `Engine`.
+
+Fresh integrated verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 95 library tests, 11 compact
+  contract tests, four deterministic lab integration tests, and six offline
+  CLI tests passed with zero failures;
+- Clippy with warnings denied and the release build: exit 0;
+- `cargo audit`: 35 locked crate dependencies scanned with no vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- AArch64 target check: exit 0, compile evidence only;
+- two final 48 kHz generations compared byte-identical except
+  `workstation-cost.txt`; and
+- artifact hygiene confirmed one ignored directory, exactly eight WAVs, and
+  no rejected output.
