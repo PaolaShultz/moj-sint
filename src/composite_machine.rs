@@ -347,6 +347,116 @@ impl Score {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OriginalLayer {
+    CrossSingle,
+    CrossChord,
+    CrossProgression,
+    CrossProgressionMono,
+    SpectralSingle,
+    SpectralChord,
+    SpectralProgression,
+    SpectralProgressionMono,
+    DualSingle,
+    DualChord,
+    DualProgression,
+    DualProgressionMono,
+}
+
+impl OriginalLayer {
+    pub const ALL: [Self; 12] = [
+        Self::CrossSingle,
+        Self::CrossChord,
+        Self::CrossProgression,
+        Self::CrossProgressionMono,
+        Self::SpectralSingle,
+        Self::SpectralChord,
+        Self::SpectralProgression,
+        Self::SpectralProgressionMono,
+        Self::DualSingle,
+        Self::DualChord,
+        Self::DualProgression,
+        Self::DualProgressionMono,
+    ];
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::CrossSingle => "cross-single",
+            Self::CrossChord => "cross-chord",
+            Self::CrossProgression => "cross-progression",
+            Self::CrossProgressionMono => "cross-progression-mono",
+            Self::SpectralSingle => "spectral-single",
+            Self::SpectralChord => "spectral-chord",
+            Self::SpectralProgression => "spectral-progression",
+            Self::SpectralProgressionMono => "spectral-progression-mono",
+            Self::DualSingle => "dual-single",
+            Self::DualChord => "dual-chord",
+            Self::DualProgression => "dual-progression",
+            Self::DualProgressionMono => "dual-progression-mono",
+        }
+    }
+
+    pub const fn family(self) -> HybridFamily {
+        match self {
+            Self::CrossSingle
+            | Self::CrossChord
+            | Self::CrossProgression
+            | Self::CrossProgressionMono => HybridFamily::CrossCoupledMachine,
+            Self::SpectralSingle
+            | Self::SpectralChord
+            | Self::SpectralProgression
+            | Self::SpectralProgressionMono => HybridFamily::SpectralShadow,
+            Self::DualSingle
+            | Self::DualChord
+            | Self::DualProgression
+            | Self::DualProgressionMono => HybridFamily::DualResonantBody,
+        }
+    }
+
+    pub const fn condition(self) -> HybridCondition {
+        match self {
+            Self::CrossSingle | Self::SpectralSingle | Self::DualSingle => HybridCondition::Single,
+            Self::CrossChord | Self::SpectralChord | Self::DualChord => HybridCondition::HeldChord,
+            Self::CrossProgression | Self::SpectralProgression | Self::DualProgression => {
+                HybridCondition::Progression
+            }
+            Self::CrossProgressionMono
+            | Self::SpectralProgressionMono
+            | Self::DualProgressionMono => HybridCondition::ProgressionMono,
+        }
+    }
+
+    pub const fn delayed_start_ms(self) -> u32 {
+        DELAYED_LAUNCH_MS[self.index()]
+    }
+
+    const fn index(self) -> usize {
+        match self {
+            Self::CrossSingle => 0,
+            Self::CrossChord => 1,
+            Self::CrossProgression => 2,
+            Self::CrossProgressionMono => 3,
+            Self::SpectralSingle => 4,
+            Self::SpectralChord => 5,
+            Self::SpectralProgression => 6,
+            Self::SpectralProgressionMono => 7,
+            Self::DualSingle => 8,
+            Self::DualChord => 9,
+            Self::DualProgression => 10,
+            Self::DualProgressionMono => 11,
+        }
+    }
+
+    const fn score(self) -> Score {
+        match self.condition() {
+            HybridCondition::Single => Score::Single,
+            HybridCondition::HeldChord => Score::HeldChord,
+            HybridCondition::Progression => Score::Progression,
+            HybridCondition::ProgressionMono => Score::ProgressionMono,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NoteInventory {
     counts: [u8; 128],
     pub total_voices: usize,
@@ -955,45 +1065,32 @@ fn custom_spec(
 }
 
 fn original_layer_specs(delayed: bool) -> Vec<LayerSpec> {
-    let mut specs = Vec::with_capacity(12);
-    let mut index = 0;
-    for family in HybridFamily::ALL {
-        for (score, label) in [
-            (Score::Single, "single"),
-            (Score::HeldChord, "chord"),
-            (Score::Progression, "progression"),
-            (Score::ProgressionMono, "progression-mono"),
-        ] {
-            specs.push(LayerSpec {
-                family,
-                score,
-                start_ms: if delayed { DELAYED_LAUNCH_MS[index] } else { 0 },
-                label: original_label(family, score, label),
-                mix_gain: ORIGINAL_COMPOSITE_GAIN,
-                matrix: IDENTITY_MATRIX,
-            });
-            index += 1;
-        }
-    }
-    specs
+    OriginalLayer::ALL
+        .into_iter()
+        .map(|layer| original_layer_spec(layer, delayed))
+        .collect()
 }
 
-fn original_label(family: HybridFamily, score: Score, fallback: &'static str) -> &'static str {
-    match (family, score) {
-        (HybridFamily::CrossCoupledMachine, Score::Single) => "cross-single",
-        (HybridFamily::CrossCoupledMachine, Score::HeldChord) => "cross-chord",
-        (HybridFamily::CrossCoupledMachine, Score::Progression) => "cross-progression",
-        (HybridFamily::CrossCoupledMachine, Score::ProgressionMono) => "cross-progression-mono",
-        (HybridFamily::SpectralShadow, Score::Single) => "spectral-single",
-        (HybridFamily::SpectralShadow, Score::HeldChord) => "spectral-chord",
-        (HybridFamily::SpectralShadow, Score::Progression) => "spectral-progression",
-        (HybridFamily::SpectralShadow, Score::ProgressionMono) => "spectral-progression-mono",
-        (HybridFamily::DualResonantBody, Score::Single) => "dual-single",
-        (HybridFamily::DualResonantBody, Score::HeldChord) => "dual-chord",
-        (HybridFamily::DualResonantBody, Score::Progression) => "dual-progression",
-        (HybridFamily::DualResonantBody, Score::ProgressionMono) => "dual-progression-mono",
-        _ => fallback,
+fn original_layer_spec(layer: OriginalLayer, delayed: bool) -> LayerSpec {
+    LayerSpec {
+        family: layer.family(),
+        score: layer.score(),
+        start_ms: if delayed { layer.delayed_start_ms() } else { 0 },
+        label: layer.label(),
+        mix_gain: ORIGINAL_COMPOSITE_GAIN,
+        matrix: IDENTITY_MATRIX,
     }
+}
+
+pub fn render_original_layer(
+    layer: OriginalLayer,
+    sample_rate: u32,
+) -> Result<Vec<f32>, HybridRenderError> {
+    prepare_layer_samples(original_layer_spec(layer, true), sample_rate)
+}
+
+pub const fn original_composite_layer_gain() -> f32 {
+    ORIGINAL_COMPOSITE_GAIN
 }
 
 fn prepare_layer_samples(spec: LayerSpec, sample_rate: u32) -> Result<Vec<f32>, HybridRenderError> {
@@ -1898,10 +1995,10 @@ pub fn midi_frequency(note: u8) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        AuditionKind, CompositeCandidate, CompositeMachine, HOT_PEAK_CEILING, ResearchAdsr,
-        ResearchAdsrConfig, audition_gain_policy, delayed_launch_offsets, gain_policy,
-        midi_frequency, punch_sweep, render_bass_candidate, render_held_candidate,
-        render_hot_composite, retained_punch_config,
+        AuditionKind, CompositeCandidate, CompositeMachine, HOT_PEAK_CEILING, OriginalLayer,
+        ResearchAdsr, ResearchAdsrConfig, audition_gain_policy, delayed_launch_offsets,
+        gain_policy, midi_frequency, punch_sweep, render_bass_candidate, render_composite,
+        render_held_candidate, render_hot_composite, render_original_layer, retained_punch_config,
     };
     use assert_no_alloc::assert_no_alloc;
 
@@ -1929,6 +2026,45 @@ mod tests {
             CompositeMachine::new(CompositeCandidate::DelayedLaunchEstimate, 48_000).unwrap();
         assert!(delayed.inventory_at_seconds(2.0).total_voices < 30);
         assert!(delayed.duration_seconds() > 20.0);
+    }
+
+    #[test]
+    fn original_layer_inventory_is_exact_and_stable() {
+        assert_eq!(OriginalLayer::ALL.len(), 12);
+        assert_eq!(
+            OriginalLayer::ALL.map(OriginalLayer::label),
+            [
+                "cross-single",
+                "cross-chord",
+                "cross-progression",
+                "cross-progression-mono",
+                "spectral-single",
+                "spectral-chord",
+                "spectral-progression",
+                "spectral-progression-mono",
+                "dual-single",
+                "dual-chord",
+                "dual-progression",
+                "dual-progression-mono",
+            ]
+        );
+        assert_eq!(
+            OriginalLayer::ALL.map(OriginalLayer::delayed_start_ms),
+            delayed_launch_offsets()
+        );
+    }
+
+    #[test]
+    fn public_original_layer_render_preserves_reference_hashes() {
+        let synchronized =
+            render_composite(CompositeCandidate::SynchronizedReference, 48_000, false).unwrap();
+        let delayed =
+            render_composite(CompositeCandidate::DelayedLaunchEstimate, 48_000, false).unwrap();
+        assert_eq!(synchronized.metrics.sample_hash, 0xbe3e_a0fd_d66b_4472);
+        assert_eq!(delayed.metrics.sample_hash, 0xc919_cb57_920c_520f);
+        let layer = render_original_layer(OriginalLayer::CrossSingle, 8_000).unwrap();
+        assert!(!layer.is_empty());
+        assert!(layer.iter().all(|sample| sample.is_finite()));
     }
 
     #[test]
