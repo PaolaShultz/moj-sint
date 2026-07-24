@@ -155,14 +155,17 @@ At this checkpoint:
   old source sum under a broadband amplitude contour, so the strike did not
   excite an independently decaying object. The generated batch was moved to
   Trash.
-- The current disposable gate instead uses three distinct monophonic D2
-  struck objects: Coupled Wire, Spectral Plate, and Dual Bridge. A
-  `7/11/9 ms` differentiated exact-source onset excites prepared modal banks
-  and is never mixed dry. Natural frequency-dependent loss produces the
-  1.6-second decay; there is no body ADSR or sustain. One shared gain of 4.43
-  produces -13.926 to -13.636 dBFS whole-file RMS with 0.516-0.993% ceiling
-  contact. All automated rejection gates pass, but human listening is open
-  and nothing is selected or integrated.
+- Human listening selected Coupled Wire from the three struck objects as very
+  nice, bright enough, and not excessive. Spectral Plate and Dual Bridge were
+  not selected for continued work. The prior batch was moved to Trash only
+  after its exact Coupled Wire reference was reproduced byte-identically.
+- The current disposable gate contains that exact reference plus Warm Hold,
+  Slow High Orbit, and Fast High Orbit. All developments keep the same
+  exciter, D2 pitch, modal ratios, coupling, brightness structure, and pickup
+  identity. A `200 ms` whole-sound attack, 5x modal-loss duration, higher
+  sustain, longer decay/release, and optional equal-and-opposite motion above
+  a prepared 320 Hz split provide the only changes. Human listening remains
+  open; nothing is integrated.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -637,15 +640,15 @@ Record `git rev-parse --short HEAD` before changing files.
 
 Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
 `docs/COMPOSITE_MACHINE_RESEARCH.md` before changing files. The current
-ignored batch is `artifacts/moj-struck-objects/`: exactly three single-D2
-resonant objects with source-derived exciters and natural modal decay.
+ignored batch is `artifacts/coupled-wire-envelope-motion/`: the exact accepted
+Coupled Wire reference plus three longer whole-sound envelope developments.
 
-Begin with the user's human listening verdict in README order: Coupled Wire,
-Spectral Plate, then Dual Bridge. The exciter is not mixed dry, there is no
-body ADSR or sustain plateau, and the files are different resonant topologies
-rather than parameter variants. Do not route anything into `Engine`, presets,
-or stable macros without explicit human acceptance. If none works, document
-the rejection and delete the batch.
+Begin with the user's human listening verdict in README order: exact reference,
+Warm Hold, Slow High Orbit, then Fast High Orbit. All developments preserve
+the accepted source and resonator. The low body stays fixed; orbit motion is
+equal-and-opposite above 320 Hz and preserves the mono sum. Do not route
+anything into `Engine`, presets, or stable macros without explicit human
+acceptance. If none works, document the rejection and delete the batch.
 
 Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
 expand production polyphony without explicit scope and native evidence.
@@ -653,13 +656,12 @@ expand production polyphony without explicit scope and native evidence.
 
 ## Next action
 
-Listen to `artifacts/moj-struck-objects/` in README order: Coupled Wire,
-Spectral Plate, then Dual Bridge. Start with playback volume low. Judge attack
-identity, whether resonant color changes naturally through the decay, and
-whether any tail becomes dull, synthetic, or noisy. These are three
-monophonic topologies under one shared gain, not three settings of one graph.
-Stop before selecting a production family, mapping controls, extracting a
-generic graph, or integrating `Engine`.
+Listen to `artifacts/coupled-wire-envelope-motion/` in README order: exact
+reference, Warm Hold, Slow High Orbit, then Fast High Orbit. Start with
+playback volume low. Judge whether the `200 ms` attack retains the accepted
+identity, whether the larger sustain and long release remain alive, and
+whether either high-only orbit is usefully audible without moving the low
+body. Stop before mapping controls or integrating `Engine`.
 
 ## Executed foundation checkpoint
 
@@ -1287,9 +1289,10 @@ Implemented on 2026-07-24 and awaiting human listening:
 Two release generations are byte-identical except
 `workstation-cost.txt`. Their deterministic aggregate SHA-256 is
 `c72d853e5cc7177585999986e8f3ab198c731703c1edf9d7479a78fb1dff5ff9`.
-The only active ignored artifact directory is
-`artifacts/moj-struck-objects/`, containing exactly the three passing WAVs and
-their reports. Human listening remains the musical acceptance gate.
+Human listening selected Coupled Wire as very nice, bright enough, and not
+excessive. Spectral Plate and Dual Bridge were not selected for this
+development pass. The batch was moved to Trash after its exact Coupled Wire
+reference was reproduced inside the successor batch.
 
 Fresh feature-worktree verification:
 
@@ -1307,4 +1310,65 @@ Fresh feature-worktree verification:
 - two fresh 48 kHz release generations and the installed batch compared
   byte-identical except `workstation-cost.txt`; and
 - artifact hygiene confirmed one ignored directory, exactly three passing
+  WAVs, and no rejected or prior-batch output.
+
+## Coupled Wire envelope and motion checkpoint
+
+Implemented on 2026-07-24 and awaiting human listening:
+
+- preserved the accepted Coupled Wire reference byte-for-byte, including its
+  4.43 gain, -13.926 dBFS RMS, and FNV-1a sample hash
+  `443e5faae3184791`;
+- retained the exact Cross-derived exciter, D2 pitch, modal ratios, 0.7-cent
+  wire split, `0.0002` velocity exchange, brightness structure, pickup
+  identity, and prepared 35 Hz DC control;
+- extended every modal loss time by one shared 5.0 scale for the developments,
+  so the later sustain contains resonant energy rather than only a multiplier
+  over a dead one-shot;
+- applied one complete stereo master envelope per development, with exact
+  attack/decay/sustain/note-off/release contracts recorded in
+  `envelopes.tsv`;
+- kept Warm Hold motionless and added only equal-and-opposite high-residual pan
+  above a prepared 320 Hz split to Slow High Orbit at 2.6 Hz/depth 0.10 and
+  Fast High Orbit at 6.2 Hz/depth 0.055;
+- measured stereo-side difference ratios of 0.017688 and 0.009986 for the two
+  orbits while maximum mono-sum error remained `0.000000060`;
+- selected one shared developed gain of 4.66 without per-file normalization,
+  compression, soft saturation, reverb, delay, chorus, dry parallel audio, or
+  pitch vibrato;
+- rendered Warm Hold, Slow High Orbit, and Fast High Orbit at
+  -10.573/-10.532/-11.336 dBFS whole-file RMS with sustain RMS
+  0.174/0.160/0.179 and ceiling contact 0.990/0.980/0.862%; and
+- retained 100% tonal coverage, no noise-like classification, correlation
+  above 0.996, mono loss below 0.028 dB, absolute DC below 0.000900, finite
+  output, rising 200 ms attacks, falling releases, bounded jumps, and exact
+  final zero.
+
+Two release generations are byte-identical except
+`workstation-cost.txt`. Their deterministic aggregate SHA-256 is
+`498f32bdfd4d1a43eae3de588ace3d3f7a6dc2ca990e861b3e153ea4caeda695`.
+The only active ignored artifact directory is
+`artifacts/coupled-wire-envelope-motion/`, containing exactly the reference,
+three passing developments, and their reports. Nothing is routed into
+production `Engine`, presets, stable macros, JACK, ALSA, or SHR-DAW.
+
+Fresh feature-worktree verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 116 library tests, 11 compact
+  contract tests, six deterministic lab integration tests, and six offline
+  CLI tests passed with zero failures;
+- `cargo clippy --all-targets --all-features -- -D warnings`: exit 0;
+- `cargo build --release`: exit 0;
+- `cargo audit`: 35 locked dependencies scanned with no vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- `cargo check --target aarch64-unknown-linux-gnu --all-targets
+  --all-features`: exit 0, compile evidence only;
+- two fresh 48 kHz release generations and both installed copies compared
+  byte-identical except `workstation-cost.txt`;
+- the reference WAV SHA-256 remained
+  `52aca28e3d82d8308ef242e728e6c6921854c8f675ec2372f1bbbb1ab92c1b03`;
+  and
+- artifact hygiene confirmed one ignored directory, exactly four passing
   WAVs, and no rejected or prior-batch output.

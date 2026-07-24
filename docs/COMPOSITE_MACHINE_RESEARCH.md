@@ -749,7 +749,45 @@ rules. Two release generations are byte-identical except volatile workstation
 timing. Their deterministic aggregate SHA-256 is
 `c72d853e5cc7177585999986e8f3ab198c731703c1edf9d7479a78fb1dff5ff9`.
 
+Human listening selected Coupled Wire as very nice, bright enough, and not
+excessive. Spectral Plate and Dual Bridge were not selected for this
+development pass. The batch was moved to Trash after its exact Coupled Wire
+reference was reproduced byte-identically in the successor batch.
+
+## 2026-07-24 Coupled Wire envelope and high motion
+
+This is selected-sound development, not another source-mechanism gate. The
+exact accepted Coupled Wire remains the orientation reference. Every
+development preserves its exciter, D2 pitch, modal ratios, wire split,
+coupling, brightness structure, pickup identity, and DC control.
+
+All developed bodies use one 5.0 modal-loss scale so meaningful resonant energy
+remains under a `200 ms` attack and long hold. Warm Hold tests only the master
+envelope. Slow and Fast High Orbit derive a high residual above a prepared
+320 Hz split and add it equally and oppositely to left and right. The low body
+is not intentionally moved and the mono sum is preserved.
+
+| file | decay | sustain | note-off | release | high motion |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `01_coupled_wire_warm_hold.wav` | 650 ms | 0.78 | 1900 ms | 1100 ms | none |
+| `02_coupled_wire_slow_orbit.wav` | 900 ms | 0.84 | 2100 ms | 1200 ms | 2.6 Hz, depth 0.10 |
+| `03_coupled_wire_fast_orbit.wav` | 500 ms | 0.74 | 1800 ms | 1500 ms | 6.2 Hz, depth 0.055 |
+
+The exact reference retains gain 4.43. The three developments share gain 4.66
+and measure -10.573/-10.532/-11.336 dBFS whole-file RMS,
+0.174/0.160/0.179 sustain RMS, and 0.990/0.980/0.862% ceiling contact.
+Slow/Fast side-difference ratios are 0.017688/0.009986 while maximum mono-sum
+error is `0.000000060`.
+
+All outputs pass finite, RMS, DC, jump, stereo/mono, tonal, conjunctive
+noise-like, attack, sustain, release, sparse-ceiling, and final-zero rules.
+There is no per-file normalization, compressor, soft saturation, reverb,
+delay, chorus, dry parallel layer, or pitch vibrato. Two release generations
+are byte-identical except workstation timing; their deterministic aggregate
+SHA-256 is
+`498f32bdfd4d1a43eae3de588ace3d3f7a6dc2ca990e861b3e153ea4caeda695`.
+
 The only active ignored artifact directory is
-`artifacts/moj-struck-objects/`, containing exactly the three passing WAVs and
-their reports. Human listening is open; nothing is selected, mapped, or
-integrated.
+`artifacts/coupled-wire-envelope-motion/`, containing the exact reference,
+three passing developments, and their reports. Human listening is open;
+nothing is mapped or integrated.

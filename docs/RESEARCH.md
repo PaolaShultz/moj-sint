@@ -140,9 +140,10 @@ middle RMS, the high-band ratio falls, and every file returns exactly to zero.
 Two release generations are byte-identical except
 `workstation-cost.txt`. Their deterministic aggregate SHA-256 is
 `c72d853e5cc7177585999986e8f3ab198c731703c1edf9d7479a78fb1dff5ff9`.
-Only `artifacts/moj-struck-objects/` remains, with exactly three passing WAVs
-and the rejection evidence. Human listening remains the musical acceptance
-gate; nothing is selected or integrated.
+Human listening selected Coupled Wire as very nice, bright enough, and not
+excessive. Spectral Plate and Dual Bridge were not selected for the next
+development pass. The artifact batch was moved to Trash after the accepted
+Coupled Wire reference was reproduced byte-identically in its successor.
 
 Primary-source provenance for the abstraction:
 
@@ -171,6 +172,40 @@ Primary-source provenance for the abstraction:
 These papers explain useful physical behaviors, but the implementation is an
 independent, deliberately non-acoustic Moj Sint abstraction with hand-declared
 modal ratios and losses.
+
+### 2026-07-24 Coupled Wire envelope and high motion
+
+This focused development retains the selected Coupled Wire exciter, pitch,
+modal ratios, wire detune, internal coupling, pickup identity, and DC control.
+The exact reference remains byte-identical at gain 4.43. The three
+developments multiply modal loss time by 5.0, then apply one complete stereo
+master envelope:
+
+| development | attack | decay | sustain | note-off | release | motion |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Warm Hold | 200 ms | 650 ms | 0.78 | 1900 ms | 1100 ms | none |
+| Slow High Orbit | 200 ms | 900 ms | 0.84 | 2100 ms | 1200 ms | 2.6 Hz, depth 0.10 |
+| Fast High Orbit | 200 ms | 500 ms | 0.74 | 1800 ms | 1500 ms | 6.2 Hz, depth 0.055 |
+
+The orbit path derives a high residual from a prepared 320 Hz one-pole split
+and adds it equally and oppositely to the two channels. It does not modulate
+pitch or intentionally move the low body. Slow/Fast side-difference ratios are
+0.017688/0.009986; maximum difference between moving and stationary mono sums
+is `0.000000060`.
+
+One shared developed gain of 4.66 gives -10.573/-10.532/-11.336 dBFS
+whole-file RMS and 0.990/0.980/0.862% ceiling contact. Sustain RMS is
+0.174/0.160/0.179. All three show rising `0-60`, `80-140`, and `160-220 ms`
+attack windows, falling release evidence, and exact final zero. Tonal pass
+fraction is 1.0; none is noise-like. Correlation remains above 0.996, mono loss
+below 0.028 dB, and absolute DC below 0.000900.
+
+Two release generations are byte-identical except workstation timing. Their
+deterministic aggregate SHA-256 is
+`498f32bdfd4d1a43eae3de588ace3d3f7a6dc2ca990e861b3e153ea4caeda695`.
+Only `artifacts/coupled-wire-envelope-motion/` remains, with the exact
+reference and three passing developments. Human listening remains the musical
+gate; nothing is integrated.
 
 ### 2026-07-24 superseded original-layer subset attempt
 
