@@ -1412,3 +1412,20 @@ Trash. The only active ignored artifact directory is now
 `artifacts/coupled-wire-controlled-thump/`, containing exactly one WAV and its
 reports. Digital headroom does not prevent independent overload in the
 external line output, amplifier, loudspeaker, room, or listening level.
+
+Fresh feature-worktree verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 122 library tests, 11 compact
+  contract tests, and 13 offline CLI/lab tests passed with zero failures;
+- `cargo clippy --all-targets --all-features -- -D warnings`: exit 0;
+- `cargo build --release`: exit 0;
+- `cargo audit`: 35 locked dependencies scanned with no vulnerabilities;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- `cargo check --target aarch64-unknown-linux-gnu --all-targets
+  --all-features`: exit 0, compile evidence only;
+- two fresh release generations matched each other and the installed artifact
+  byte-for-byte except `workstation-cost.txt`; and
+- artifact hygiene confirmed one ignored directory, exactly one passing WAV,
+  and no rejected or prior-batch output.

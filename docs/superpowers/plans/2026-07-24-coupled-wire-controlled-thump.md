@@ -707,7 +707,7 @@ git commit -m "docs: record controlled Coupled Wire thump gate"
 **Files:**
 - Verify all tracked changes and ignored artifact contents.
 
-- [ ] **Step 1: Invoke `superpowers:verification-before-completion`**
+- [x] **Step 1: Invoke `superpowers:verification-before-completion`**
 
 Run the required fresh commands:
 
@@ -725,13 +725,13 @@ cargo check --target aarch64-unknown-linux-gnu --all-targets --all-features
 Expected: all commands pass. `cargo deny check` may retain only the already
 documented duplicate-version warning if dependency state is unchanged.
 
-- [ ] **Step 2: Re-run deterministic release generation**
+- [x] **Step 2: Re-run deterministic release generation**
 
 Generate two fresh release batches and compare them to each other and the
 installed artifact, excluding only `workstation-cost.txt`. Re-read the
 rejection report and verify exactly one WAV.
 
-- [ ] **Step 3: Inspect repository and artifact hygiene**
+- [x] **Step 3: Inspect repository and artifact hygiene**
 
 Run:
 
