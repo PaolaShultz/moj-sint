@@ -139,12 +139,16 @@ At this checkpoint:
   structurally different successor graphs. Its corrected hot presentation now
   adds fixed-gain full-score, D1/D2/D3, D1-pedal, punch-envelope, mono, and raw
   sections. Engineering bounds pass, but the musical verdict is open.
-- The disposable composite presentation has now been replaced by a compact
-  power experiment: one hot delayed reference, ten primary one-to-three-
-  mechanism machines, and six bass-bearing mono diagnostics. Fixed gains,
-  intentional saturation/clipping, a 0.999 ceiling, tone/pitch retention,
-  event, ablation, mono, residual, hash, and generation-cost evidence pass the
-  automated gate. Human listening remains completely open.
+- The compact one-to-three-mechanism power experiment was rejected completely:
+  none of its newly designed sounds worked, and its 4.854-29.208% clipping
+  overcorrected the request for a slightly hotter signal into prolonged
+  distortion/noise. Its generated batch was deleted.
+- The current disposable gate combines only three or four exact original
+  hybrid layers. Seven candidates plus the twelve-layer delayed reference use
+  shared fixed gain into a -0.3 dBFS ceiling. All candidates pass the finite,
+  active-level, sparse-crest, tonal, noise, residual, DC, discontinuity,
+  stereo/mono, hash, and deterministic-generation rules. Human listening is
+  open; nothing is selected or integrated.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -642,14 +646,13 @@ and native evidence.
 
 ## Next action
 
-Listen to `artifacts/composite-machine-lab/` in its README order: the hot
-delayed-launch orientation, ten compact primary experiments, then the six
-matching mono diagnostics. Start with playback volume low because the batch is
-intentionally hot. Record power versus mere clipping/loudness, identity,
-evolving-tone retention, D1/D2 weight, thump/kick usefulness, Struck Comb's
-value against its severe residual, and Context Relay's combination behavior.
-Stop before selecting a production family, mapping controls, extracting the
-generic graph, or integrating `Engine`.
+Listen to `artifacts/original-hybrid-subset-mix/` in README order: the exact
+twelve-layer delayed reference followed by the seven passing three- or
+four-layer combinations. Start with playback volume low. Decide which smaller
+combination, if any, retains the fused and harmonized identity of the reference
+and whether its sparse crest limiting adds useful edge without obvious
+distortion or noise. Stop before selecting a production family, mapping
+controls, extracting the generic graph, or integrating `Engine`.
 
 ## Executed foundation checkpoint
 
@@ -1022,7 +1025,7 @@ Fresh integrated verification:
 
 ## Compact composite power checkpoint
 
-Implemented on 2026-07-23 and awaiting human listening:
+Implemented on 2026-07-23 and rejected by human listening on 2026-07-24:
 
 - preserved the old reconstruction code and exact 48 kHz raw hashes while
   replacing only the ignored disposable listening batch;
@@ -1053,7 +1056,36 @@ Implemented on 2026-07-23 and awaiting human listening:
   workstation, a 15.852x audio-duration/generation ratio and 0.126 seconds per
   equivalent two-second WAV.
 
-The final ignored batch is `artifacts/composite-machine-lab/`. It contains ten
-primary experiments, one reference, six mono diagnostics, and concise reports.
-It is intentionally hot; digital level is not acoustic SPL. Automated evidence
-does not claim that any sound is powerful, distinctive, special, or musical.
+The user rejected every primary sound. The experiment used newly designed
+mechanisms rather than smaller combinations of the successful original twelve,
+and its 4.854-29.208% clipping was an excessive interpretation of "slightly
+hotter." The ignored generated batch was deleted. Its reproducible source,
+tests, and negative evidence remain tracked.
+
+## Original hybrid subset checkpoint
+
+Implemented on 2026-07-24 and awaiting human listening:
+
+- exposed the exact twelve original layers without changing the synchronized
+  or delayed 48 kHz reconstruction hashes;
+- created four same-condition three-layer combinations and three role-swapped
+  four-layer combinations, preserving original DSP, scores, seeds, fades,
+  stereo construction, per-layer preparation, and rebased relative launch
+  delays;
+- added no new oscillator, mechanism, envelope, pitch event, effect,
+  compressor, soft saturator, cross-coupling, or per-file normalization;
+- selected shared fixed gains of 17.5 for three-layer files and 16.5 for
+  four-layer files into a static -0.3 dBFS ceiling;
+- measured candidate active RMS of -10.813 to -10.090 dBFS and sparse ceiling
+  contact of 0-0.292%; the reference is -10.122 dBFS with 0.480% contact;
+- retained 100% scheduled tonal coverage, no noise-like classification,
+  0-0.509 dB mono loss, 0.804-1.000 correlation, absolute DC below 0.000126,
+  maximum jump below 0.165, and eight-times residuals from -8.820 to
+  -3.706 dB; and
+- generated two byte-identical release batches except volatile workstation
+  timing, with deterministic aggregate SHA-256
+  `598744ae2602a000688cc0844ed3e53be83efccd7aeadb8771952d75c24660c6`.
+
+The current ignored batch is `artifacts/original-hybrid-subset-mix/`. These
+metrics reject obvious defects but do not establish musical value. Nothing is
+selected, preserved in Git, mapped to controls, or integrated into `Engine`.

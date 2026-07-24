@@ -497,7 +497,13 @@ Use `artifacts/composite-machine-lab/README.md`: hot delayed reference, files
 intentionally hot; start with playback volume low. Digital level is not
 acoustic SPL.
 
-Human listening must answer:
+The subsequent human listening verdict rejected every compact candidate. None
+worked musically, and the presentation's 4.854-29.208% full-file clipping was
+an excessive interpretation of the request for a slightly hotter signal with
+occasional hard-limited crests. The generated batch was deleted. The source,
+tests, and evidence remain as a durable negative result.
+
+The rejected listening questions were:
 
 1. Which files are genuinely powerful rather than merely clipped or loud?
 2. Which one-, two-, or three-mechanism identities are distinguishable and
@@ -512,3 +518,52 @@ Human listening must answer:
 
 No result is selected, preserved outside the disposable batch, routed into
 production, or claimed musically successful.
+
+## 2026-07-24 exact original-layer subset experiment
+
+The corrected experiment does not invent smaller replacement machines. It
+selects three or four exact layers from the original twelve-file pool and
+retains their DSP, schedules, seeds, fades, channel construction, preparation,
+and relative delayed-launch spacing. The candidates are:
+
+1. all three singles;
+2. all three held chords;
+3. all three stereo progressions;
+4. all three mono progressions;
+5. Cross single + Spectral chord + Dual progression + Cross mono progression;
+6. Spectral single + Dual chord + Cross progression + Spectral mono progression;
+7. Dual single + Cross chord + Spectral progression + Dual mono progression.
+
+There is no compressor, automatic limiter, soft saturator, maximizer, filter,
+new envelope, pitch change, nonlinear cross-coupling, or per-file
+normalization. The only presentation stage is shared fixed linear gain into a
+static -0.3 dBFS hard ceiling. Three-layer candidates share gain 17.5;
+four-layer candidates share gain 16.5; the twelve-layer delayed reference uses
+gain 10.0.
+
+All seven candidates pass the predeclared gate. Active RMS is
+-10.813 to -10.090 dBFS and hard-ceiling contact is 0-0.292%. The reference
+measures -10.122 dBFS with 0.480% ceiling contact. Tonal coverage is 100% for
+every scheduled segment. No candidate is classified as noise-like:
+magnitude-spectrum flatness is 0.230-0.468 and every tonal projection passes.
+Mono loss is at most 0.509 dB, correlation is 0.804-1.000, absolute DC is
+below 0.000126, and maximum adjacent-sample jump is below 0.165.
+
+The eight-times post-sum hard-ceiling residual is -4.749 dB for singles,
+-8.700 dB for chords, -3.706 dB for stereo progressions, -4.793 dB for mono
+progressions, -6.154 dB for the Cross anchor, -8.820 dB for the Spectral
+anchor, and -4.041 dB for the Dual anchor. These are retained engineering
+limitations, not alias-clean or sample-rate-invariant claims.
+
+Two fresh release batches are byte-identical except
+`workstation-cost.txt`. Their deterministic aggregate SHA-256 is
+`598744ae2602a000688cc0844ed3e53be83efccd7aeadb8771952d75c24660c6`.
+The raw reconstruction hashes remain `be3ea0fdd66b4472` synchronized and
+`c919cb57920c520f` delayed.
+
+The ignored disposable listening batch is
+`artifacts/original-hybrid-subset-mix/`. Human listening must compare the
+twelve-layer delayed reference with the seven smaller combinations in README
+order. Automated evidence only confirms that obvious level, clipping, tonal,
+noise-like, residual, DC, discontinuity, stereo/mono, finite, and tail
+failures were not presented.

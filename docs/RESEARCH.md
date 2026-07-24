@@ -18,6 +18,44 @@ synchronously. The 30-voice first-four-second inventory is exact only for the
 sample-aligned counterfactual. Historical offsets are unknowable from the
 WAVs; the lab's 0-4110 ms stagger is a controlled estimate.
 
+### 2026-07-24 original-layer subset correction
+
+Human listening rejected the compact one-to-three-mechanism batch completely.
+Its sources were newly designed replacements rather than combinations of the
+twelve sounds that produced the first positive result. Its gain policy also
+overcorrected from an earlier quiet presentation: most primary files held
+4.854-29.208% of their samples at the ceiling and sounded like heavily
+distorted noise rather than a slightly hotter mix.
+
+The corrected experiment selects only exact original layers. It contains four
+three-layer comparisons (all singles, all held chords, all stereo
+progressions, and all mono progressions) plus three four-layer role swaps.
+Each subset retains the original DSP, score, seeds, fades, stereo construction,
+per-layer preparation, and relative delayed-launch offsets. No new sound
+mechanism, envelope, pitch event, effect, compression, soft saturation, or
+per-file normalization is added.
+
+The final 48 kHz policy uses shared linear gains of 17.5 for every three-layer
+candidate and 16.5 for every four-layer candidate into a static -0.3 dBFS
+ceiling. Candidate active RMS is -10.813 to -10.090 dBFS. Ceiling contact is
+0-0.292%, rather than the rejected compact batch's prolonged clipping. The
+twelve-layer reference uses gain 10.0, measures -10.122 dBFS active RMS, and
+touches the ceiling for 0.480% of active samples.
+
+All seven candidates retain every scheduled tonal target under the 36 dB
+rule. Spectral flatness is 0.230-0.468 and no candidate meets the conjunctive
+noise classification. Mono loss is 0-0.509 dB, correlation is
+0.804-1.000, absolute DC is below 0.000126, maximum adjacent-sample jump is
+below 0.165, and the eight-times post-sum ceiling residual is
+-8.819 to -3.706 dB. These measurements reject obvious defects; they do not
+establish musical success.
+
+Two release generations were byte-identical except the volatile workstation
+timing file. The aggregate deterministic SHA-256 is
+`598744ae2602a000688cc0844ed3e53be83efccd7aeadb8771952d75c24660c6`.
+The synchronized and delayed original reconstruction hashes remain exactly
+`be3ea0fdd66b4472` and `c919cb57920c520f`.
+
 Iteration A rejected a near-duplicate risky junction. Iteration B rejected
 excess junction products. Iteration C retains a distinct three-progression
 pairwise exchange whose isolated difference products have 31.281 dB margin
