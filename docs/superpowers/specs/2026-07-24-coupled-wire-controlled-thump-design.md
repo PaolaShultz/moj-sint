@@ -43,15 +43,16 @@ natural 1.6-second decay, and prepared 35 Hz DC control.
 Process each frame through prepared, complementary scalar branches:
 
 1. Derive a centered mono low body below 105 Hz. This branch never enters a
-   nonlinear function. During the strike it follows a deterministic contour
-   that reduces its first 80 ms by 1.5-3 dB and returns smoothly to unity by
-   150 ms.
+   nonlinear function. During the strike it follows a deterministic contour:
+   -2 dB through 8 ms, a smooth fall to about -5.2 dB by 12 ms, hold through
+   25 ms, and smooth recovery to unity by 50 ms.
 2. Derive a 105-500 Hz thump branch from the complementary residual. Its
    odd-symmetric piecewise hard-crest contribution begins at 8 ms, remains
    active through the 45 ms strike window, and fades completely to zero by
    70 ms. Blend no more than 35% shaped signal at maximum.
 3. Keep the residual above 500 Hz clean so the selected brightness is not
-   turned into broadband fizz.
+   turned into broadband fizz. Apply only a master-envelope gain of 0.02
+   through 80 ms, recovering smoothly to unity by 130 ms.
 4. Recombine the centered low body with the original channel-specific upper
    branches. Apply prepared DC control after the nonlinear branch.
 5. Choose one fixed presentation gain that keeps sample peak at or below
@@ -102,8 +103,9 @@ Tests and the offline lab must prove:
 - the candidate is rejected as noise when flatness and lost tonal anchors
   jointly fail;
 - eight-times-rate comparison measures the nonlinear path's high-rate
-  residual, which must improve by at least 3 dB over the rejected full-band
-  clamp; and
+  residual relative to its probe input, which must be at most -50 dB; the
+  rejected full-band clamp remains a reported comparison, not the acceptance
+  baseline; and
 - two independent release renders are byte-identical except documented
   workstation timing.
 
