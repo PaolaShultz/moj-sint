@@ -17,6 +17,56 @@ pub const MIN_TOTAL_RMS: f64 = 0.199_526_23;
 pub const MAX_TOTAL_RMS: f64 = 0.316_227_77;
 pub const MAX_ABSOLUTE_DC: f64 = 0.002;
 
+const COUPLED_WIRE_A: [(f32, f32); 8] = [
+    (1.0, 1.65),
+    (2.003, 1.10),
+    (3.012, 0.82),
+    (4.028, 0.58),
+    (5.055, 0.41),
+    (6.09, 0.30),
+    (7.13, 0.21),
+    (8.18, 0.15),
+];
+const COUPLED_WIRE_B: [(f32, f32); 8] = [
+    (1.0, 1.51),
+    (2.003, 0.99),
+    (3.012, 0.74),
+    (4.028, 0.53),
+    (5.055, 0.38),
+    (6.09, 0.28),
+    (7.13, 0.20),
+    (8.18, 0.14),
+];
+const SPECTRAL_PLATE: [(f32, f32); 11] = [
+    (1.0, 1.42),
+    (2.01, 0.76),
+    (2.74, 0.52),
+    (3.89, 0.38),
+    (5.13, 0.29),
+    (6.47, 0.23),
+    (7.92, 0.18),
+    (9.51, 0.145),
+    (11.2, 0.115),
+    (13.4, 0.09),
+    (16.1, 0.075),
+];
+const DUAL_BRIDGE_A: [(f32, f32); 6] = [
+    (1.0, 1.60),
+    (3.02, 0.77),
+    (5.07, 0.49),
+    (7.14, 0.33),
+    (9.25, 0.23),
+    (11.4, 0.16),
+];
+const DUAL_BRIDGE_B: [(f32, f32); 6] = [
+    (2.006, 1.14),
+    (4.03, 0.62),
+    (6.08, 0.41),
+    (8.16, 0.29),
+    (10.3, 0.21),
+    (12.5, 0.15),
+];
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StruckTopology {
     CoupledWire,
@@ -66,6 +116,56 @@ impl StruckTopology {
             Self::DualBridge => "03_dual_bridge.wav",
         }
     }
+
+    pub const fn coupling(self) -> f32 {
+        match self {
+            Self::CoupledWire => 0.0002,
+            Self::SpectralPlate => 0.0,
+            Self::DualBridge => 0.0003,
+        }
+    }
+
+    pub const fn second_bank_delay_ms(self) -> u32 {
+        match self {
+            Self::CoupledWire => 2,
+            Self::SpectralPlate => 0,
+            Self::DualBridge => 3,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct StruckModeSpec {
+    pub bank: usize,
+    pub index: usize,
+    pub ratio: f32,
+    pub decay_seconds: f32,
+    pub detune: f32,
+}
+
+pub fn mode_specs(topology: StruckTopology) -> Vec<StruckModeSpec> {
+    let detuned = 2.0_f32.powf(0.7 / 1_200.0);
+    let banks: &[(&[(f32, f32)], f32)] = match topology {
+        StruckTopology::CoupledWire => &[(&COUPLED_WIRE_A, 1.0), (&COUPLED_WIRE_B, detuned)],
+        StruckTopology::SpectralPlate => &[(&SPECTRAL_PLATE, 1.0)],
+        StruckTopology::DualBridge => &[(&DUAL_BRIDGE_A, 1.0), (&DUAL_BRIDGE_B, 1.0)],
+    };
+    banks
+        .iter()
+        .enumerate()
+        .flat_map(|(bank, (modes, detune))| {
+            modes
+                .iter()
+                .enumerate()
+                .map(move |(index, (ratio, decay_seconds))| StruckModeSpec {
+                    bank,
+                    index,
+                    ratio: *ratio,
+                    decay_seconds: *decay_seconds,
+                    detune: *detune,
+                })
+        })
+        .collect()
 }
 
 #[derive(Clone, Copy, Debug, Error, PartialEq)]
@@ -165,42 +265,15 @@ impl StruckObject {
         let excitation = prepare_excitation(topology, sample_rate)?;
         let banks = match topology {
             StruckTopology::CoupledWire => vec![
-                make_bank(
-                    &[1.0, 2.003, 3.012, 4.028, 5.055, 6.09, 7.13, 8.18],
-                    &[1.65, 1.10, 0.82, 0.58, 0.41, 0.30, 0.21, 0.15],
-                    sample_rate,
-                    1.0,
-                ),
-                make_bank(
-                    &[1.0, 2.003, 3.012, 4.028, 5.055, 6.09, 7.13, 8.18],
-                    &[1.51, 0.99, 0.74, 0.53, 0.38, 0.28, 0.20, 0.14],
-                    sample_rate,
-                    2.0_f32.powf(0.7 / 1_200.0),
-                ),
+                make_bank(&COUPLED_WIRE_A, sample_rate, 1.0),
+                make_bank(&COUPLED_WIRE_B, sample_rate, 2.0_f32.powf(0.7 / 1_200.0)),
             ],
-            StruckTopology::SpectralPlate => vec![make_bank(
-                &[
-                    1.0, 2.01, 2.74, 3.89, 5.13, 6.47, 7.92, 9.51, 11.2, 13.4, 16.1,
-                ],
-                &[
-                    1.42, 0.76, 0.52, 0.38, 0.29, 0.23, 0.18, 0.145, 0.115, 0.09, 0.075,
-                ],
-                sample_rate,
-                1.0,
-            )],
+            StruckTopology::SpectralPlate => {
+                vec![make_bank(&SPECTRAL_PLATE, sample_rate, 1.0)]
+            }
             StruckTopology::DualBridge => vec![
-                make_bank(
-                    &[1.0, 3.02, 5.07, 7.14, 9.25, 11.4],
-                    &[1.60, 0.77, 0.49, 0.33, 0.23, 0.16],
-                    sample_rate,
-                    1.0,
-                ),
-                make_bank(
-                    &[2.006, 4.03, 6.08, 8.16, 10.3, 12.5],
-                    &[1.14, 0.62, 0.41, 0.29, 0.21, 0.15],
-                    sample_rate,
-                    1.0,
-                ),
+                make_bank(&DUAL_BRIDGE_A, sample_rate, 1.0),
+                make_bank(&DUAL_BRIDGE_B, sample_rate, 1.0),
             ],
         };
         Ok(Self {
@@ -227,11 +300,7 @@ impl StruckObject {
         if self.frame >= self.duration_frames {
             return StereoFrame::default();
         }
-        let coupling = match self.topology {
-            StruckTopology::CoupledWire => 0.0002,
-            StruckTopology::DualBridge => 0.0003,
-            StruckTopology::SpectralPlate => 0.0,
-        };
+        let coupling = self.topology.coupling();
         let previous = self.previous_bank_sums;
         let older = self.older_bank_sums;
         let mut left = 0.0;
@@ -294,12 +363,11 @@ impl StruckObject {
     }
 }
 
-fn make_bank(ratios: &[f32], decays: &[f32], sample_rate: u32, detune: f32) -> Vec<Mode> {
-    ratios
+fn make_bank(modes: &[(f32, f32)], sample_rate: u32, detune: f32) -> Vec<Mode> {
+    modes
         .iter()
-        .zip(decays)
         .enumerate()
-        .map(|(index, (&ratio, &decay))| Mode::new(ratio, decay, index, sample_rate, detune))
+        .map(|(index, &(ratio, decay))| Mode::new(ratio, decay, index, sample_rate, detune))
         .collect()
 }
 
