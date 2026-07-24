@@ -1,7 +1,7 @@
 use moj_sint::envelope_audition::{
-    DECAY_MS, DURATION_MS, EnvelopeEvidence, EnvelopeRender, LAYER_OFFSETS_MS, MIN_TOTAL_RMS,
-    MONOPHONIC_LAYERS, RELEASE_MS, SUSTAIN, evaluate_render, preview_all, render_profile,
-    select_shared_gain,
+    BODY_ATTACK_MS, BODY_FAST_DECAY_MS, BODY_SILENT_FROM_MS, DURATION_MS, EnvelopeEvidence,
+    EnvelopeRender, LAYER_OFFSETS_MS, MIN_TOTAL_RMS, MONOPHONIC_LAYERS, STRIKE_ATTACK_MS,
+    STRIKE_MIX, evaluate_render, preview_all, render_profile, select_shared_gain,
 };
 use moj_sint::hybrid_subset::classify_noise_like;
 use std::fs::{self, File};
@@ -82,7 +82,7 @@ fn render_lab(output: &Path, sample_rate: u32) -> Result<(), Box<dyn std::error:
     write_cost(output, started.elapsed().as_secs_f64())?;
 
     println!(
-        "wrote monophonic envelope audition at {} Hz to {}",
+        "wrote piano strike envelope audition at {} Hz to {}",
         sample_rate,
         output.display()
     );
@@ -93,7 +93,7 @@ fn write_manifest(output: &Path, shared_gain: f32, rows: &[AuditionRow]) -> std:
     let mut file = writer(output, "manifest.tsv")?;
     writeln!(
         file,
-        "number\tprofile\tfilename\tlayers\toffsets_ms\tattack_ms\tdecay_ms\tsustain\trelease_ms\tduration_ms\tshared_gain\ttotal_rms_dbfs\tstatus"
+        "number\tprofile\tfilename\tbody_layers\toffsets_ms\tstrike_source\tstrike_ms\tstrike_attack_ms\tstrike_mix\tbody_attack_ms\tbody_fast_decay_ms\tbody_silent_from_ms\tduration_ms\tshared_gain\ttotal_rms_dbfs\tstatus"
     )?;
     let layers = MONOPHONIC_LAYERS
         .iter()
@@ -108,16 +108,19 @@ fn write_manifest(output: &Path, shared_gain: f32, rows: &[AuditionRow]) -> std:
     for row in rows {
         writeln!(
             file,
-            "{:02}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.2}\t{}\t{}\t{:.6}\t{:.6}\t{}",
+            "{:02}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.2}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}",
             row.number,
             row.render.profile.slug(),
             row.filename(),
             layers,
             offsets,
-            row.render.profile.attack_ms(),
-            DECAY_MS,
-            SUSTAIN,
-            RELEASE_MS,
+            row.render.profile.strike_layer().label(),
+            row.render.profile.strike_ms(),
+            STRIKE_ATTACK_MS,
+            STRIKE_MIX,
+            BODY_ATTACK_MS,
+            BODY_FAST_DECAY_MS,
+            BODY_SILENT_FROM_MS,
             DURATION_MS,
             shared_gain,
             dbfs(row.render.total_rms),
@@ -225,9 +228,11 @@ fn write_generation_summary(
     writeln!(file, "minimum_total_rms\t{MIN_TOTAL_RMS:.9}\tlinear")?;
     writeln!(file, "minimum_total_rms_dbfs\t-14.000000\tdbfs")?;
     writeln!(file, "duration\t{DURATION_MS}\tms")?;
-    writeln!(file, "decay\t{DECAY_MS}\tms")?;
-    writeln!(file, "sustain\t{SUSTAIN:.2}\tlinear")?;
-    writeln!(file, "release\t{RELEASE_MS}\tms")?;
+    writeln!(file, "body_attack\t{BODY_ATTACK_MS}\tms")?;
+    writeln!(file, "body_fast_decay\t{BODY_FAST_DECAY_MS}\tms")?;
+    writeln!(file, "body_silent_from\t{BODY_SILENT_FROM_MS}\tms")?;
+    writeln!(file, "strike_attack\t{STRIKE_ATTACK_MS}\tms")?;
+    writeln!(file, "strike_mix\t{STRIKE_MIX:.2}\tlinear")?;
     writeln!(file, "output_ceiling\t-0.300000\tdbfs")
 }
 
@@ -238,29 +243,30 @@ fn write_readme(
     rows: &[AuditionRow],
 ) -> std::io::Result<()> {
     let mut file = writer(output, "README.md")?;
-    writeln!(file, "# Moj Sint monophonic envelope comparison\n")?;
+    writeln!(file, "# Moj Sint piano-strike envelope comparison\n")?;
     writeln!(
         file,
         "**Please start with playback volume low.** Digital level is not acoustic SPL.\n"
     )?;
     writeln!(
         file,
-        "These files keep one complete composite sound: the exact Cross, Spectral, and Dual single-note layers summed with fixed 0/2/5 ms offsets. The result is musically monophonic while retaining its two-channel stereo construction.\n"
+        "Every file keeps the same piano-like one-shot body: the exact Cross, Spectral, and Dual single-note D2 layers summed with fixed 0/2/5 ms offsets. The result is musically monophonic while retaining its two-channel stereo construction.\n"
     )?;
     writeln!(
         file,
-        "Only the shared post-sum attack changes. Every file lasts 2.4 seconds and shares 220 ms decay, 0.58 sustain, 500 ms release, gain {:.6}, and a static -0.3 dBFS ceiling. There is no individual normalization. Any result below -14 dBFS whole-file RMS receives no WAV.\n",
+        "The body has a 2 ms rise, 60 ms fast decay, a curved fade to zero at 700 ms, and no flat sustain. Each 800 ms file varies only the brief pitched D2 strike source, mixed at 0.30 before shared gain {:.6} and a static -0.3 dBFS ceiling. There is no individual normalization. Any result below -14 dBFS whole-file RMS receives no WAV.\n",
         shared_gain
     )?;
     writeln!(file, "Listen in this order:\n")?;
     for row in rows.iter().filter(|row| row.passing()) {
         writeln!(
             file,
-            "{}. `{}` — {}, {} ms attack; whole-file RMS {:.3} dBFS, active RMS {:.3} dBFS, ceiling {:.3}%.",
+            "{}. `{}` — {}, exact {} source, {} ms strike; whole-file RMS {:.3} dBFS, active RMS {:.3} dBFS, ceiling {:.3}%.",
             row.number,
             row.filename(),
             row.render.profile.label(),
-            row.render.profile.attack_ms(),
+            row.render.profile.strike_layer().label(),
+            row.render.profile.strike_ms(),
             dbfs(row.render.total_rms),
             dbfs(row.render.metrics.active_rms),
             100.0 * row.render.metrics.ceiling_proportion,
@@ -268,7 +274,7 @@ fn write_readme(
     }
     writeln!(
         file,
-        "\nRejected profiles have no WAV and are listed in `rejections.tsv`. These are envelope positions of the same source, not claims of different source mechanisms. Automated checks discard obvious failures; human listening decides whether any attack behavior is useful.\n"
+        "\nRejected profiles have no WAV and are listed in `rejections.tsv`. The body is fixed; the exact-source strike mechanism changes. Automated checks discard obvious failures; human listening decides whether any strike behavior is useful.\n"
     )?;
     writeln!(
         file,

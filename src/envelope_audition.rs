@@ -23,9 +23,6 @@ pub const BODY_FAST_DECAY_MS: u32 = 60;
 pub const BODY_SILENT_FROM_MS: u32 = 700;
 pub const STRIKE_ATTACK_MS: u32 = 1;
 pub const STRIKE_MIX: f32 = 0.30;
-pub const DECAY_MS: u32 = BODY_FAST_DECAY_MS;
-pub const SUSTAIN: f32 = 0.0;
-pub const RELEASE_MS: u32 = 0;
 pub const MIN_TOTAL_RMS: f64 = 0.199_526_23;
 pub const MAX_TOTAL_RMS: f64 = 0.316_227_77;
 
@@ -53,10 +50,6 @@ impl StrikeProfile {
             Self::Spectral => 28,
             Self::Dual => 42,
         }
-    }
-
-    pub const fn attack_ms(self) -> u32 {
-        BODY_ATTACK_MS
     }
 
     pub const fn slug(self) -> &'static str {

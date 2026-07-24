@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 #[test]
-fn lab_writes_only_deterministic_monophonic_envelope_comparisons() {
+fn lab_writes_only_deterministic_piano_strike_comparisons() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();
     run_lab(first.path());
@@ -35,9 +35,9 @@ fn lab_writes_only_deterministic_monophonic_envelope_comparisons() {
     assert_eq!(
         wav_names,
         [
-            "01_monophonic_attack_006ms.wav",
-            "02_monophonic_attack_035ms.wav",
-            "03_monophonic_attack_140ms.wav",
+            "01_piano_cross_strike.wav",
+            "02_piano_spectral_strike.wav",
+            "03_piano_dual_strike.wav",
         ]
     );
     for name in wav_names {
@@ -45,13 +45,16 @@ fn lab_writes_only_deterministic_monophonic_envelope_comparisons() {
         assert_eq!(reader.spec().channels, 2);
         assert_eq!(reader.spec().sample_rate, 4_000);
         assert_eq!(reader.spec().sample_format, hound::SampleFormat::Float);
-        assert_eq!(reader.samples::<f32>().count(), 2 * 4_000 * 2_400 / 1_000);
+        assert_eq!(reader.samples::<f32>().count(), 2 * 4_000 * 800 / 1_000);
     }
 
     let readme = fs::read_to_string(first.path().join("README.md")).unwrap();
     assert!(readme.contains("musically monophonic"));
     assert!(readme.contains("whole-file RMS"));
-    assert!(readme.contains("one complete composite sound"));
+    assert!(readme.contains("piano-like one-shot"));
+    assert!(readme.contains("no flat sustain"));
+    assert!(readme.contains("pitched D2 strike"));
+    assert!(!readme.contains("2.4 seconds"));
     assert!(!readme.contains("chord"));
     assert!(!readme.contains("progression"));
     assert!(readme.contains("human listening decides"));
