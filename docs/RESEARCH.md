@@ -217,6 +217,35 @@ restricted to 105-500 Hz during the onset. The current ignored batch remains
 only until one controlled successor passes every automated contract. Nothing
 is integrated.
 
+### 2026-07-24 Coupled Wire controlled thump
+
+The successor preserves the unpresented 1.6-second Coupled Wire source
+(`647e93d33e919af3` FNV-1a), centers and keeps the branch below 105 Hz linear,
+restricts nonlinear hard-crest residual to 105-500 Hz from 8-70 ms, and keeps
+material above 500 Hz free of nonlinear processing. Its fixed low contour is
+8/12/25/50 ms; the clean upper branch holds gain 0.02 through 80 ms and returns
+to unity by 130 ms.
+
+The least nonlinear passing selection is `gentle` at gain 4.60. The 45-90 Hz
+onset changed from -7.456 dBFS in the rejected full-band-clamped reference to
+-11.147 dBFS. Below-105 Hz nonlinear leakage is -40.218 dB and the 105-500 Hz
+shaped residual is -29.815 dB. Whole-file RMS is -15.107 dBFS; sample and
+estimated true peaks are both -2.006 dB with zero ceiling contact. DC is
+`0.000341796`, maximum jump `0.015249848`, correlation `0.996780839`, mono
+loss `0.016345` dB, tonal pass fraction 1.0, and spectral flatness
+`0.000014807`; output is finite, decays naturally, and reaches exact final
+zero.
+
+The nonlinear 48/384 kHz residual is -53.577 dB relative to probe input,
+passing the absolute -50 dB gate. The rejected clamp measures -57.864 dB in
+the same report but is not an acceptance baseline. Two release generations
+and the installed artifact are deterministic except workstation timing; the
+file-set SHA-256 is
+`e8aa1c458ff0a4fda6c5f4184e282fad377448719e4153efc2005b6e4afd2f5d`.
+The rejected envelope/motion artifact was moved to Trash and replaced by
+`artifacts/coupled-wire-controlled-thump/`, which contains exactly one WAV.
+No production mapping or integration follows before human listening.
+
 ### 2026-07-24 superseded original-layer subset attempt
 
 Human listening rejected the compact one-to-three-mechanism batch completely.

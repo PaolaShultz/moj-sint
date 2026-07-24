@@ -649,13 +649,11 @@ before changing files. The Coupled Wire envelope/motion batch is rejected;
 only its first reference was somewhat usable, and cranked line output exposed
 uncontrolled bass/sub distortion.
 
-Implement the approved single-successor controlled-thump experiment
-test-first. Preserve the original Coupled Wire source. Keep the sub and 73 Hz
-fundamental clean and centered, place bounded hard-crest character only in a
-short 105-500 Hz attack branch, leave modest final headroom, and reject noise,
-low-band nonlinear leakage, weak RMS, excessive alias residual, or mono
-damage. Do not route anything into `Engine`, presets, or stable macros without
-explicit human acceptance.
+Listen to the single controlled-thump successor in
+`artifacts/coupled-wire-controlled-thump/`. Judge whether it keeps the useful
+Coupled Wire identity and nasty strike while controlling the bass/sub
+distortion heard at high line-output gain. Do not route it into `Engine`,
+presets, or stable macros without explicit human acceptance.
 
 Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
 expand production polyphony without explicit scope and native evidence.
@@ -663,9 +661,9 @@ expand production polyphony without explicit scope and native evidence.
 
 ## Next action
 
-Write the implementation plan for the approved controlled-thump design, then
-execute it test-first after the written-spec review gate. Replace the rejected
-artifact only after one successor passes every engineering contract. Stop
+Obtain the human listening verdict for
+`01_coupled_wire_controlled_thump.wav`. If rejected, trash this disposable
+batch and record the reason. If accepted, define the next product decision
 before mapping controls or integrating `Engine`.
 
 ## Executed foundation checkpoint
@@ -1377,3 +1375,40 @@ Fresh feature-worktree verification:
   and
 - artifact hygiene confirmed one ignored directory, exactly four passing
   WAVs, and no rejected or prior-batch output.
+
+## Coupled Wire controlled-thump checkpoint
+
+Implemented on 2026-07-24 and awaiting human listening:
+
+- preserved the exact unpresented 1.6-second Coupled Wire generator, with
+  source FNV-1a hash `647e93d33e919af3`;
+- split a centered linear low body below 105 Hz from a 105-500 Hz thump branch
+  and clean material above 500 Hz;
+- used the accepted low contour at 8/12/25/50 ms, the nonlinear wet window at
+  8/12/45/70 ms, and a clean upper recovery from gain 0.02 through 80 ms to
+  unity by 130 ms;
+- selected the least nonlinear `gentle` configuration at fixed gain 4.60,
+  without a full-band limiter, compressor, per-file normalization, chord,
+  delay, reverb, or production integration;
+- reduced 45-90 Hz onset RMS from the rejected reference's -7.456 dBFS to
+  -11.147 dBFS while keeping below-105 Hz nonlinear leakage at -40.218 dB and
+  the 105-500 Hz shaped residual at -29.815 dB;
+- measured -15.107 dBFS whole-file RMS, -2.006 dBFS sample peak,
+  -2.006 dBTP estimated true peak, zero ceiling contact, DC `0.000341796`,
+  maximum jump `0.015249848`, correlation `0.996780839`, mono loss
+  `0.016345` dB, full tonal coverage, spectral flatness `0.000014807`, finite
+  output, natural 1.6-second decay, and exact final zero; and
+- measured the candidate nonlinear high-rate residual at -53.577 dB relative
+  to probe input, passing the absolute -50 dB alias bound. The rejected
+  full-band clamp's -57.864 dB result is comparison-only, not the gate.
+
+Two release generations and the installed batch are byte-identical except
+`workstation-cost.txt`. The deterministic file-set SHA-256 is
+`e8aa1c458ff0a4fda6c5f4184e282fad377448719e4153efc2005b6e4afd2f5d`;
+the single WAV SHA-256 is
+`c4ccb994405c05a95369a081819ee0e4dffaf72c2e39aac7cf93b3ecac353e59`.
+The rejected `artifacts/coupled-wire-envelope-motion/` batch was moved to
+Trash. The only active ignored artifact directory is now
+`artifacts/coupled-wire-controlled-thump/`, containing exactly one WAV and its
+reports. Digital headroom does not prevent independent overload in the
+external line output, amplifier, loudspeaker, room, or listening level.

@@ -796,3 +796,28 @@ design keeps the centered sub/fundamental linear, reduces its strike crest,
 and confines bounded hard-crest character to 105-500 Hz during the onset. The
 current batch remains only until a passing successor replaces it; nothing is
 mapped or integrated.
+
+## 2026-07-24 Coupled Wire controlled thump
+
+This is one successor to the selected Coupled Wire, not a new variation batch.
+The source remains sample-identical before presentation. The low branch below
+105 Hz is centered and linear; only a bounded 105-500 Hz residual receives
+hard-crest shaping during the 8-70 ms onset, and material above 500 Hz remains
+clean. The fixed low contour uses 8/12/25/50 ms points and the clean upper
+branch recovers from gain 0.02 at 80 ms to unity at 130 ms.
+
+The selected `gentle` configuration at gain 4.60 measures -15.107 dBFS RMS,
+-2.006 dBFS sample peak, -2.006 dBTP estimated true peak, zero ceiling
+contact, -40.218 dB low nonlinear leakage, and -29.815 dB thump residual. The
+45-90 Hz onset is -11.147 dBFS, 3.692 dB below the rejected reference.
+Correlation is `0.996780839`, mono loss is `0.016345` dB, tonal coverage is
+complete, the noise classifier passes, output is finite, and the 1.6-second
+render returns to exact zero. The absolute alias residual is -53.577 dB
+relative to probe input.
+
+Two release generations and the installed artifact compare byte-identical
+except workstation timing. Their deterministic file-set SHA-256 is
+`e8aa1c458ff0a4fda6c5f4184e282fad377448719e4153efc2005b6e4afd2f5d`.
+The rejected envelope/motion artifact was moved to Trash. The only active
+ignored artifact is `artifacts/coupled-wire-controlled-thump/`, containing one
+WAV and reports. Human listening remains open; nothing is mapped or integrated.

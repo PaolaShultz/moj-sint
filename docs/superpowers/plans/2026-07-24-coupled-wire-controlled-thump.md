@@ -630,7 +630,7 @@ git commit -m "feat: present one controlled Coupled Wire thump"
 - Generate ignored: `artifacts/coupled-wire-controlled-thump/*`
 - Trash rejected ignored: `artifacts/coupled-wire-envelope-motion/`
 
-- [ ] **Step 1: Build release and generate two temporary batches**
+- [x] **Step 1: Build release and generate two temporary batches**
 
 Run:
 
@@ -644,7 +644,7 @@ target/release/coupled-wire-thump-lab render "$second"
 
 Expected: both commands exit 0 and each directory contains exactly one WAV.
 
-- [ ] **Step 2: Compare and inspect the complete evidence**
+- [x] **Step 2: Compare and inspect the complete evidence**
 
 Compare every file except `workstation-cost.txt` byte-for-byte. Inspect
 `selection.tsv`, `rejections.tsv`, `metrics.tsv`, `bands.tsv`, and `alias.tsv`.
@@ -657,7 +657,7 @@ Confirm:
 - the clean source hash remains exact before processing; and
 - reports make no acoustic SPL or Raspberry Pi claim.
 
-- [ ] **Step 3: Replace the rejected artifact safely**
+- [x] **Step 3: Replace the rejected artifact safely**
 
 Copy the passing temporary batch to
 `artifacts/coupled-wire-controlled-thump/`, compare it byte-for-byte to the
@@ -670,7 +670,7 @@ Confirm `find artifacts -mindepth 1 -maxdepth 1 -type d` prints exactly:
 artifacts/coupled-wire-controlled-thump
 ```
 
-- [ ] **Step 4: Record the completed engineering checkpoint**
+- [x] **Step 4: Record the completed engineering checkpoint**
 
 Update all three durable docs with:
 
@@ -685,7 +685,7 @@ Update all three durable docs with:
 - the rejected old batch removal; and
 - human listening still open with no production integration.
 
-- [ ] **Step 5: Verify docs and commit**
+- [x] **Step 5: Verify docs and commit**
 
 Run:
 
