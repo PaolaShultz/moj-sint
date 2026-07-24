@@ -111,7 +111,7 @@ pub enum SubsetError {
     InvalidSampleRate,
     #[error("gain must be finite and positive")]
     InvalidGain,
-    #[error("no positive shared gain satisfies the sparse-ceiling rule")]
+    #[error("no positive presentation gain satisfies the level and sparse-ceiling rules")]
     NoSharedGain,
     #[error(transparent)]
     Hybrid(#[from] HybridRenderError),
@@ -323,17 +323,20 @@ pub struct ReferenceRender {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct GroupGains {
-    pub three_layer: f32,
-    pub four_layer: f32,
+pub struct PresentationGains {
+    values: [f32; SubsetCandidate::ALL.len()],
 }
 
-impl GroupGains {
+impl PresentationGains {
     pub fn for_candidate(self, candidate: SubsetCandidate) -> f32 {
-        if candidate.layers().len() == 3 {
-            self.three_layer
-        } else {
-            self.four_layer
+        match candidate {
+            SubsetCandidate::ThreeSingles => self.values[0],
+            SubsetCandidate::ThreeChords => self.values[1],
+            SubsetCandidate::ThreeStereoProgressions => self.values[2],
+            SubsetCandidate::ThreeMonoProgressions => self.values[3],
+            SubsetCandidate::CrossAnchor => self.values[4],
+            SubsetCandidate::SpectralAnchor => self.values[5],
+            SubsetCandidate::DualAnchor => self.values[6],
         }
     }
 }
@@ -427,19 +430,18 @@ pub fn render_reference(sample_rate: u32) -> Result<ReferenceRender, SubsetError
     })
 }
 
-pub fn select_group_gains(previews: &[RawPreview]) -> Result<GroupGains, SubsetError> {
-    Ok(GroupGains {
-        three_layer: select_shared_gain(
-            previews
-                .iter()
-                .filter(|preview| preview.candidate.layers().len() == 3),
-        )?,
-        four_layer: select_shared_gain(
-            previews
-                .iter()
-                .filter(|preview| preview.candidate.layers().len() == 4),
-        )?,
-    })
+pub fn select_presentation_gains(
+    previews: &[RawPreview],
+) -> Result<PresentationGains, SubsetError> {
+    let mut values = [0.0; SubsetCandidate::ALL.len()];
+    for (index, candidate) in SubsetCandidate::ALL.into_iter().enumerate() {
+        let preview = previews
+            .iter()
+            .find(|preview| preview.candidate == candidate)
+            .ok_or(SubsetError::NoSharedGain)?;
+        values[index] = select_shared_gain(std::iter::once(preview))?;
+    }
+    Ok(PresentationGains { values })
 }
 
 fn select_shared_gain<'a>(
@@ -993,14 +995,20 @@ mod tests {
     }
 
     #[test]
-    fn shared_gain_is_group_wide_and_respects_sparse_ceiling_rule() {
-        let previews = preview_all(8_000).unwrap();
-        let gains = select_group_gains(&previews).unwrap();
-        assert!(gains.three_layer.is_finite() && gains.three_layer > 0.0);
-        assert!(gains.four_layer.is_finite() && gains.four_layer > 0.0);
+    fn presentation_gains_keep_every_full_rate_composite_inside_the_level_gate() {
+        let previews = preview_all(48_000).unwrap();
+        let gains = select_presentation_gains(&previews).unwrap();
         for preview in previews {
             let gain = gains.for_candidate(preview.candidate);
+            assert!(gain.is_finite() && gain > 0.0);
             let metrics = preview.metrics_at_gain(gain);
+            assert!(
+                (MIN_ACTIVE_RMS..=MAX_ACTIVE_RMS).contains(&metrics.active_rms),
+                "{} active RMS {} at gain {}",
+                preview.candidate.slug(),
+                metrics.active_rms,
+                gain
+            );
             assert!(metrics.ceiling_proportion <= MAX_CEILING_PROPORTION);
         }
     }

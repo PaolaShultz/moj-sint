@@ -37,7 +37,7 @@ After applying the fixed layer offsets and summing the selected layers:
 1. apply one equal-power pre-sum trim of `1 / sqrt(layer_count)` to every
    selected layer;
 2. apply one shared master ADSR to the complete stereo sum;
-3. apply the shared three- or four-layer presentation gain; and
+3. apply one explicit fixed presentation gain for the complete candidate; and
 4. apply the static `-0.3 dBFS` hard ceiling.
 
 The master ADSR is identical for every candidate:
@@ -54,7 +54,10 @@ remain source-internal safety/details; they are not separate audible master
 envelopes.
 
 No compressor, automatic limiter, soft saturator, maximizer, time-varying
-make-up gain, or per-file normalization is allowed.
+make-up gain, or post-render normalization is allowed. Presentation gains are
+reported per composite because one shared three-layer gain cannot keep both
+the single-note and mono-progression composites inside the full-rate
+`-14` to `-10 dBFS` gate.
 
 ## Listening output
 

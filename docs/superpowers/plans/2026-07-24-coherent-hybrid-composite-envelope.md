@@ -4,7 +4,7 @@
 
 **Goal:** Replace second-scale sequential layer entry with fixed micro-delays and one post-sum master ADSR so every three- or four-layer candidate behaves as one complete composite sound.
 
-**Architecture:** Keep the exact original source-layer renderer and candidate membership. Change only the isolated `hybrid_subset` timing/mix boundary: fixed 0/2/5 and 0/4/9/15 ms offsets, equal-power layer trim, one prepared master ADSR after summation, then existing shared gain and static ceiling. Replace all generated output with one ignored coherent-composite batch.
+**Architecture:** Keep the exact original source-layer renderer and candidate membership. Change only the isolated `hybrid_subset` timing/mix boundary: fixed 0/2/5 and 0/4/9/15 ms offsets, equal-power layer trim, one prepared master ADSR after summation, then an explicit fixed gain for each complete composite and the static ceiling. Replace all generated output with one ignored coherent-composite batch.
 
 **Tech Stack:** Rust 2024, existing Moj Sint hybrid/subset modules, `assert_no_alloc`, `hound`, Cargo integration tests.
 
@@ -166,9 +166,9 @@ the old artifact identity.
 Rename the reference to
 `01_reference_fixed-microdelay-master-envelope.wav`. Build it from all twelve
 exact original layers using `0,1,3,4,5,7,8,9,11,12,14,15 ms`. Report the
-fixed offsets, equal-power trim, master ADSR `25/180/0.88/320 ms`, shared group
-gain, active RMS, peak, ceiling proportion, tonal/noise evidence, residuals,
-and hashes.
+fixed offsets, equal-power trim, master ADSR `25/180/0.88/320 ms`, explicit
+per-composite presentation gain, active RMS, peak, ceiling proportion,
+tonal/noise evidence, residuals, and hashes.
 
 Do not write isolated layers, solo files, long-delay references, mono
 diagnostics, sweeps, or failed WAVs.

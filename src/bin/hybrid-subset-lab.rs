@@ -1,9 +1,9 @@
 use moj_sint::hybrid_subset::{
-    CandidateEvidence, GroupGains, MASTER_ATTACK_MS, MASTER_DECAY_MS, MASTER_RELEASE_MS,
-    MASTER_SUSTAIN, REFERENCE_OFFSETS_MS, ReferenceRender, SubsetRender, evaluate_candidate,
+    CandidateEvidence, MASTER_ATTACK_MS, MASTER_DECAY_MS, MASTER_RELEASE_MS, MASTER_SUSTAIN,
+    PresentationGains, REFERENCE_OFFSETS_MS, ReferenceRender, SubsetRender, evaluate_candidate,
     evaluate_reference, fixed_offsets_ms, measure_high_rate_residual,
     measure_reference_high_rate_residual, preview_all, render_candidate, render_reference,
-    select_group_gains,
+    select_presentation_gains,
 };
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
@@ -58,7 +58,7 @@ fn render_lab(
     fs::create_dir_all(output)?;
     let started = Instant::now();
     let previews = preview_all(sample_rate)?;
-    let gains = select_group_gains(&previews)?;
+    let gains = select_presentation_gains(&previews)?;
     let reference = render_reference(sample_rate)?;
     let reference_residual = measure_reference_high_rate_residual(
         sample_rate,
@@ -112,8 +112,8 @@ fn render_lab(
     write_rejections(output, reference_filename, &reference_evidence, &rows)?;
     write_hashes(output, &reference, &rows)?;
     write_composite_regression(output, sample_rate, reference.raw_hash)?;
-    write_generation_summary(output, sample_rate, gains, &rows)?;
-    write_readme(output, sample_rate, gains, &reference, &rows)?;
+    write_generation_summary(output, sample_rate, &rows)?;
+    write_readme(output, sample_rate, &reference, &rows)?;
     write_cost(output, started.elapsed().as_secs_f64())?;
 
     println!(
@@ -126,7 +126,7 @@ fn render_lab(
 
 fn write_manifest(
     output: &Path,
-    gains: GroupGains,
+    gains: PresentationGains,
     reference: &ReferenceRender,
     reference_filename: &str,
     reference_evidence: &CandidateEvidence,
@@ -135,7 +135,7 @@ fn write_manifest(
     let mut file = writer(output, "manifest.tsv")?;
     writeln!(
         file,
-        "number\tcandidate\tfilename\tlayer_count\tlayers\tfixed_offsets_ms\tshared_gain\tstatus"
+        "number\tcandidate\tfilename\tlayer_count\tlayers\tfixed_offsets_ms\tpresentation_gain\tstatus"
     )?;
     let reference_layers = moj_sint::composite_machine::OriginalLayer::ALL
         .iter()
@@ -407,7 +407,6 @@ fn write_composite_regression(
 fn write_generation_summary(
     output: &Path,
     sample_rate: u32,
-    gains: GroupGains,
     rows: &[CandidateRow],
 ) -> std::io::Result<()> {
     let mut file = writer(output, "generation-summary.tsv")?;
@@ -424,16 +423,14 @@ fn write_generation_summary(
         "rejected_candidate_count\t{}\tcount",
         rows.iter().filter(|row| !row.passing()).count()
     )?;
-    writeln!(
-        file,
-        "three_layer_shared_gain\t{:.6}\tlinear",
-        gains.three_layer
-    )?;
-    writeln!(
-        file,
-        "four_layer_shared_gain\t{:.6}\tlinear",
-        gains.four_layer
-    )?;
+    for row in rows {
+        writeln!(
+            file,
+            "{}_presentation_gain\t{:.6}\tlinear",
+            row.render.candidate.slug(),
+            row.render.gain
+        )?;
+    }
     writeln!(file, "three_layer_offsets\t0,2,5\tms")?;
     writeln!(file, "four_layer_offsets\t0,4,9,15\tms")?;
     writeln!(file, "reference_offsets\t0,1,3,4,5,7,8,9,11,12,14,15\tms")?;
@@ -448,7 +445,6 @@ fn write_generation_summary(
 fn write_readme(
     output: &Path,
     sample_rate: u32,
-    gains: GroupGains,
     reference: &ReferenceRender,
     rows: &[CandidateRow],
 ) -> std::io::Result<()> {
@@ -460,7 +456,7 @@ fn write_readme(
     )?;
     writeln!(
         file,
-        "Every candidate combines three or four exact original hybrid layers as one complete sound. The layers use fixed micro-delays of 0/2/5 ms or 0/4/9/15 ms, then the complete stereo sum follows one shared master ADSR (25 ms attack, 180 ms decay, 0.88 sustain, 320 ms release). There are no new source mechanisms, effects, compressors, soft saturators, or per-file normalization. A fixed shared group gain feeds a static -0.3 dBFS ceiling; no retained file exceeds 1% crest contact.\n"
+        "Every candidate combines three or four exact original hybrid layers as one complete sound. The layers use fixed micro-delays of 0/2/5 ms or 0/4/9/15 ms, then the complete stereo sum follows one shared master ADSR (25 ms attack, 180 ms decay, 0.88 sustain, 320 ms release). There are no new source mechanisms, effects, compressors, soft saturators, or post-render normalization. One explicit fixed presentation gain per complete composite feeds a static -0.3 dBFS ceiling; no retained file exceeds 1% crest contact.\n"
     )?;
     writeln!(file, "Listen in this order:\n")?;
     writeln!(
@@ -492,8 +488,7 @@ fn write_readme(
     }
     writeln!(
         file,
-        "\nShared gains: three-layer {:.6}; four-layer {:.6}. Rejected designs have no WAV and are listed in `rejections.tsv`.\n",
-        gains.three_layer, gains.four_layer
+        "\nEach fixed presentation gain is reported in `manifest.tsv` and `generation-summary.tsv`. Rejected designs have no WAV and are listed in `rejections.tsv`.\n"
     )?;
     writeln!(
         file,

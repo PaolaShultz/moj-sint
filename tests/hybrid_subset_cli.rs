@@ -73,6 +73,10 @@ fn hybrid_subset_lab_writes_only_deterministic_passing_original_combinations() {
     assert!(readme.contains("not acoustic SPL"));
 
     let manifest = fs::read_to_string(first.path().join("manifest.tsv")).unwrap();
+    assert!(manifest.starts_with(
+        "number\tcandidate\tfilename\tlayer_count\tlayers\tfixed_offsets_ms\tpresentation_gain\tstatus"
+    ));
+    assert!(!manifest.contains("shared_gain"));
     assert!(manifest.contains("0,2,5"));
     assert!(manifest.contains("0,4,9,15"));
     for line in manifest.lines().skip(1) {
