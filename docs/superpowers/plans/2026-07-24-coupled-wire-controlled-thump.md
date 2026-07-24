@@ -745,13 +745,13 @@ git check-ignore -v artifacts/coupled-wire-controlled-thump/README.md
 Expected: clean tracked worktree, coherent commits, only the new ignored
 artifact directory, and ignore evidence from `.gitignore`.
 
-- [ ] **Step 4: Invoke `superpowers:finishing-a-development-branch`**
+- [x] **Step 4: Invoke `superpowers:finishing-a-development-branch`**
 
 Use the already authorized local integration path: fast-forward local `main`,
 run `cargo test --all-targets --all-features` on merged `main`, remove the
 temporary worktree, delete the merged feature branch, and do not push.
 
-- [ ] **Step 5: Report the listening gate**
+- [x] **Step 5: Report the listening gate**
 
 Link `artifacts/coupled-wire-controlled-thump/README.md`, name the single WAV,
 summarize the measured low-band control and headroom, report verification and
