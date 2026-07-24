@@ -165,6 +165,31 @@ impl PreparedStrike {
     }
 }
 
+#[derive(Clone, Copy)]
+struct PreparedDcBlocker {
+    coefficient: f32,
+    previous_input: f32,
+    previous_output: f32,
+}
+
+impl PreparedDcBlocker {
+    fn new(sample_rate: u32) -> Self {
+        Self {
+            coefficient: (-std::f32::consts::TAU * 4.0 / sample_rate as f32).exp(),
+            previous_input: 0.0,
+            previous_output: 0.0,
+        }
+    }
+
+    #[inline]
+    fn sample(&mut self, input: f32) -> f32 {
+        let output = input - self.previous_input + self.coefficient * self.previous_output;
+        self.previous_input = input;
+        self.previous_output = output;
+        output
+    }
+}
+
 pub struct EnvelopeAuditionMixer {
     layers: Vec<PreparedLayer>,
     strike: PreparedStrike,
@@ -175,6 +200,8 @@ pub struct EnvelopeAuditionMixer {
     layer_trim: f32,
     gain: f32,
     last_body_envelope: f32,
+    left_dc: PreparedDcBlocker,
+    right_dc: PreparedDcBlocker,
 }
 
 impl EnvelopeAuditionMixer {
@@ -218,6 +245,8 @@ impl EnvelopeAuditionMixer {
             layer_trim: 1.0 / (MONOPHONIC_LAYERS.len() as f32).sqrt(),
             gain,
             last_body_envelope: 0.0,
+            left_dc: PreparedDcBlocker::new(sample_rate),
+            right_dc: PreparedDcBlocker::new(sample_rate),
         })
     }
 
@@ -252,7 +281,14 @@ impl EnvelopeAuditionMixer {
         }
         self.last_body_envelope = body_envelope;
         self.frame = self.frame.saturating_add(1);
-        sum
+        if body_envelope == 0.0 {
+            HybridFrame::default()
+        } else {
+            HybridFrame {
+                left: self.left_dc.sample(sum.left),
+                right: self.right_dc.sample(sum.right),
+            }
+        }
     }
 
     #[inline]
@@ -449,7 +485,8 @@ pub fn select_shared_gain(previews: &[EnvelopePreview]) -> Result<f32, EnvelopeA
     while gain > 0.0 {
         if previews.iter().all(|preview| {
             let samples = apply_gain_and_ceiling(&preview.samples, gain);
-            let metrics = measure_subset(&samples, 0, samples.len() / 2);
+            let (active_start_frame, active_end_frame) = active_region(&samples);
+            let metrics = measure_subset(&samples, active_start_frame, active_end_frame);
             measure_total_rms(&samples) <= MAX_TOTAL_RMS
                 && metrics.ceiling_proportion <= MAX_CEILING_PROPORTION
         }) {
@@ -616,8 +653,15 @@ mod tests {
     }
 
     #[test]
-    fn shared_gain_keeps_every_profile_inside_the_total_rms_gate() {
+    fn shared_gain_keeps_piano_strikes_inside_the_total_rms_gate() {
         let previews = preview_all(48_000).unwrap();
+        assert_eq!(
+            previews
+                .iter()
+                .map(|preview| preview.profile)
+                .collect::<Vec<_>>(),
+            StrikeProfile::ALL
+        );
         let gain = select_shared_gain(&previews).unwrap();
         for preview in &previews {
             let render = render_profile(preview, gain).unwrap();
@@ -628,7 +672,12 @@ mod tests {
                 render.total_rms,
                 gain
             );
-            assert!(evaluate_render(&render).rejection_reasons().is_empty());
+            let reasons = evaluate_render(&render).rejection_reasons();
+            assert!(
+                reasons.is_empty(),
+                "{} rejected at shared gain {gain}: {reasons:?}",
+                render.profile.slug()
+            );
         }
     }
 
