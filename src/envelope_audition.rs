@@ -556,4 +556,15 @@ mod tests {
             assert!(evaluate_render(&render).rejection_reasons().is_empty());
         }
     }
+
+    #[test]
+    fn deliberately_weak_profile_is_rejected_by_total_rms() {
+        let preview = preview_profile(AttackProfile::VeryShort, 8_000).unwrap();
+        let render = render_profile(&preview, 0.01).unwrap();
+        assert!(
+            evaluate_render(&render)
+                .rejection_reasons()
+                .contains(&EnvelopeRejection::TotalRms)
+        );
+    }
 }
