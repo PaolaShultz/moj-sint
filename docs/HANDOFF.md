@@ -143,14 +143,20 @@ At this checkpoint:
   none of its newly designed sounds worked, and its 4.854-29.208% clipping
   overcorrected the request for a slightly hotter signal into prolonged
   distortion/noise. Its generated batch was deleted.
-- The current disposable gate combines only three or four exact original
-  hybrid layers as one voice. Fixed micro-delays finish within 5 or 15 ms,
-  then one shared 25/180/0.88/320 ms master ADSR controls the complete stereo
-  sum. Seven candidates plus a twelve-layer 0-15 ms orientation reference use
-  explicit fixed presentation gains into a -0.3 dBFS ceiling. All eight pass
-  the finite, active-level, sparse-crest, tonal, noise, residual, DC,
-  discontinuity, stereo/mono, hash, and deterministic-generation rules.
-  Human listening is open; nothing is selected or integrated.
+- Human listening rejected the eight-file coherent composite gate as steady
+  tones. Although its layers shared a nominal ADSR, the 0.88 sustain held most
+  of each long source near a constant level, so it did not expose the requested
+  audible envelope shapes. Its generated batch was deleted.
+- The current disposable gate is musically monophonic: one D2 composite made
+  from the exact Cross, Spectral, and Dual single-note sources. Fixed
+  `0/2/5 ms` micro-delays alter the sum without turning layers into separate
+  events. Three 2.4-second renders use one post-sum master envelope with
+  6/35/140 ms attack alternatives and shared 220 ms decay, 0.58 sustain,
+  500 ms release, release at 1.9 seconds, and one fixed gain of 51.5. Whole-file
+  RMS is -10.123 to -10.039 dBFS, all three pass the -14 dBFS minimum and the
+  finite, sparse-crest, tonal, noise, tail, DC, discontinuity, stereo/mono, and
+  deterministic-generation gates. Human listening is open; nothing is
+  selected or integrated.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -625,14 +631,15 @@ Record `git rev-parse --short HEAD` before changing files.
 
 Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
 `docs/COMPOSITE_MACHINE_RESEARCH.md` before changing files. The current
-ignored batch is `artifacts/coherent-hybrid-composites/`: one twelve-layer
-orientation reference and seven three- or four-layer composites.
+ignored batch is `artifacts/monophonic-envelope-composites/`: exactly three
+versions of one three-source, single-note composite.
 
-Begin with the user's human listening verdict. Every file is one summed voice:
-fixed 0-5 or 0-15 ms micro-delays feed one shared master ADSR. Do not audition
-layers as sequential events, select the least bad result, or route anything
-into `Engine`, presets, or stable macros without explicit human acceptance.
-If none works, document the rejection and delete the batch.
+Begin with the user's human listening verdict. Every file contains the same D2
+composite with fixed 0/2/5 ms micro-delays and one shared master envelope; only
+its 6/35/140 ms attack changes. Do not treat these as three source-mechanism
+variations or route anything into `Engine`, presets, or stable macros without
+explicit human acceptance. If none works, document the rejection and delete
+the batch.
 
 Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
 expand production polyphony without explicit scope and native evidence.
@@ -640,15 +647,12 @@ expand production polyphony without explicit scope and native evidence.
 
 ## Next action
 
-Listen to `artifacts/coherent-hybrid-composites/` in README order: the
-twelve-layer fixed-microdelay reference followed by the seven passing three-
-or four-layer combinations. Start with playback volume low. Judge each file as
-one complete composite voice under one master envelope; there are no solo or
-sequential-entry auditions. Decide which smaller combination, if any, retains
-the fused identity of the reference and whether the sparse crest limiting adds
-useful edge without obvious distortion or noise. Stop before selecting a
-production family, mapping controls, extracting a generic graph, or
-integrating `Engine`.
+Listen to `artifacts/monophonic-envelope-composites/` in README order: 6 ms,
+35 ms, then 140 ms attack. Start with playback volume low. Judge how the same
+complete monophonic composite responds to the three audible onset shapes.
+There are no chords, solos, sequential layer entries, or low-RMS files. Stop
+before selecting a production family, mapping controls, extracting a generic
+graph, or integrating `Engine`.
 
 ## Executed foundation checkpoint
 
@@ -1106,7 +1110,7 @@ Verification recorded for that superseded batch:
 
 ## Coherent hybrid composite checkpoint
 
-Implemented on 2026-07-24 and awaiting human listening:
+Implemented and rejected by human listening on 2026-07-24:
 
 - retained the exact seven three- or four-layer memberships and all original
   source DSP, scores, seeds, fades, and stereo construction;
@@ -1132,10 +1136,11 @@ Implemented on 2026-07-24 and awaiting human listening:
   seven complete composites. No solo, long-delay, diagnostic, sweep, or
   rejected WAV is present.
 
-The only ignored artifact directory is
-`artifacts/coherent-hybrid-composites/`. Automated evidence rejects obvious
-defects but does not establish musical value. Nothing is selected, preserved
-in Git, mapped to controls, or integrated into `Engine`.
+The user found the outputs to be steady tones rather than useful envelope
+auditions. The nominal ADSR did not solve that perceptual problem: its 0.88
+sustain kept most of each long file at a nearly steady level. The ignored
+artifact directory was deleted. Nothing was selected, preserved in Git,
+mapped to controls, or integrated into `Engine`.
 
 Fresh integrated verification:
 
@@ -1151,4 +1156,50 @@ Fresh integrated verification:
 - two final 48 kHz generations compared byte-identical except
   `workstation-cost.txt`; and
 - artifact hygiene confirmed one ignored directory, exactly eight WAVs, and
+  no rejected output.
+
+## Monophonic envelope audition checkpoint
+
+Implemented on 2026-07-24 and awaiting human listening:
+
+- retained only the exact Cross, Spectral, and Dual single-note D2 sources;
+- summed their fixed `0/2/5 ms` offsets as one voice before applying one shared
+  post-sum stereo envelope;
+- rendered exactly three 2.4-second comparisons with 6, 35, and 140 ms
+  attacks, shared 220 ms decay, 0.58 sustain, 500 ms release, and release
+  beginning at 1.9 seconds;
+- applied one shared fixed gain of 51.5 into a static -0.3 dBFS ceiling, with
+  no per-profile normalization, compressor, automatic limiter, or soft
+  saturator;
+- rejected any candidate below -14 dBFS whole-file RMS instead of writing its
+  WAV; the three retained files measure -10.123, -10.076, and -10.039 dBFS;
+- retained 100% tonal coverage, no noise-like classification, 0.033-0.275%
+  ceiling contact, correlation above 0.882, mono loss below 0.476 dB, absolute
+  DC below 0.000431, finite output, valid tails, and bounded jumps; and
+- generated two byte-identical 48 kHz batches except volatile workstation
+  timing, with deterministic aggregate SHA-256
+  `c495a4d26c572db307502b9a70f9e2593fa955050723f62c508ad451fcf13bbc`.
+
+The only ignored artifact directory is
+`artifacts/monophonic-envelope-composites/`. It contains exactly three WAVs
+and their reports; no chord, progression, solo, old steady-tone batch, failed,
+weak-RMS, or noise-rejected WAV remains. These are attack positions of one
+source topology for a focused envelope audition, not three fundamentally
+different sound mechanisms. Nothing is selected, preserved in Git, mapped to
+controls, or integrated into `Engine`.
+
+Fresh integrated verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 102 library tests, 11 compact
+  contract tests, four deterministic lab integration tests, and six offline
+  CLI tests passed with zero failures;
+- Clippy with warnings denied and the release build: exit 0;
+- `cargo audit`: 35 locked crate dependencies scanned with no vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- AArch64 target check: exit 0, compile evidence only;
+- two final 48 kHz generations compared byte-identical except
+  `workstation-cost.txt`; and
+- artifact hygiene confirmed one ignored directory, exactly three WAVs, and
   no rejected output.

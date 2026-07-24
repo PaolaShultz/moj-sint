@@ -626,5 +626,51 @@ The only ignored artifact directory is
 reference and seven complete composites. No solo, long-delay, mono diagnostic,
 sweep, failed, or noise-rejected WAV is present.
 
-This is an open human listening gate. No sound is selected, mapped to controls,
-preserved as a tracked preset, or integrated into `Engine`.
+Human listening rejected this gate because the files presented as steady
+tones. The nominal common envelope used a 0.88 sustain across long sources, so
+its attack variations did not provide the requested audible envelope
+comparison. The generated batch was deleted. No sound was selected, mapped to
+controls, preserved as a tracked preset, or integrated into `Engine`.
+
+## 2026-07-24 monophonic envelope audition
+
+This focused audition retains only the exact single-note D2 render from each
+of the Cross, Spectral, and Dual families. The sources begin at fixed
+`0/2/5 ms` offsets and are equal-power trimmed, summed as one stereo voice,
+and then controlled by one common post-sum envelope. There are no chord,
+progression, solo, or separately entering layer files.
+
+The three exact 2.4-second profiles are:
+
+| file | attack | decay | sustain | release |
+| --- | ---: | ---: | ---: | ---: |
+| `01_monophonic_attack_006ms.wav` | 6 ms | 220 ms | 0.58 | 500 ms |
+| `02_monophonic_attack_035ms.wav` | 35 ms | 220 ms | 0.58 | 500 ms |
+| `03_monophonic_attack_140ms.wav` | 140 ms | 220 ms | 0.58 | 500 ms |
+
+Release begins at 1.9 seconds for every file. One shared fixed presentation
+gain of 51.5 feeds a static -0.3 dBFS ceiling. There is no analysis-dependent
+per-profile normalization, compressor, automatic limiter, or soft saturator.
+
+The gate measures whole-file total RMS and refuses to write a WAV below
+-14 dBFS. The three retained profiles measure:
+
+| attack | total RMS | ceiling contact | correlation | mono loss |
+| ---: | ---: | ---: | ---: | ---: |
+| 6 ms | -10.123 dBFS | 0.033% | 0.885 | 0.466 dB |
+| 35 ms | -10.076 dBFS | 0.118% | 0.885 | 0.468 dB |
+| 140 ms | -10.039 dBFS | 0.275% | 0.883 | 0.476 dB |
+
+All three retain 100% tonal coverage, spectral flatness 0.371, no noise-like
+classification, absolute DC below 0.000431, maximum adjacent-sample jump below
+0.136, finite output, and valid tails. These metrics reject obvious defects;
+they do not establish musical quality.
+
+Two release generations are byte-identical except
+`workstation-cost.txt`. Their deterministic aggregate SHA-256 is
+`c495a4d26c572db307502b9a70f9e2593fa955050723f62c508ad451fcf13bbc`.
+The ignored batch is `artifacts/monophonic-envelope-composites/`, containing
+exactly the three WAVs above and their reports. These are parameter positions
+within one topology for the explicitly requested envelope comparison, not a
+claim of three fundamentally different listening variations. Human listening
+is open; nothing is selected, mapped, or integrated.

@@ -46,10 +46,36 @@ and eight-times residuals are -6.675 to -2.548 dB.
 Two release generations are byte-identical except
 `workstation-cost.txt`. Their deterministic aggregate SHA-256 is
 `e3d88ce822abd66885d79289d1fad56bd8e3e2b171cb8435864666ec949c3e2c`.
-Only `artifacts/coherent-hybrid-composites/` remains. It contains the one
-reference plus seven complete candidates and no solo, long-delay, diagnostic,
-sweep, noise-rejected, or otherwise failed WAV. Human listening remains the
-musical acceptance gate.
+Human listening then rejected this batch as steady tones rather than useful
+envelope auditions. The 0.88 sustain held most of each long source near a
+constant level despite the nominal attack/decay/release stages. Its generated
+artifact directory was deleted.
+
+### 2026-07-24 monophonic envelope audition
+
+The replacement holds source identity constant to answer the user's narrower
+envelope question. It uses only the exact Cross, Spectral, and Dual
+single-note D2 sources, with fixed `0/2/5 ms` offsets, equal-power trim, and
+one post-sum stereo envelope. It contains no chord or progression layer.
+
+The three 2.4-second profiles use attacks of 6, 35, and 140 ms. All share
+220 ms decay, 0.58 sustain, a release beginning at 1.9 seconds, and 500 ms
+release. One fixed presentation gain of 51.5 is shared across every profile
+before a static -0.3 dBFS ceiling; there is no per-profile normalization,
+compressor, automatic limiter, or soft saturator.
+
+Whole-file total RMS is -10.123/-10.076/-10.039 dBFS. A profile below
+-14 dBFS is rejected before WAV writing, and the gain selector also caps the
+loudest profile at -10 dBFS. All retained files are finite and tonal, are not
+noise-like, return through valid tails, and pass the declared DC, jump,
+stereo/mono, and sparse-ceiling-contact rules.
+
+Two release generations are byte-identical except
+`workstation-cost.txt`. Their deterministic aggregate SHA-256 is
+`c495a4d26c572db307502b9a70f9e2593fa955050723f62c508ad451fcf13bbc`.
+Only `artifacts/monophonic-envelope-composites/` remains, with exactly three
+WAVs and no rejected output. Human listening remains the musical acceptance
+gate.
 
 ### 2026-07-24 superseded original-layer subset attempt
 
