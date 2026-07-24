@@ -11,8 +11,9 @@ use crate::struck_object::{
 };
 use std::f32::consts::TAU;
 
-const DEVELOPED_DECAY_SCALE: f32 = 5.0;
-const MOTION_SPLIT_HZ: f32 = 320.0;
+pub const DEVELOPED_DECAY_SCALE: f32 = 5.0;
+pub const MOTION_SPLIT_HZ: f32 = 320.0;
+pub const REFERENCE_GAIN: f32 = 4.43;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoupledMotionProfile {
