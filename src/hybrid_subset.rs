@@ -20,6 +20,13 @@ pub const MAX_HIGH_RATE_RESIDUAL_DB: f64 = -1.0;
 pub const MAX_SPECTRAL_FLATNESS: f64 = 0.50;
 pub const MIN_TONAL_PASS_FRACTION: f64 = 2.0 / 3.0;
 pub const TARGET_MARGIN_DB: f64 = 36.0;
+pub const MASTER_ATTACK_MS: u32 = 25;
+pub const MASTER_DECAY_MS: u32 = 180;
+pub const MASTER_SUSTAIN: f32 = 0.88;
+pub const MASTER_RELEASE_MS: u32 = 320;
+const THREE_LAYER_OFFSETS_MS: [u32; 3] = [0, 4, 9];
+const FOUR_LAYER_OFFSETS_MS: [u32; 4] = [0, 4, 9, 15];
+pub const REFERENCE_OFFSETS_MS: [u32; 12] = [0, 1, 3, 4, 5, 7, 8, 9, 11, 12, 14, 15];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SubsetCandidate {
@@ -119,10 +126,57 @@ struct PreparedLayer {
     start_frame: usize,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct MasterEnvelope {
+    attack_frames: usize,
+    decay_frames: usize,
+    release_frames: usize,
+}
+
+impl MasterEnvelope {
+    fn new(sample_rate: u32) -> Self {
+        let frames = |milliseconds: u32| {
+            ((u64::from(milliseconds) * u64::from(sample_rate)) / 1_000).max(1) as usize
+        };
+        Self {
+            attack_frames: frames(MASTER_ATTACK_MS),
+            decay_frames: frames(MASTER_DECAY_MS),
+            release_frames: frames(MASTER_RELEASE_MS),
+        }
+    }
+
+    #[inline]
+    fn value_at(self, frame: usize, duration_frames: usize) -> f32 {
+        if frame >= duration_frames {
+            return 0.0;
+        }
+        let release_start = duration_frames.saturating_sub(self.release_frames);
+        if frame >= release_start {
+            let release_length = duration_frames - release_start;
+            if release_length <= 1 {
+                return 0.0;
+            }
+            return MASTER_SUSTAIN * (duration_frames - 1 - frame) as f32
+                / (release_length - 1) as f32;
+        }
+        if frame < self.attack_frames {
+            return frame as f32 / self.attack_frames as f32;
+        }
+        if frame < self.attack_frames + self.decay_frames {
+            let progress = (frame - self.attack_frames) as f32 / self.decay_frames as f32;
+            return 1.0 - (1.0 - MASTER_SUSTAIN) * progress;
+        }
+        MASTER_SUSTAIN
+    }
+}
+
 pub struct HybridSubsetMixer {
     layers: Vec<PreparedLayer>,
     frame: usize,
     duration_frames: usize,
+    layer_trim: f32,
+    master_envelope: MasterEnvelope,
+    last_master_envelope: f32,
     gain: f32,
 }
 
@@ -138,19 +192,28 @@ impl HybridSubsetMixer {
         if !gain.is_finite() || gain <= 0.0 {
             return Err(SubsetError::InvalidGain);
         }
-        let first_ms = candidate
-            .layers()
-            .iter()
-            .map(|layer| layer.delayed_start_ms())
-            .min()
-            .unwrap_or(0);
-        let mut layers = Vec::with_capacity(candidate.layers().len());
+        let offsets = fixed_offsets_ms(candidate);
+        Self::from_layers(candidate.layers(), &offsets, sample_rate, gain)
+    }
+
+    fn from_layers(
+        source_layers: &[OriginalLayer],
+        offsets_ms: &[u32],
+        sample_rate: u32,
+        gain: f32,
+    ) -> Result<Self, SubsetError> {
+        if sample_rate == 0 {
+            return Err(SubsetError::InvalidSampleRate);
+        }
+        if !gain.is_finite() || gain <= 0.0 {
+            return Err(SubsetError::InvalidGain);
+        }
+        debug_assert_eq!(source_layers.len(), offsets_ms.len());
+        let mut layers = Vec::with_capacity(source_layers.len());
         let mut duration_frames = 0;
-        for &layer in candidate.layers() {
+        for (&layer, &offset_ms) in source_layers.iter().zip(offsets_ms) {
             let samples: Arc<[f32]> = render_original_layer(layer, sample_rate)?.into();
-            let start_frame = ((u64::from(layer.delayed_start_ms() - first_ms)
-                * u64::from(sample_rate))
-                / 1_000) as usize;
+            let start_frame = ((u64::from(offset_ms) * u64::from(sample_rate)) / 1_000) as usize;
             duration_frames = duration_frames.max(start_frame + samples.len() / 2);
             layers.push(PreparedLayer {
                 samples,
@@ -161,6 +224,9 @@ impl HybridSubsetMixer {
             layers,
             frame: 0,
             duration_frames,
+            layer_trim: 1.0 / (source_layers.len() as f32).sqrt(),
+            master_envelope: MasterEnvelope::new(sample_rate),
+            last_master_envelope: 0.0,
             gain,
         })
     }
@@ -177,8 +243,17 @@ impl HybridSubsetMixer {
                 }
             }
         }
+        output.left *= self.layer_trim;
+        output.right *= self.layer_trim;
+        let master = self
+            .master_envelope
+            .value_at(self.frame, self.duration_frames);
+        self.last_master_envelope = master;
         self.frame = self.frame.saturating_add(1);
-        output
+        HybridFrame {
+            left: output.left * master,
+            right: output.right * master,
+        }
     }
 
     #[inline]
@@ -192,6 +267,10 @@ impl HybridSubsetMixer {
 
     pub fn duration_frames(&self) -> usize {
         self.duration_frames
+    }
+
+    pub fn last_master_envelope(&self) -> f32 {
+        self.last_master_envelope
     }
 }
 
@@ -260,18 +339,12 @@ impl GroupGains {
     }
 }
 
-pub fn rebased_offsets_ms(candidate: SubsetCandidate) -> Vec<u32> {
-    let first = candidate
-        .layers()
-        .iter()
-        .map(|layer| layer.delayed_start_ms())
-        .min()
-        .unwrap_or(0);
-    candidate
-        .layers()
-        .iter()
-        .map(|layer| layer.delayed_start_ms() - first)
-        .collect()
+pub fn fixed_offsets_ms(candidate: SubsetCandidate) -> Vec<u32> {
+    if candidate.layers().len() == 3 {
+        THREE_LAYER_OFFSETS_MS.to_vec()
+    } else {
+        FOUR_LAYER_OFFSETS_MS.to_vec()
+    }
 }
 
 pub fn preview_all(sample_rate: u32) -> Result<Vec<RawPreview>, SubsetError> {
@@ -612,7 +685,7 @@ pub fn measure_tonal_pass_fraction(
     if sample_rate == 0 || samples.len() < 2 {
         return 0.0;
     }
-    let offsets = rebased_offsets_ms(candidate);
+    let offsets = fixed_offsets_ms(candidate);
     let mut minimum_fraction = 1.0_f64;
     let mut measured = false;
     for (&layer, &offset_ms) in candidate.layers().iter().zip(&offsets) {
@@ -703,7 +776,7 @@ pub fn measure_high_rate_residual(
     const FACTOR: usize = 8;
     let mut target = HybridSubsetMixer::new(candidate, sample_rate, gain)?;
     let mut reference = HybridSubsetMixer::new(candidate, sample_rate * FACTOR as u32, gain)?;
-    let latest_ms = rebased_offsets_ms(candidate).into_iter().max().unwrap_or(0) + 1_000;
+    let latest_ms = fixed_offsets_ms(candidate).into_iter().max().unwrap_or(0) + 1_000;
     let target_skip = (u64::from(latest_ms) * u64::from(sample_rate) / 1_000) as usize;
     for _ in 0..target_skip {
         target.sample();
@@ -800,6 +873,39 @@ mod tests {
                 OriginalLayer::CrossProgressionMono,
             ]
         );
+    }
+
+    #[test]
+    fn fixed_offsets_are_micro_delays_inside_the_master_attack() {
+        assert_eq!(
+            fixed_offsets_ms(SubsetCandidate::ThreeSingles),
+            vec![0, 4, 9]
+        );
+        assert_eq!(
+            fixed_offsets_ms(SubsetCandidate::CrossAnchor),
+            vec![0, 4, 9, 15]
+        );
+        for candidate in SubsetCandidate::ALL {
+            let offsets = fixed_offsets_ms(candidate);
+            assert_eq!(offsets.len(), candidate.layers().len());
+            assert!(offsets.iter().all(|offset| *offset < MASTER_ATTACK_MS));
+            assert!(offsets.windows(2).all(|pair| pair[0] < pair[1]));
+        }
+    }
+
+    #[test]
+    fn one_master_envelope_controls_the_complete_stereo_sum() {
+        let mut mixer = HybridSubsetMixer::new(SubsetCandidate::CrossAnchor, 8_000, 1.0).unwrap();
+        let first = assert_no_alloc(|| mixer.sample());
+        assert_eq!(first, HybridFrame::default());
+        assert_eq!(mixer.last_master_envelope(), 0.0);
+        for _ in 0..mixer.duration_frames().saturating_sub(2) {
+            let frame = assert_no_alloc(|| mixer.sample());
+            assert!(frame.left.is_finite() && frame.right.is_finite());
+        }
+        let final_frame = assert_no_alloc(|| mixer.sample());
+        assert_eq!(final_frame, HybridFrame::default());
+        assert_eq!(mixer.last_master_envelope(), 0.0);
     }
 
     #[test]
