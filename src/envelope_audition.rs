@@ -17,12 +17,68 @@ pub const MONOPHONIC_LAYERS: [OriginalLayer; 3] = [
     OriginalLayer::DualSingle,
 ];
 pub const LAYER_OFFSETS_MS: [u32; 3] = [0, 2, 5];
-pub const DURATION_MS: u32 = 2_400;
+pub const DURATION_MS: u32 = 800;
+pub const BODY_ATTACK_MS: u32 = 2;
+pub const BODY_FAST_DECAY_MS: u32 = 60;
+pub const BODY_SILENT_FROM_MS: u32 = 700;
+pub const STRIKE_ATTACK_MS: u32 = 1;
+pub const STRIKE_MIX: f32 = 0.30;
 pub const DECAY_MS: u32 = 220;
 pub const SUSTAIN: f32 = 0.58;
 pub const RELEASE_MS: u32 = 500;
 pub const MIN_TOTAL_RMS: f64 = 0.199_526_23;
 pub const MAX_TOTAL_RMS: f64 = 0.316_227_77;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StrikeProfile {
+    Cross,
+    Spectral,
+    Dual,
+}
+
+impl StrikeProfile {
+    pub const ALL: [Self; 3] = [Self::Cross, Self::Spectral, Self::Dual];
+
+    pub const fn strike_layer(self) -> OriginalLayer {
+        match self {
+            Self::Cross => OriginalLayer::CrossSingle,
+            Self::Spectral => OriginalLayer::SpectralSingle,
+            Self::Dual => OriginalLayer::DualSingle,
+        }
+    }
+
+    pub const fn strike_ms(self) -> u32 {
+        match self {
+            Self::Cross => 16,
+            Self::Spectral => 28,
+            Self::Dual => 42,
+        }
+    }
+
+    pub const fn slug(self) -> &'static str {
+        match self {
+            Self::Cross => "cross-strike",
+            Self::Spectral => "spectral-strike",
+            Self::Dual => "dual-strike",
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Cross => "tight Cross strike",
+            Self::Spectral => "bright Spectral strike",
+            Self::Dual => "round Dual strike",
+        }
+    }
+
+    pub const fn filename(self) -> &'static str {
+        match self {
+            Self::Cross => "01_piano_cross_strike.wav",
+            Self::Spectral => "02_piano_spectral_strike.wav",
+            Self::Dual => "03_piano_dual_strike.wav",
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AttackProfile {
@@ -493,22 +549,25 @@ mod tests {
     }
 
     #[test]
-    fn attack_profiles_are_short_fixed_and_share_the_remaining_shape() {
+    fn profiles_vary_exact_short_strike_sources() {
         assert_eq!(
-            AttackProfile::ALL.map(AttackProfile::attack_ms),
-            [6, 35, 140]
+            StrikeProfile::ALL.map(StrikeProfile::strike_layer),
+            [
+                OriginalLayer::CrossSingle,
+                OriginalLayer::SpectralSingle,
+                OriginalLayer::DualSingle,
+            ]
         );
-        for profile in AttackProfile::ALL {
-            assert_eq!(profile.duration_ms(), 2_400);
-            assert_eq!(profile.decay_ms(), 220);
-            assert_eq!(profile.sustain(), 0.58);
-            assert_eq!(profile.release_ms(), 500);
-            assert!(
-                LAYER_OFFSETS_MS
-                    .iter()
-                    .all(|offset| *offset < profile.attack_ms())
-            );
-        }
+        assert_eq!(
+            StrikeProfile::ALL.map(StrikeProfile::strike_ms),
+            [16, 28, 42]
+        );
+        assert_eq!(DURATION_MS, 800);
+        assert_eq!(BODY_ATTACK_MS, 2);
+        assert_eq!(BODY_FAST_DECAY_MS, 60);
+        assert_eq!(BODY_SILENT_FROM_MS, 700);
+        assert_eq!(STRIKE_ATTACK_MS, 1);
+        assert_eq!(STRIKE_MIX, 0.30);
     }
 
     #[test]
