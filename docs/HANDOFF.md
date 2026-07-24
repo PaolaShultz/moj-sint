@@ -150,14 +150,19 @@ At this checkpoint:
 - Human listening rejected the 2.4-second monophonic envelope batch: its 0.58
   sustain still held too long, and its attack/decay behavior was too slow. The
   generated batch was moved to Trash.
-- The current disposable gate keeps the same exact three-source D2 body but
-  uses an 800 ms piano-like one-shot: 2 ms rise, 60 ms fast decay, curved decay
-  to zero by 700 ms, then exact silence. It has no flat sustain or note-off
-  release. Three files vary a brief exact-source D2 strike: Cross 16 ms,
-  Spectral 28 ms, and Dual 42 ms. One shared gain of 137.0 produces whole-file
-  RMS of -12.932 to -12.883 dBFS. All pass the finite, sparse-crest, tonal,
-  noise, tail, DC, discontinuity, stereo/mono, and deterministic-generation
-  gates. Human listening is open; nothing is selected or integrated.
+- Human listening rejected the 800 ms piano-strike batch as a muted,
+  towel-damped imitation without convincing natural decay. Its body was the
+  old source sum under a broadband amplitude contour, so the strike did not
+  excite an independently decaying object. The generated batch was moved to
+  Trash.
+- The current disposable gate instead uses three distinct monophonic D2
+  struck objects: Coupled Wire, Spectral Plate, and Dual Bridge. A
+  `7/11/9 ms` differentiated exact-source onset excites prepared modal banks
+  and is never mixed dry. Natural frequency-dependent loss produces the
+  1.6-second decay; there is no body ADSR or sustain. One shared gain of 4.43
+  produces -13.926 to -13.636 dBFS whole-file RMS with 0.516-0.993% ceiling
+  contact. All automated rejection gates pass, but human listening is open
+  and nothing is selected or integrated.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -632,14 +637,15 @@ Record `git rev-parse --short HEAD` before changing files.
 
 Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
 `docs/COMPOSITE_MACHINE_RESEARCH.md` before changing files. The current
-ignored batch is `artifacts/piano-strike-envelope-composites/`: exactly three
-versions of one three-source, single-note body with varied pitched strikes.
+ignored batch is `artifacts/moj-struck-objects/`: exactly three single-D2
+resonant objects with source-derived exciters and natural modal decay.
 
-Begin with the user's human listening verdict. Every file contains the same D2
-body with fixed 0/2/5 ms micro-delays and one no-sustain piano-like envelope;
-only its brief exact-source D2 strike changes. Do not route anything into
-`Engine`, presets, or stable macros without explicit human acceptance. If none
-works, document the rejection and delete the batch.
+Begin with the user's human listening verdict in README order: Coupled Wire,
+Spectral Plate, then Dual Bridge. The exciter is not mixed dry, there is no
+body ADSR or sustain plateau, and the files are different resonant topologies
+rather than parameter variants. Do not route anything into `Engine`, presets,
+or stable macros without explicit human acceptance. If none works, document
+the rejection and delete the batch.
 
 Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
 expand production polyphony without explicit scope and native evidence.
@@ -647,12 +653,13 @@ expand production polyphony without explicit scope and native evidence.
 
 ## Next action
 
-Listen to `artifacts/piano-strike-envelope-composites/` in README order: Cross,
-Spectral, then Dual strike. Start with playback volume low. Judge whether the
-16/28/42 ms pitched strike additions create a useful piano/bat onset over the
-same short, no-sustain body. There are no chords, solos, sequential layer
-entries, or low-RMS files. Stop before selecting a production family, mapping
-controls, extracting a generic graph, or integrating `Engine`.
+Listen to `artifacts/moj-struck-objects/` in README order: Coupled Wire,
+Spectral Plate, then Dual Bridge. Start with playback volume low. Judge attack
+identity, whether resonant color changes naturally through the decay, and
+whether any tail becomes dull, synthetic, or noisy. These are three
+monophonic topologies under one shared gain, not three settings of one graph.
+Stop before selecting a production family, mapping controls, extracting a
+generic graph, or integrating `Engine`.
 
 ## Executed foundation checkpoint
 
@@ -1203,7 +1210,7 @@ Fresh integrated verification:
 
 ## Piano-strike envelope audition checkpoint
 
-Implemented on 2026-07-24 and awaiting human listening:
+Implemented and rejected by human listening on 2026-07-24:
 
 - retained the same exact Cross, Spectral, and Dual single-note D2 body with
   fixed `0/2/5 ms` offsets and equal-power trim;
@@ -1225,11 +1232,12 @@ Implemented on 2026-07-24 and awaiting human listening:
   timing, with deterministic aggregate SHA-256
   `423cb4bbdaffd3f5ea65bf9bf0d280e588f3825ca5b340df6267a0e6bcd1cdac`.
 
-The only ignored artifact directory is
-`artifacts/piano-strike-envelope-composites/`. It contains exactly three WAVs
-and their reports; no old envelope batch, chord, progression, solo, failed,
-weak-RMS, or noise-rejected WAV remains. Nothing is selected, preserved in
-Git, mapped to controls, or integrated into `Engine`.
+Human listening rejected the batch because it sounded like a towel-damped
+imitation without a convincing naturally evolving decay. The old source body
+was still being shaped by a broadband amplitude contour rather than acting as
+an energy-bearing resonant object. The artifact directory was moved to Trash.
+Nothing was selected, preserved in Git, mapped to controls, or integrated into
+`Engine`.
 
 Fresh integrated verification:
 
@@ -1246,3 +1254,57 @@ Fresh integrated verification:
   `workstation-cost.txt`; and
 - artifact hygiene confirmed one ignored directory, exactly three WAVs, and
   no rejected output.
+
+## Moj Sint struck-object checkpoint
+
+Implemented on 2026-07-24 and awaiting human listening:
+
+- added isolated `struck_object` research DSP without modifying production
+  `Engine`, presets, or stable macros;
+- built three monophonic single-D2 topologies: two coupled eight-mode wires,
+  one eleven-mode inharmonic plate, and two internally coupled six-mode bridge
+  bodies;
+- used the differentiated first `7/11/9 ms` of the exact Cross, Spectral, and
+  Dual successful sources only as exciters; the source audio is never mixed
+  dry;
+- delayed only the second internal bank by `2/0/3 ms`, keeping one common
+  onset and one overall 1.6-second object;
+- used prepared second-order modal recurrences, frequency-dependent losses,
+  bounded previous-velocity exchange of `0.0002/0/0.0003`, prepared 35 Hz DC
+  control, a 0.5 ms boundary rise, and final 100 ms safety fade;
+- added no body ADSR, sustain stage, compressor, soft saturator, per-file
+  normalization, dry layer, or new nonlinear oscillator;
+- selected one shared gain of 4.43 into the static -0.3 dBFS sparse ceiling;
+- rendered `01_coupled_wire.wav`, `02_spectral_plate.wav`, and
+  `03_dual_bridge.wav` at -13.926/-13.636/-13.743 dBFS whole-file RMS;
+- retained 100% tonal coverage, no noise-like classification, 0.516/0.861/
+  0.993% ceiling contact, correlation above 0.995, mono loss below 0.029 dB,
+  absolute DC below 0.001552, finite output, bounded jumps, and exact return to
+  zero; and
+- measured early-to-late decay of -41.531/-47.235/-43.103 dB with falling
+  high-band ratios for all three bodies.
+
+Two release generations are byte-identical except
+`workstation-cost.txt`. Their deterministic aggregate SHA-256 is
+`c72d853e5cc7177585999986e8f3ab198c731703c1edf9d7479a78fb1dff5ff9`.
+The only active ignored artifact directory is
+`artifacts/moj-struck-objects/`, containing exactly the three passing WAVs and
+their reports. Human listening remains the musical acceptance gate.
+
+Fresh feature-worktree verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 108 library tests, 11 compact
+  contract tests, five deterministic lab integration tests, and six offline
+  CLI tests passed with zero failures;
+- `cargo clippy --all-targets --all-features -- -D warnings`: exit 0;
+- `cargo build --release`: exit 0;
+- `cargo audit`: 35 locked dependencies scanned with no vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- `cargo check --target aarch64-unknown-linux-gnu --all-targets
+  --all-features`: exit 0, compile evidence only;
+- two fresh 48 kHz release generations and the installed batch compared
+  byte-identical except `workstation-cost.txt`; and
+- artifact hygiene confirmed one ignored directory, exactly three passing
+  WAVs, and no rejected or prior-batch output.

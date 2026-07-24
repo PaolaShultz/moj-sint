@@ -49,8 +49,10 @@ The first object uses the differentiated first `7 ms` of `CrossSingle` as a
 force impulse. The impulse excites two same-note stiff-wire modal banks. Their
 fundamentals differ by only `0.7 cents`, so they remain one D2 pitch rather
 than a harmony. Eight modes per wire use progressively sharpened
-inharmonic ratios. A bounded `0.012` per-sample bridge exchange transfers
-energy between corresponding modes.
+inharmonic ratios. The second bank receives the same strike `2 ms` later,
+inside the one onset. A bounded `0.0002` previous-velocity bridge exchange,
+divided by the peer-bank mode count, transfers energy without destabilizing
+the recurrences.
 
 High modes decay first; low modes remain longer. The two pickups use different
 modal sign and width patterns while preserving a centered low body. This
@@ -65,7 +67,7 @@ pattern. The fundamental and octave anchors retain pitch; the remaining modes
 produce a distinctly Moj Sint metallic field.
 
 Each mode has its own loss coefficient. High, irregular modes disappear in
-`90-280 ms`; the fundamental and low anchors persist for `700-1250 ms`.
+`75-290 ms`; the fundamental and low anchors persist for `760-1420 ms`.
 Unequal left/right pickup weights create stereo without phase-inverting the
 low anchor.
 
@@ -74,8 +76,9 @@ low anchor.
 The third object uses the first `9 ms` of `DualSingle` as excitation for two
 different six-mode bodies. One body emphasizes the D2 fundamental and odd
 partials; the other uses octave and stretched upper modes. A one-sample
-bounded bridge path transfers `0.018` of each body's previous summed velocity
-into the other body.
+bounded bridge path transfers `0.0003` of each body's previous summed
+velocity, divided by the peer-bank mode count, into the other body. The second
+body receives the same strike `3 ms` later, still inside the single onset.
 
 This is not reverb or a feedback effect around a finished tone. The coupling
 is inside the resonant object and is covered by stability and energy-decay
@@ -108,7 +111,8 @@ A candidate also receives no WAV for:
 
 - non-finite output or unstable modal energy;
 - allocation in the sample path;
-- excessive DC, adjacent-sample jump, or ceiling contact above `1%`;
+- absolute finite-transient DC above `0.002`, adjacent-sample jump, or ceiling
+  contact above `1%`;
 - failed D2 fundamental and octave anchors;
 - conjunctive noise-like classification;
 - more than `1 dB` mono loss or inadequate stereo correlation;
@@ -118,6 +122,7 @@ A candidate also receives no WAV for:
 Because the new renderer uses only linear prepared recurrences and source
 differencing, it adds no nonlinear oscillator or waveshaper requiring a new
 aliasing contract. Existing source aliasing limitations remain documented.
+Prepared `35 Hz` DC blocking precedes the common presentation stage.
 
 ## Listening Batch
 

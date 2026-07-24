@@ -711,6 +711,45 @@ byte-identical except `workstation-cost.txt`; their deterministic aggregate
 SHA-256 is
 `423cb4bbdaffd3f5ea65bf9bf0d280e588f3825ca5b340df6267a0e6bcd1cdac`.
 
-The ignored batch is `artifacts/piano-strike-envelope-composites/`, containing
-exactly the three passing WAVs above and their reports. Human listening is
-open; nothing is selected, mapped, or integrated.
+Human listening rejected this batch as a towel-damped imitation without
+convincing natural decay. The old source composite remained a finished body
+under a broadband amplitude contour, while the added strike was only another
+audible layer. The artifact directory was moved to Trash; nothing was
+selected, mapped, or integrated.
+
+## 2026-07-24 Moj Sint struck objects
+
+The replacement is not an acoustic-instrument imitation and does not reuse the
+old complete composite as a body. It takes only a brief differentiated onset
+from an exact successful source and injects that energy into a new resonant
+object. The exciter is never mixed dry and the resonant object, rather than a
+body ADSR, creates the decay.
+
+| file | exciter | topology | internal onset spread |
+| --- | --- | --- | ---: |
+| `01_coupled_wire.wav` | first 7 ms Cross single | paired stiff-wire banks, eight modes each, 0.7-cent split, `0.0002` bounded velocity exchange | 2 ms |
+| `02_spectral_plate.wav` | first 11 ms Spectral single | eleven fixed inharmonic modes with D2 and octave anchors | 0 ms |
+| `03_dual_bridge.wav` | first 9 ms Dual single | odd/fundamental and stretched octave/even six-mode bodies, `0.0003` bounded velocity exchange | 3 ms |
+
+Each file is one monophonic D2 onset, not sequential layers. All coefficients
+are prepared before the allocation-free sample path. Frequency-dependent modal
+loss supplies the 1.6-second evolution; only a 0.5 ms boundary rise and final
+100 ms safety fade are applied. Prepared 35 Hz DC control feeds one shared gain
+of 4.43 into the existing static -0.3 dBFS sparse ceiling.
+
+| object | total RMS | ceiling contact | early-to-late decay | correlation | mono loss |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Coupled Wire | -13.926 dBFS | 0.516% | -41.531 dB | 0.995 | 0.029 dB |
+| Spectral Plate | -13.636 dBFS | 0.861% | -47.235 dB | 0.997 | 0.025 dB |
+| Dual Bridge | -13.743 dBFS | 0.993% | -43.103 dB | 0.997 | 0.021 dB |
+
+All three pass finite, RMS, DC, jump, stereo/mono, tonal, conjunctive
+noise-like, multi-window decay, spectral-decay, sparse-ceiling, and final-zero
+rules. Two release generations are byte-identical except volatile workstation
+timing. Their deterministic aggregate SHA-256 is
+`c72d853e5cc7177585999986e8f3ab198c731703c1edf9d7479a78fb1dff5ff9`.
+
+The only active ignored artifact directory is
+`artifacts/moj-struck-objects/`, containing exactly the three passing WAVs and
+their reports. Human listening is open; nothing is selected, mapped, or
+integrated.

@@ -97,9 +97,80 @@ finite, and final-silence rules. The 48 kHz ceiling contact is
 Two release generations are byte-identical except
 `workstation-cost.txt`. Their deterministic aggregate SHA-256 is
 `423cb4bbdaffd3f5ea65bf9bf0d280e588f3825ca5b340df6267a0e6bcd1cdac`.
-Only `artifacts/piano-strike-envelope-composites/` remains, with exactly three
-WAVs and no rejected output. Human listening remains the musical acceptance
-gate.
+Human listening rejected the batch as a towel-damped imitation without
+convincing natural decay. The old source sum remained a body under a broadband
+amplitude contour; the added strike did not excite an independent resonant
+object. The artifact directory was moved to Trash.
+
+### 2026-07-24 Moj Sint struck objects
+
+The replacement borrows only the useful struck-object abstraction:
+
+```text
+brief excitation -> energy-bearing resonant object -> natural loss
+```
+
+It does not target an acoustic instrument. The differentiated first
+`7/11/9 ms` of the exact Cross/Spectral/Dual single-D2 sources excites three
+different prepared linear topologies and is never mixed dry:
+
+- Coupled Wire uses paired eight-mode stiff-wire banks, a 0.7-cent difference,
+  a 2 ms second-bank strike offset, and bounded `0.0002` previous-velocity
+  exchange divided by the peer-bank mode count.
+- Spectral Plate uses eleven fixed inharmonic modes with a D2 fundamental and
+  octave anchor.
+- Dual Bridge uses an odd/fundamental six-mode body and a stretched
+  octave/even six-mode body, a 3 ms second-bank strike offset, and bounded
+  `0.0003` previous-velocity exchange divided by the peer-bank mode count.
+
+All trigonometric and damping coefficients are prepared before sampling. The
+sample path is scalar, finite, deterministic, and allocation-free. There is no
+body ADSR or sustain, only a 0.5 ms boundary rise and final 100 ms safety fade.
+Prepared 35 Hz DC control precedes one shared gain of 4.43 and the static
+-0.3 dBFS sparse ceiling. No per-file normalization, compressor, soft
+saturator, dry layer, or new nonlinear oscillator was added.
+
+At 48 kHz the three files measure -13.926/-13.636/-13.743 dBFS whole-file RMS,
+0.516/0.861/0.993% ceiling contact, correlation above 0.995, mono loss below
+0.029 dB, and absolute DC below 0.001552. Tonal pass fraction is 1.0 and none
+is classified as noise-like. Early-to-late reduction is
+-41.531/-47.235/-43.103 dB; middle RMS is below early RMS, late RMS is below
+middle RMS, the high-band ratio falls, and every file returns exactly to zero.
+
+Two release generations are byte-identical except
+`workstation-cost.txt`. Their deterministic aggregate SHA-256 is
+`c72d853e5cc7177585999986e8f3ab198c731703c1edf9d7479a78fb1dff5ff9`.
+Only `artifacts/moj-struck-objects/` remains, with exactly three passing WAVs
+and the rejection evidence. Human listening remains the musical acceptance
+gate; nothing is selected or integrated.
+
+Primary-source provenance for the abstraction:
+
+- Balázs Bank, Federico Avanzini, Gianpaolo Borin, Giovanni De Poli, Federico
+  Fontana, and Davide Rocchesso, “Physically Informed Signal Processing
+  Methods for Piano Sound Synthesis: A Research Overview,” *EURASIP Journal on
+  Applied Signal Processing* 2003:10, 941-952,
+  <https://research.unipd.it/retrieve/e14fb267-96c0-3de1-e053-1705fe0ac030/bank_jasp03.pdf>.
+  Copyright 2003 Hindawi Publishing Corporation. Used only for the general
+  exciter-string-radiator separation and frequency-dependent loss rationale;
+  no source code, coefficient table, prose, sample, or figure was copied.
+- Riccardo Simionato, Stefano Fasciani, and Sverre Holm,
+  “Physics-informed differentiable method for piano modeling,” *Frontiers in
+  Signal Processing* 3:1276748, published 13 February 2024,
+  <https://doi.org/10.3389/frsip.2023.1276748>. The article is CC BY. Used only
+  to confirm the general relationship between stiffness, inharmonic partials,
+  and faster high-frequency loss; no model implementation or dataset was
+  copied.
+- Gabriel Weinreich, “Coupled piano strings,” *The Journal of the Acoustical
+  Society of America* 62(6), 1474-1484, 1977,
+  <https://doi.org/10.1121/1.381677>. The consulted metadata does not grant a
+  reuse license. Used only for the qualitative observation that coupled
+  same-note resonators can exchange energy and produce beats and aftersound;
+  no equations, prose, source, sample, or figure was copied.
+
+These papers explain useful physical behaviors, but the implementation is an
+independent, deliberately non-acoustic Moj Sint abstraction with hand-declared
+modal ratios and losses.
 
 ### 2026-07-24 superseded original-layer subset attempt
 
