@@ -35,7 +35,7 @@ of `1.0`, it must remain sample-identical to the accepted reference.
 An isolated `coupled_wire_motion` module will:
 
 1. render the exact Cross-derived Coupled Wire exciter and two-bank body;
-2. multiply every declared modal decay time by one shared `2.6` loss scale;
+2. multiply every declared modal decay time by one shared `5.0` loss scale;
 3. split the completed stereo body into low and high components with prepared
    one-pole state at `320 Hz`;
 4. add equal-and-opposite high-band pan motion to left and right, preserving

@@ -101,7 +101,7 @@ cargo test --lib coupled_wire_motion::tests::
   and prepared sine/cosine rotation. Use `smoothstep(x) = x*x*(3-2*x)` for
   attack, decay, and release stage curves.
 - [ ] Construct developed voices with Coupled Wire, duration matching the
-  profile, and modal decay scale `2.6`. Add pan as:
+  profile, and modal decay scale `5.0`. Add pan as:
 
 ```rust
 left += pan * high_mid;

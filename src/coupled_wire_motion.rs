@@ -1,8 +1,17 @@
 use crate::dsp::hybrid::HybridFrame as StereoFrame;
-use crate::struck_object::{StruckError, StruckObject, StruckTopology};
+use crate::envelope_audition::measure_total_rms;
+use crate::hybrid_subset::{
+    MAX_CEILING_PROPORTION, MAX_JUMP, MIN_CORRELATION, MIN_TONAL_PASS_FRACTION, OUTPUT_CEILING,
+    SubsetCandidate, SubsetMetrics, classify_noise_like, measure_spectral_flatness, measure_subset,
+    measure_tonal_pass_fraction,
+};
+use crate::struck_object::{
+    MAX_ABSOLUTE_DC, MAX_TOTAL_RMS, MIN_TOTAL_RMS, StruckError, StruckObject, StruckTopology,
+    window_rms,
+};
 use std::f32::consts::TAU;
 
-const DEVELOPED_DECAY_SCALE: f32 = 2.6;
+const DEVELOPED_DECAY_SCALE: f32 = 5.0;
 const MOTION_SPLIT_HZ: f32 = 320.0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -280,10 +289,246 @@ pub fn render_unpresented(
     Ok(samples)
 }
 
+#[derive(Clone, Debug)]
+pub struct CoupledMotionPreview {
+    pub profile: CoupledMotionProfile,
+    pub samples: Vec<f32>,
+    pub sample_rate: u32,
+}
+
+#[derive(Clone, Debug)]
+pub struct CoupledMotionRender {
+    pub profile: CoupledMotionProfile,
+    pub samples: Vec<f32>,
+    pub sample_rate: u32,
+    pub gain: f32,
+    pub total_rms: f64,
+    pub metrics: SubsetMetrics,
+    pub attack_rms: [f64; 3],
+    pub sustain_rms: f64,
+    pub release_early_rms: f64,
+    pub release_late_rms: f64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CoupledMotionRejection {
+    NonFinite,
+    TotalRms,
+    ExcessiveDc,
+    ExcessiveCeiling,
+    MaximumJump,
+    StereoMono,
+    TonalInventory,
+    NoiseLike,
+    Attack,
+    Sustain,
+    Release,
+    ReturnToZero,
+}
+
+impl CoupledMotionRejection {
+    pub const fn slug(self) -> &'static str {
+        match self {
+            Self::NonFinite => "non_finite",
+            Self::TotalRms => "total_rms",
+            Self::ExcessiveDc => "excessive_dc",
+            Self::ExcessiveCeiling => "excessive_ceiling",
+            Self::MaximumJump => "maximum_jump",
+            Self::StereoMono => "stereo_mono",
+            Self::TonalInventory => "tonal_inventory",
+            Self::NoiseLike => "noise_like",
+            Self::Attack => "attack",
+            Self::Sustain => "sustain",
+            Self::Release => "release",
+            Self::ReturnToZero => "return_to_zero",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct CoupledMotionEvidence {
+    pub total_rms: f64,
+    pub metrics: SubsetMetrics,
+    pub tonal_pass_fraction: f64,
+    pub spectral_flatness: f64,
+    pub attack_rms: [f64; 3],
+    pub sustain_rms: f64,
+    pub release_early_rms: f64,
+    pub release_late_rms: f64,
+    pub returns_to_zero: bool,
+}
+
+impl CoupledMotionEvidence {
+    pub fn rejection_reasons(self) -> Vec<CoupledMotionRejection> {
+        let mut reasons = Vec::new();
+        if !self.metrics.finite || !self.total_rms.is_finite() {
+            reasons.push(CoupledMotionRejection::NonFinite);
+        }
+        if !(MIN_TOTAL_RMS..=MAX_TOTAL_RMS).contains(&self.total_rms) {
+            reasons.push(CoupledMotionRejection::TotalRms);
+        }
+        if self.metrics.dc.abs() > MAX_ABSOLUTE_DC {
+            reasons.push(CoupledMotionRejection::ExcessiveDc);
+        }
+        if self.metrics.ceiling_proportion > MAX_CEILING_PROPORTION {
+            reasons.push(CoupledMotionRejection::ExcessiveCeiling);
+        }
+        if self.metrics.maximum_jump > MAX_JUMP {
+            reasons.push(CoupledMotionRejection::MaximumJump);
+        }
+        if self.metrics.mono_loss_db > 1.0 || self.metrics.correlation <= MIN_CORRELATION {
+            reasons.push(CoupledMotionRejection::StereoMono);
+        }
+        if self.tonal_pass_fraction + f64::EPSILON < MIN_TONAL_PASS_FRACTION {
+            reasons.push(CoupledMotionRejection::TonalInventory);
+        }
+        if classify_noise_like(self.spectral_flatness, self.tonal_pass_fraction) {
+            reasons.push(CoupledMotionRejection::NoiseLike);
+        }
+        if !(self.attack_rms[0] < self.attack_rms[1] && self.attack_rms[1] < self.attack_rms[2]) {
+            reasons.push(CoupledMotionRejection::Attack);
+        }
+        if self.sustain_rms < 0.1 {
+            reasons.push(CoupledMotionRejection::Sustain);
+        }
+        if self.release_late_rms >= self.release_early_rms {
+            reasons.push(CoupledMotionRejection::Release);
+        }
+        if !self.returns_to_zero {
+            reasons.push(CoupledMotionRejection::ReturnToZero);
+        }
+        reasons
+    }
+}
+
+pub fn preview_developed(sample_rate: u32) -> Result<Vec<CoupledMotionPreview>, StruckError> {
+    CoupledMotionProfile::DEVELOPED
+        .into_iter()
+        .map(|profile| preview(profile, sample_rate))
+        .collect()
+}
+
+pub fn preview(
+    profile: CoupledMotionProfile,
+    sample_rate: u32,
+) -> Result<CoupledMotionPreview, StruckError> {
+    Ok(CoupledMotionPreview {
+        profile,
+        samples: render_unpresented(profile, sample_rate, true)?,
+        sample_rate,
+    })
+}
+
+pub fn select_shared_gain(previews: &[CoupledMotionPreview]) -> Result<f32, StruckError> {
+    if previews.is_empty() {
+        return Err(StruckError::NoSharedGain);
+    }
+    let mut maximum = f32::INFINITY;
+    for preview in previews {
+        let rms = measure_total_rms(&preview.samples);
+        if rms > 0.0 {
+            maximum = maximum.min((MAX_TOTAL_RMS / rms) as f32);
+        }
+        let mut magnitudes = preview
+            .samples
+            .iter()
+            .map(|value| value.abs())
+            .collect::<Vec<_>>();
+        magnitudes.sort_unstable_by(f32::total_cmp);
+        let index = ((magnitudes.len() as f64 * (1.0 - MAX_CEILING_PROPORTION)).ceil() as usize)
+            .saturating_sub(1)
+            .min(magnitudes.len() - 1);
+        if magnitudes[index] > 0.0 {
+            maximum = maximum.min(OUTPUT_CEILING / magnitudes[index]);
+        }
+    }
+    let mut gain = (maximum * 100.0).floor() * 0.01;
+    while gain > 0.0 {
+        if previews.iter().all(|preview| {
+            let samples = apply_gain(&preview.samples, gain);
+            let metrics = measure_subset(&samples, 0, samples.len() / 2);
+            measure_total_rms(&samples) <= MAX_TOTAL_RMS
+                && metrics.ceiling_proportion <= MAX_CEILING_PROPORTION
+        }) {
+            return Ok(gain);
+        }
+        gain -= 0.01;
+    }
+    Err(StruckError::NoSharedGain)
+}
+
+pub fn render_preview(
+    preview: &CoupledMotionPreview,
+    gain: f32,
+) -> Result<CoupledMotionRender, StruckError> {
+    if !gain.is_finite() || gain <= 0.0 {
+        return Err(StruckError::InvalidGain);
+    }
+    let samples = apply_gain(&preview.samples, gain);
+    let spec = preview.profile.spec();
+    Ok(CoupledMotionRender {
+        profile: preview.profile,
+        total_rms: measure_total_rms(&samples),
+        metrics: measure_subset(&samples, 0, samples.len() / 2),
+        attack_rms: [
+            window_rms(&samples, 0, 60, preview.sample_rate),
+            window_rms(&samples, 80, 140, preview.sample_rate),
+            window_rms(&samples, 160, 220, preview.sample_rate),
+        ],
+        sustain_rms: window_rms(
+            &samples,
+            spec.note_off_ms.saturating_sub(400) as usize,
+            spec.note_off_ms.saturating_sub(100) as usize,
+            preview.sample_rate,
+        ),
+        release_early_rms: window_rms(
+            &samples,
+            spec.note_off_ms as usize,
+            spec.note_off_ms as usize + 200,
+            preview.sample_rate,
+        ),
+        release_late_rms: window_rms(
+            &samples,
+            spec.duration_ms.saturating_sub(250) as usize,
+            spec.duration_ms.saturating_sub(50) as usize,
+            preview.sample_rate,
+        ),
+        samples,
+        sample_rate: preview.sample_rate,
+        gain,
+    })
+}
+
+pub fn evaluate(render: &CoupledMotionRender) -> CoupledMotionEvidence {
+    CoupledMotionEvidence {
+        total_rms: render.total_rms,
+        metrics: render.metrics,
+        tonal_pass_fraction: measure_tonal_pass_fraction(
+            SubsetCandidate::ThreeSingles,
+            &render.samples,
+            render.sample_rate,
+        ),
+        spectral_flatness: measure_spectral_flatness(&render.samples, 0, render.samples.len() / 2),
+        attack_rms: render.attack_rms,
+        sustain_rms: render.sustain_rms,
+        release_early_rms: render.release_early_rms,
+        release_late_rms: render.release_late_rms,
+        returns_to_zero: render.samples[render.samples.len() - 2..]
+            .iter()
+            .all(|value| value.abs() <= 1.0e-7),
+    }
+}
+
+fn apply_gain(samples: &[f32], gain: f32) -> Vec<f32> {
+    samples
+        .iter()
+        .map(|value| (value * gain).clamp(-OUTPUT_CEILING, OUTPUT_CEILING))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::struck_object::window_rms;
     use assert_no_alloc::assert_no_alloc;
 
     #[test]
@@ -374,5 +619,31 @@ mod tests {
                 profile.slug()
             );
         }
+    }
+
+    #[test]
+    fn one_shared_gain_keeps_every_development_inside_the_gate() {
+        let previews = preview_developed(48_000).unwrap();
+        let gain = select_shared_gain(&previews).unwrap();
+        for preview in &previews {
+            let render = render_preview(preview, gain).unwrap();
+            let evidence = evaluate(&render);
+            assert!(
+                evidence.rejection_reasons().is_empty(),
+                "{} {gain} {evidence:?}",
+                render.profile.slug()
+            );
+        }
+    }
+
+    #[test]
+    fn weak_development_is_rejected_by_whole_file_rms() {
+        let preview = preview(CoupledMotionProfile::WarmHold, 8_000).unwrap();
+        let render = render_preview(&preview, 0.01).unwrap();
+        assert!(
+            evaluate(&render)
+                .rejection_reasons()
+                .contains(&CoupledMotionRejection::TotalRms)
+        );
     }
 }
