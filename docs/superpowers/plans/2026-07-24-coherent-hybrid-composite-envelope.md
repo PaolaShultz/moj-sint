@@ -4,7 +4,7 @@
 
 **Goal:** Replace second-scale sequential layer entry with fixed micro-delays and one post-sum master ADSR so every three- or four-layer candidate behaves as one complete composite sound.
 
-**Architecture:** Keep the exact original source-layer renderer and candidate membership. Change only the isolated `hybrid_subset` timing/mix boundary: fixed 0/4/9/15 ms offsets, equal-power layer trim, one prepared master ADSR after summation, then existing shared gain and static ceiling. Replace all generated output with one ignored coherent-composite batch.
+**Architecture:** Keep the exact original source-layer renderer and candidate membership. Change only the isolated `hybrid_subset` timing/mix boundary: fixed 0/2/5 and 0/4/9/15 ms offsets, equal-power layer trim, one prepared master ADSR after summation, then existing shared gain and static ceiling. Replace all generated output with one ignored coherent-composite batch.
 
 **Tech Stack:** Rust 2024, existing Moj Sint hybrid/subset modules, `assert_no_alloc`, `hound`, Cargo integration tests.
 
@@ -25,7 +25,7 @@ Add tests requiring:
 fn fixed_offsets_are_micro_delays_inside_the_master_attack() {
     assert_eq!(
         fixed_offsets_ms(SubsetCandidate::ThreeSingles),
-        vec![0, 4, 9]
+        vec![0, 2, 5]
     );
     assert_eq!(
         fixed_offsets_ms(SubsetCandidate::CrossAnchor),
@@ -89,7 +89,7 @@ pub const MASTER_ATTACK_MS: u32 = 25;
 pub const MASTER_DECAY_MS: u32 = 180;
 pub const MASTER_SUSTAIN: f32 = 0.88;
 pub const MASTER_RELEASE_MS: u32 = 320;
-const THREE_LAYER_OFFSETS_MS: [u32; 3] = [0, 4, 9];
+const THREE_LAYER_OFFSETS_MS: [u32; 3] = [0, 2, 5];
 const FOUR_LAYER_OFFSETS_MS: [u32; 4] = [0, 4, 9, 15];
 const REFERENCE_OFFSETS_MS: [u32; 12] =
     [0, 1, 3, 4, 5, 7, 8, 9, 11, 12, 14, 15];
@@ -115,7 +115,7 @@ channels after `sample_raw` and before the presentation gain/static ceiling.
 Store `last_master_envelope` for the focused contract test.
 
 Replace `rebased_offsets_ms` with `fixed_offsets_ms`; construction uses
-0/4/9/15 ms based only on selection order.
+0/2/5 or 0/4/9/15 ms based only on selection order.
 
 - [ ] **Step 4: Run focused tests**
 
@@ -149,7 +149,7 @@ assert!(!readme.contains("delayed-launch"));
 assert_eq!(wav_names.len(), 8);
 ```
 
-Require `manifest.tsv` to contain `0,4,9` and `0,4,9,15`, and reject any offset
+Require `manifest.tsv` to contain `0,2,5` and `0,4,9,15`, and reject any offset
 greater than 15 ms.
 
 Run:

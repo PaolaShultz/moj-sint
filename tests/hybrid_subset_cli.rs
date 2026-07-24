@@ -15,7 +15,7 @@ fn hybrid_subset_lab_writes_only_deterministic_passing_original_combinations() {
     );
 
     let files = deterministic_files(first.path());
-    assert!(files.contains_key("01_reference_twelve-layer-delayed.wav"));
+    assert!(files.contains_key("01_reference_fixed-microdelay-master-envelope.wav"));
     for report in [
         "README.md",
         "manifest.tsv",
@@ -24,7 +24,7 @@ fn hybrid_subset_lab_writes_only_deterministic_passing_original_combinations() {
         "residual.tsv",
         "rejections.tsv",
         "hashes.tsv",
-        "reconstruction-regression.tsv",
+        "composite-regression.tsv",
         "generation-summary.tsv",
     ] {
         assert!(files.contains_key(report), "missing {report}");
@@ -32,7 +32,7 @@ fn hybrid_subset_lab_writes_only_deterministic_passing_original_combinations() {
     assert!(first.path().join("workstation-cost.txt").is_file());
 
     let allowed = [
-        "01_reference_twelve-layer-delayed.wav",
+        "01_reference_fixed-microdelay-master-envelope.wav",
         "02_three-singles.wav",
         "03_three-chords.wav",
         "04_three-stereo-progressions.wav",
@@ -41,7 +41,12 @@ fn hybrid_subset_lab_writes_only_deterministic_passing_original_combinations() {
         "07_spectral-anchor.wav",
         "08_dual-anchor.wav",
     ];
-    for name in files.keys().filter(|name| name.ends_with(".wav")) {
+    let wav_names = files
+        .keys()
+        .filter(|name| name.ends_with(".wav"))
+        .collect::<Vec<_>>();
+    assert_eq!(wav_names.len(), 8);
+    for name in wav_names {
         assert!(allowed.contains(&name.as_str()), "unexpected WAV {name}");
         let reader = hound::WavReader::open(first.path().join(name)).unwrap();
         assert_eq!(reader.spec().channels, 2);
@@ -60,9 +65,23 @@ fn hybrid_subset_lab_writes_only_deterministic_passing_original_combinations() {
 
     let readme = fs::read_to_string(first.path().join("README.md")).unwrap();
     assert!(readme.contains("exact original hybrid layers"));
+    assert!(readme.contains("fixed micro-delays"));
+    assert!(readme.contains("one shared master ADSR"));
+    assert!(!readme.contains("delayed-launch"));
     assert!(readme.contains("start with playback volume low"));
     assert!(readme.contains("human listening decides"));
     assert!(readme.contains("not acoustic SPL"));
+
+    let manifest = fs::read_to_string(first.path().join("manifest.tsv")).unwrap();
+    assert!(manifest.contains("0,2,5"));
+    assert!(manifest.contains("0,4,9,15"));
+    for line in manifest.lines().skip(1) {
+        let fields = line.split('\t').collect::<Vec<_>>();
+        assert_eq!(fields.len(), 8, "{line}");
+        for offset in fields[5].split(',') {
+            assert!(offset.parse::<u32>().unwrap() <= 15, "{line}");
+        }
+    }
 }
 
 fn run_lab(output: &Path) {

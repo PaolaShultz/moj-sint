@@ -1,6 +1,5 @@
 use crate::composite_machine::{
-    CompositeCandidate, CompositeError, OriginalLayer, original_composite_layer_gain,
-    render_composite, render_original_layer,
+    CompositeError, OriginalLayer, original_composite_layer_gain, render_original_layer,
 };
 use crate::dsp::hybrid::HybridFrame;
 use crate::hybrid::{HybridCondition, HybridRenderError, PROGRESSION, measure_frequency_levels};
@@ -24,7 +23,7 @@ pub const MASTER_ATTACK_MS: u32 = 25;
 pub const MASTER_DECAY_MS: u32 = 180;
 pub const MASTER_SUSTAIN: f32 = 0.88;
 pub const MASTER_RELEASE_MS: u32 = 320;
-const THREE_LAYER_OFFSETS_MS: [u32; 3] = [0, 4, 9];
+const THREE_LAYER_OFFSETS_MS: [u32; 3] = [0, 2, 5];
 const FOUR_LAYER_OFFSETS_MS: [u32; 4] = [0, 4, 9, 15];
 pub const REFERENCE_OFFSETS_MS: [u32; 12] = [0, 1, 3, 4, 5, 7, 8, 9, 11, 12, 14, 15];
 
@@ -395,16 +394,22 @@ pub fn render_candidate(preview: &RawPreview, gain: f32) -> Result<SubsetRender,
 }
 
 pub fn render_reference(sample_rate: u32) -> Result<ReferenceRender, SubsetError> {
-    let raw = render_composite(
-        CompositeCandidate::DelayedLaunchEstimate,
+    let mut mixer = HybridSubsetMixer::from_layers(
+        &OriginalLayer::ALL,
+        &REFERENCE_OFFSETS_MS,
         sample_rate,
-        false,
+        1.0,
     )?;
-    let raw_hash = raw.metrics.sample_hash;
-    let (active_start_frame, active_end_frame) = active_region(&raw.samples);
+    let mut raw_samples = Vec::with_capacity(2 * mixer.duration_frames());
+    for _ in 0..mixer.duration_frames() {
+        let frame = mixer.sample_raw();
+        raw_samples.extend([frame.left, frame.right]);
+    }
+    let (active_start_frame, active_end_frame) = active_region(&raw_samples);
+    let raw_hash = measure_subset(&raw_samples, active_start_frame, active_end_frame).sample_hash;
     let preview = RawPreview {
         candidate: SubsetCandidate::ThreeSingles,
-        samples: raw.samples,
+        samples: raw_samples,
         sample_rate,
         active_start_frame,
         active_end_frame,
@@ -677,18 +682,54 @@ pub fn evaluate_candidate(
     }
 }
 
+pub fn evaluate_reference(
+    render: &ReferenceRender,
+    sample_rate: u32,
+    high_rate_residual_db: f64,
+) -> CandidateEvidence {
+    CandidateEvidence {
+        metrics: render.metrics,
+        tonal_pass_fraction: measure_reference_tonal_pass_fraction(&render.samples, sample_rate),
+        spectral_flatness: measure_spectral_flatness(
+            &render.samples,
+            render.active_start_frame,
+            render.active_end_frame,
+        ),
+        high_rate_residual_db,
+        returns_to_zero: returns_to_zero(&render.samples),
+    }
+}
+
 pub fn measure_tonal_pass_fraction(
     candidate: SubsetCandidate,
+    samples: &[f32],
+    sample_rate: u32,
+) -> f64 {
+    let offsets = fixed_offsets_ms(candidate);
+    measure_layers_tonal_pass_fraction(candidate.layers(), &offsets, samples, sample_rate)
+}
+
+pub fn measure_reference_tonal_pass_fraction(samples: &[f32], sample_rate: u32) -> f64 {
+    measure_layers_tonal_pass_fraction(
+        &OriginalLayer::ALL,
+        &REFERENCE_OFFSETS_MS,
+        samples,
+        sample_rate,
+    )
+}
+
+fn measure_layers_tonal_pass_fraction(
+    layers: &[OriginalLayer],
+    offsets: &[u32],
     samples: &[f32],
     sample_rate: u32,
 ) -> f64 {
     if sample_rate == 0 || samples.len() < 2 {
         return 0.0;
     }
-    let offsets = fixed_offsets_ms(candidate);
     let mut minimum_fraction = 1.0_f64;
     let mut measured = false;
-    for (&layer, &offset_ms) in candidate.layers().iter().zip(&offsets) {
+    for (&layer, &offset_ms) in layers.iter().zip(offsets) {
         let segments: Vec<(u32, u32, [u8; 3], usize)> = match layer.condition() {
             HybridCondition::Single => vec![(0, 10_000, [38, 38, 38], 1)],
             HybridCondition::HeldChord => vec![(0, 12_000, [50, 53, 57], 3)],
@@ -770,13 +811,45 @@ pub fn measure_high_rate_residual(
     gain: f32,
     sample_count: usize,
 ) -> Result<f64, SubsetError> {
+    let offsets = fixed_offsets_ms(candidate);
+    measure_layers_high_rate_residual(
+        candidate.layers(),
+        &offsets,
+        sample_rate,
+        gain,
+        sample_count,
+    )
+}
+
+pub fn measure_reference_high_rate_residual(
+    sample_rate: u32,
+    gain: f32,
+    sample_count: usize,
+) -> Result<f64, SubsetError> {
+    measure_layers_high_rate_residual(
+        &OriginalLayer::ALL,
+        &REFERENCE_OFFSETS_MS,
+        sample_rate,
+        gain,
+        sample_count,
+    )
+}
+
+fn measure_layers_high_rate_residual(
+    layers: &[OriginalLayer],
+    offsets_ms: &[u32],
+    sample_rate: u32,
+    gain: f32,
+    sample_count: usize,
+) -> Result<f64, SubsetError> {
     if sample_count < 64 {
         return Err(SubsetError::InvalidSampleRate);
     }
     const FACTOR: usize = 8;
-    let mut target = HybridSubsetMixer::new(candidate, sample_rate, gain)?;
-    let mut reference = HybridSubsetMixer::new(candidate, sample_rate * FACTOR as u32, gain)?;
-    let latest_ms = fixed_offsets_ms(candidate).into_iter().max().unwrap_or(0) + 1_000;
+    let mut target = HybridSubsetMixer::from_layers(layers, offsets_ms, sample_rate, gain)?;
+    let mut reference =
+        HybridSubsetMixer::from_layers(layers, offsets_ms, sample_rate * FACTOR as u32, gain)?;
+    let latest_ms = offsets_ms.iter().copied().max().unwrap_or(0) + 1_000;
     let target_skip = (u64::from(latest_ms) * u64::from(sample_rate) / 1_000) as usize;
     for _ in 0..target_skip {
         target.sample();
@@ -879,7 +952,7 @@ mod tests {
     fn fixed_offsets_are_micro_delays_inside_the_master_attack() {
         assert_eq!(
             fixed_offsets_ms(SubsetCandidate::ThreeSingles),
-            vec![0, 4, 9]
+            vec![0, 2, 5]
         );
         assert_eq!(
             fixed_offsets_ms(SubsetCandidate::CrossAnchor),

@@ -21,7 +21,7 @@ scores, seeds, fades, stereo paths, or internal source processing.
 
 Use these fixed offsets in selection order:
 
-- three-layer combinations: `0, 4, 9 ms`;
+- three-layer combinations: `0, 2, 5 ms`;
 - four-layer combinations: `0, 4, 9, 15 ms`.
 - twelve-layer orientation reference:
   `0, 1, 3, 4, 5, 7, 8, 9, 11, 12, 14, 15 ms`.
