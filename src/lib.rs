@@ -6,6 +6,7 @@ pub mod analysis;
 pub mod compact_composite;
 pub mod composite_machine;
 pub mod control;
+pub mod coupled_wire_thump;
 pub mod coupled_wire_motion;
 pub mod dsp;
 pub mod engine;
