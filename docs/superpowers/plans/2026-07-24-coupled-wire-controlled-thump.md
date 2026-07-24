@@ -483,7 +483,7 @@ git commit -m "test: reject uncontrolled Coupled Wire thump"
 - Create: `src/bin/coupled-wire-thump-lab.rs`
 - Create: `tests/coupled_wire_thump_cli.rs`
 
-- [ ] **Step 1: Write the failing CLI integration test**
+- [x] **Step 1: Write the failing CLI integration test**
 
 Create `tests/coupled_wire_thump_cli.rs`:
 
@@ -559,7 +559,7 @@ fn deterministic_files(directory: &Path) -> BTreeMap<String, Vec<u8>> {
 }
 ```
 
-- [ ] **Step 2: Run the CLI test and confirm RED**
+- [x] **Step 2: Run the CLI test and confirm RED**
 
 Run:
 
@@ -570,7 +570,7 @@ cargo test --test coupled_wire_thump_cli
 Expected: compile failure because `CARGO_BIN_EXE_coupled-wire-thump-lab` and the
 binary do not exist.
 
-- [ ] **Step 3: Implement the lab and reports**
+- [x] **Step 3: Implement the lab and reports**
 
 Create `src/bin/coupled-wire-thump-lab.rs` following the existing Coupled Wire
 lab pattern. Accept only:
@@ -601,7 +601,7 @@ Call `select_candidate(48_000)`, evaluate it, and write:
 Write stereo 32-bit float WAV using `hound`. If the selected render fails when
 re-evaluated, write reports but no WAV and return failure.
 
-- [ ] **Step 4: Run deterministic CLI and focused unit tests**
+- [x] **Step 4: Run deterministic CLI and focused unit tests**
 
 Run:
 
@@ -613,7 +613,7 @@ cargo clippy --bin coupled-wire-thump-lab --test coupled_wire_thump_cli -- -D wa
 
 Expected: PASS with exactly one deterministic WAV and all reports.
 
-- [ ] **Step 5: Commit the lab**
+- [x] **Step 5: Commit the lab**
 
 ```bash
 git add src/bin/coupled-wire-thump-lab.rs tests/coupled_wire_thump_cli.rs

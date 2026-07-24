@@ -257,6 +257,27 @@ pub enum ThumpRejection {
     ReturnToZero,
 }
 
+impl ThumpRejection {
+    pub const fn slug(self) -> &'static str {
+        match self {
+            Self::NonFinite => "non_finite",
+            Self::WeakOrExcessiveRms => "weak_or_excessive_rms",
+            Self::SamplePeak => "sample_peak",
+            Self::TruePeak => "true_peak",
+            Self::CeilingContact => "ceiling_contact",
+            Self::LowOnset => "low_onset",
+            Self::LowNonlinearLeakage => "low_nonlinear_leakage",
+            Self::ThumpResidual => "thump_residual",
+            Self::DcOrJump => "dc_or_jump",
+            Self::TonalInventory => "tonal_inventory",
+            Self::NoiseLike => "noise_like",
+            Self::StereoMono => "stereo_mono",
+            Self::Aliasing => "aliasing",
+            Self::ReturnToZero => "return_to_zero",
+        }
+    }
+}
+
 impl ThumpEvidence {
     pub fn rejection_reasons(self) -> Vec<ThumpRejection> {
         let mut reasons = Vec::new();
@@ -361,7 +382,7 @@ pub fn evaluate(render: &ThumpRender) -> ThumpEvidence {
     let reference_high_rate_residual_db =
         measure_rejected_reference_high_rate_residual(render.sample_rate)
             .unwrap_or(f64::NEG_INFINITY);
-    evaluate_with_alias(
+    evaluate_with_rate_residuals(
         render,
         high_rate_residual_db,
         reference_high_rate_residual_db,
@@ -375,7 +396,7 @@ pub fn select_candidate(sample_rate: u32) -> Result<ThumpRender, StruckError> {
         let preview = preview(config, sample_rate)?;
         for gain in PRESENTATION_GAINS {
             let render = render(&preview, gain)?;
-            let evidence = evaluate_with_alias(&render, candidate_alias, reference_alias);
+            let evidence = evaluate_with_rate_residuals(&render, candidate_alias, reference_alias);
             if evidence.rejection_reasons().is_empty() {
                 return Ok(render);
             }
@@ -384,7 +405,7 @@ pub fn select_candidate(sample_rate: u32) -> Result<ThumpRender, StruckError> {
     Err(StruckError::NoSharedGain)
 }
 
-fn evaluate_with_alias(
+pub fn evaluate_with_rate_residuals(
     render: &ThumpRender,
     high_rate_residual_db: f64,
     reference_high_rate_residual_db: f64,
