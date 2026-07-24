@@ -1,5 +1,6 @@
 use crate::composite_machine::{
-    OriginalLayer, original_composite_layer_gain, render_original_layer,
+    CompositeCandidate, CompositeError, OriginalLayer, original_composite_layer_gain,
+    render_composite, render_original_layer,
 };
 use crate::dsp::hybrid::HybridFrame;
 use crate::hybrid::{HybridCondition, HybridRenderError, PROGRESSION, measure_frequency_levels};
@@ -108,6 +109,8 @@ pub enum SubsetError {
     NoSharedGain,
     #[error(transparent)]
     Hybrid(#[from] HybridRenderError),
+    #[error(transparent)]
+    Composite(#[from] CompositeError),
 }
 
 #[derive(Clone)]
@@ -231,6 +234,16 @@ pub struct SubsetRender {
     pub active_end_frame: usize,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReferenceRender {
+    pub samples: Vec<f32>,
+    pub metrics: SubsetMetrics,
+    pub gain: f32,
+    pub raw_hash: u64,
+    pub active_start_frame: usize,
+    pub active_end_frame: usize,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GroupGains {
     pub three_layer: f32,
@@ -308,6 +321,34 @@ pub fn render_candidate(preview: &RawPreview, gain: f32) -> Result<SubsetRender,
     })
 }
 
+pub fn render_reference(sample_rate: u32) -> Result<ReferenceRender, SubsetError> {
+    let raw = render_composite(
+        CompositeCandidate::DelayedLaunchEstimate,
+        sample_rate,
+        false,
+    )?;
+    let raw_hash = raw.metrics.sample_hash;
+    let (active_start_frame, active_end_frame) = active_region(&raw.samples);
+    let preview = RawPreview {
+        candidate: SubsetCandidate::ThreeSingles,
+        samples: raw.samples,
+        sample_rate,
+        active_start_frame,
+        active_end_frame,
+    };
+    let gain = select_shared_gain(std::iter::once(&preview))?;
+    let samples = apply_gain_and_ceiling(&preview.samples, gain);
+    let metrics = measure_subset(&samples, active_start_frame, active_end_frame);
+    Ok(ReferenceRender {
+        samples,
+        metrics,
+        gain,
+        raw_hash,
+        active_start_frame,
+        active_end_frame,
+    })
+}
+
 pub fn select_group_gains(previews: &[RawPreview]) -> Result<GroupGains, SubsetError> {
     Ok(GroupGains {
         three_layer: select_shared_gain(
@@ -351,8 +392,9 @@ fn select_shared_gain<'a>(
     let mut gain = (maximum * 4.0).floor() * 0.25;
     while gain > 0.0 {
         if previews.clone().all(|preview| {
-            preview.metrics_at_gain(gain).ceiling_proportion
-                <= MAX_CEILING_PROPORTION + f64::EPSILON
+            let metrics = preview.metrics_at_gain(gain);
+            metrics.ceiling_proportion <= MAX_CEILING_PROPORTION + f64::EPSILON
+                && metrics.active_rms <= MAX_ACTIVE_RMS
         }) {
             return Ok(gain);
         }
