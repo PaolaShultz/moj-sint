@@ -159,13 +159,17 @@ At this checkpoint:
   nice, bright enough, and not excessive. Spectral Plate and Dual Bridge were
   not selected for continued work. The prior batch was moved to Trash only
   after its exact Coupled Wire reference was reproduced byte-identically.
-- The current disposable gate contains that exact reference plus Warm Hold,
-  Slow High Orbit, and Fast High Orbit. All developments keep the same
-  exciter, D2 pitch, modal ratios, coupling, brightness structure, and pickup
-  identity. A `200 ms` whole-sound attack, 5x modal-loss duration, higher
-  sustain, longer decay/release, and optional equal-and-opposite motion above
-  a prepared 320 Hz split provide the only changes. Human listening remains
-  open; nothing is integrated.
+- Human listening rejected the Coupled Wire envelope/motion batch. Only its
+  exact first reference was somewhat usable; the longer envelopes and orbit
+  developments were not retained. At high line-output gain the reference
+  exposed excessive bass/sub distortion. Inspection found that its complete
+  signal was hard-clamped at -0.3 dBFS from about 8-80 ms while its 45-90 Hz
+  onset band remained very strong.
+- The approved next experiment keeps the original 73 Hz fundamental and sub
+  path clean and centered, reduces only their strike crest, and moves bounded
+  hard-crest character into a 105-500 Hz branch for a short onset window. It
+  will produce one successor WAV with modest headroom, not another parameter
+  batch. Nothing is integrated.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -638,17 +642,20 @@ context and should not be copied back into the new prompt:
 Continue Moj Sint in `/home/shome/p/moj-sint` from the current clean `main`.
 Record `git rev-parse --short HEAD` before changing files.
 
-Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
-`docs/COMPOSITE_MACHINE_RESEARCH.md` before changing files. The current
-ignored batch is `artifacts/coupled-wire-envelope-motion/`: the exact accepted
-Coupled Wire reference plus three longer whole-sound envelope developments.
+Read `docs/HANDOFF.md`, `docs/RESEARCH.md`,
+`docs/COMPOSITE_MACHINE_RESEARCH.md`, and
+`docs/superpowers/specs/2026-07-24-coupled-wire-controlled-thump-design.md`
+before changing files. The Coupled Wire envelope/motion batch is rejected;
+only its first reference was somewhat usable, and cranked line output exposed
+uncontrolled bass/sub distortion.
 
-Begin with the user's human listening verdict in README order: exact reference,
-Warm Hold, Slow High Orbit, then Fast High Orbit. All developments preserve
-the accepted source and resonator. The low body stays fixed; orbit motion is
-equal-and-opposite above 320 Hz and preserves the mono sum. Do not route
-anything into `Engine`, presets, or stable macros without explicit human
-acceptance. If none works, document the rejection and delete the batch.
+Implement the approved single-successor controlled-thump experiment
+test-first. Preserve the original Coupled Wire source. Keep the sub and 73 Hz
+fundamental clean and centered, place bounded hard-crest character only in a
+short 105-500 Hz attack branch, leave modest final headroom, and reject noise,
+low-band nonlinear leakage, weak RMS, excessive alias residual, or mono
+damage. Do not route anything into `Engine`, presets, or stable macros without
+explicit human acceptance.
 
 Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
 expand production polyphony without explicit scope and native evidence.
@@ -656,12 +663,10 @@ expand production polyphony without explicit scope and native evidence.
 
 ## Next action
 
-Listen to `artifacts/coupled-wire-envelope-motion/` in README order: exact
-reference, Warm Hold, Slow High Orbit, then Fast High Orbit. Start with
-playback volume low. Judge whether the `200 ms` attack retains the accepted
-identity, whether the larger sustain and long release remain alive, and
-whether either high-only orbit is usefully audible without moving the low
-body. Stop before mapping controls or integrating `Engine`.
+Write the implementation plan for the approved controlled-thump design, then
+execute it test-first after the written-spec review gate. Replace the rejected
+artifact only after one successor passes every engineering contract. Stop
+before mapping controls or integrating `Engine`.
 
 ## Executed foundation checkpoint
 

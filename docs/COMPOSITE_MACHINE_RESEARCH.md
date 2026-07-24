@@ -789,5 +789,10 @@ SHA-256 is
 
 The only active ignored artifact directory is
 `artifacts/coupled-wire-envelope-motion/`, containing the exact reference,
-three passing developments, and their reports. Human listening is open;
-nothing is mapped or integrated.
+three passing developments, and their reports. Human listening rejected the
+batch: only the exact reference was somewhat usable, and cranked line output
+exposed uncontrolled bass/sub distortion. The approved single-successor
+design keeps the centered sub/fundamental linear, reduces its strike crest,
+and confines bounded hard-crest character to 105-500 Hz during the onset. The
+current batch remains only until a passing successor replaces it; nothing is
+mapped or integrated.

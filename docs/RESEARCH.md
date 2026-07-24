@@ -203,9 +203,19 @@ below 0.028 dB, and absolute DC below 0.000900.
 Two release generations are byte-identical except workstation timing. Their
 deterministic aggregate SHA-256 is
 `498f32bdfd4d1a43eae3de588ace3d3f7a6dc2ca990e861b3e153ea4caeda695`.
-Only `artifacts/coupled-wire-envelope-motion/` remains, with the exact
-reference and three passing developments. Human listening remains the musical
-gate; nothing is integrated.
+Human listening rejected this envelope/motion batch. Only the exact first
+reference was somewhat usable; the longer envelope and orbit developments
+were not retained. At high line-output gain the reference exposed excessive
+bass/sub distortion. Inspection showed that the full-band presentation clamp
+was active from about 8-80 ms and that the 45-90 Hz strike band was
+-7.456 dBFS RMS.
+
+The approved successor keeps the original source but removes full-band
+clipping: its centered sub/fundamental branch stays linear and receives only a
+short deterministic crest reduction, while bounded hard-crest character is
+restricted to 105-500 Hz during the onset. The current ignored batch remains
+only until one controlled successor passes every automated contract. Nothing
+is integrated.
 
 ### 2026-07-24 superseded original-layer subset attempt
 
