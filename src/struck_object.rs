@@ -176,6 +176,8 @@ pub enum StruckError {
     Hybrid(#[from] HybridRenderError),
     #[error("gain must be finite and positive")]
     InvalidGain,
+    #[error("duration and modal decay configuration must be finite and positive")]
+    InvalidConfiguration,
     #[error("no shared gain satisfies all presentation limits")]
     NoSharedGain,
 }
@@ -259,21 +261,38 @@ pub struct StruckObject {
 
 impl StruckObject {
     pub fn new(topology: StruckTopology, sample_rate: u32) -> Result<Self, StruckError> {
+        Self::configured(topology, sample_rate, DURATION_MS, 1.0)
+    }
+
+    pub(crate) fn configured(
+        topology: StruckTopology,
+        sample_rate: u32,
+        duration_ms: u32,
+        decay_scale: f32,
+    ) -> Result<Self, StruckError> {
         if sample_rate == 0 {
             return Err(StruckError::InvalidSampleRate);
+        }
+        if duration_ms <= 100 || !decay_scale.is_finite() || decay_scale <= 0.0 {
+            return Err(StruckError::InvalidConfiguration);
         }
         let excitation = prepare_excitation(topology, sample_rate)?;
         let banks = match topology {
             StruckTopology::CoupledWire => vec![
-                make_bank(&COUPLED_WIRE_A, sample_rate, 1.0),
-                make_bank(&COUPLED_WIRE_B, sample_rate, 2.0_f32.powf(0.7 / 1_200.0)),
+                make_bank(&COUPLED_WIRE_A, sample_rate, 1.0, decay_scale),
+                make_bank(
+                    &COUPLED_WIRE_B,
+                    sample_rate,
+                    2.0_f32.powf(0.7 / 1_200.0),
+                    decay_scale,
+                ),
             ],
             StruckTopology::SpectralPlate => {
-                vec![make_bank(&SPECTRAL_PLATE, sample_rate, 1.0)]
+                vec![make_bank(&SPECTRAL_PLATE, sample_rate, 1.0, decay_scale)]
             }
             StruckTopology::DualBridge => vec![
-                make_bank(&DUAL_BRIDGE_A, sample_rate, 1.0),
-                make_bank(&DUAL_BRIDGE_B, sample_rate, 1.0),
+                make_bank(&DUAL_BRIDGE_A, sample_rate, 1.0, decay_scale),
+                make_bank(&DUAL_BRIDGE_B, sample_rate, 1.0, decay_scale),
             ],
         };
         Ok(Self {
@@ -281,7 +300,7 @@ impl StruckObject {
             banks,
             excitation,
             frame: 0,
-            duration_frames: DURATION_MS as usize * sample_rate as usize / 1_000,
+            duration_frames: duration_ms as usize * sample_rate as usize / 1_000,
             boundary_rise_frames: (sample_rate as usize / 2_000).max(1),
             final_fade_frames: sample_rate as usize / 10,
             previous_bank_sums: [0.0; 2],
@@ -363,11 +382,13 @@ impl StruckObject {
     }
 }
 
-fn make_bank(modes: &[(f32, f32)], sample_rate: u32, detune: f32) -> Vec<Mode> {
+fn make_bank(modes: &[(f32, f32)], sample_rate: u32, detune: f32, decay_scale: f32) -> Vec<Mode> {
     modes
         .iter()
         .enumerate()
-        .map(|(index, &(ratio, decay))| Mode::new(ratio, decay, index, sample_rate, detune))
+        .map(|(index, &(ratio, decay))| {
+            Mode::new(ratio, decay * decay_scale, index, sample_rate, detune)
+        })
         .collect()
 }
 
@@ -707,6 +728,40 @@ mod tests {
         hashes.sort_unstable();
         hashes.dedup();
         assert_eq!(hashes.len(), 3);
+    }
+
+    #[test]
+    fn configured_reference_is_sample_identical() {
+        let sample_rate = 8_000;
+        let mut accepted = StruckObject::new(StruckTopology::CoupledWire, sample_rate).unwrap();
+        let mut configured =
+            StruckObject::configured(StruckTopology::CoupledWire, sample_rate, DURATION_MS, 1.0)
+                .unwrap();
+        assert_eq!(accepted.duration_frames(), configured.duration_frames());
+        for _ in 0..accepted.duration_frames() {
+            assert_eq!(accepted.sample(), configured.sample());
+        }
+    }
+
+    #[test]
+    fn configured_render_rejects_invalid_bounds() {
+        for (duration_ms, decay_scale) in [
+            (0, 1.0),
+            (DURATION_MS, 0.0),
+            (DURATION_MS, -1.0),
+            (DURATION_MS, f32::NAN),
+            (DURATION_MS, f32::INFINITY),
+        ] {
+            assert!(matches!(
+                StruckObject::configured(
+                    StruckTopology::CoupledWire,
+                    48_000,
+                    duration_ms,
+                    decay_scale,
+                ),
+                Err(StruckError::InvalidConfiguration)
+            ));
+        }
     }
 
     #[test]
