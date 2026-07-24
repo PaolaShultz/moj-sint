@@ -67,6 +67,20 @@ fn lab_writes_only_deterministic_passing_envelope_comparisons() {
     let hashes = fs::read_to_string(first.path().join("hashes.tsv")).unwrap();
     assert!(hashes.contains("00_coupled_wire_reference.wav\t443e5faae3184791"));
 
+    let motion = fs::read_to_string(first.path().join("motion.tsv")).unwrap();
+    let mut lines = motion.lines();
+    let header = lines.next().unwrap().split('\t').collect::<Vec<_>>();
+    let ratio_index = header
+        .iter()
+        .position(|field| *field == "side_difference_ratio")
+        .unwrap();
+    for line in
+        lines.filter(|line| line.starts_with("slow-orbit\t") || line.starts_with("fast-orbit\t"))
+    {
+        let fields = line.split('\t').collect::<Vec<_>>();
+        assert!(fields[ratio_index].parse::<f64>().unwrap() >= 0.003);
+    }
+
     let rejections = fs::read_to_string(first.path().join("rejections.tsv")).unwrap();
     for line in rejections.lines().skip(1) {
         let fields = line.split('\t').collect::<Vec<_>>();

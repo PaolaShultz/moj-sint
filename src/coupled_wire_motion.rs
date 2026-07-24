@@ -290,6 +290,38 @@ pub fn render_unpresented(
     Ok(samples)
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct CoupledMotionMeasurement {
+    pub side_difference_rms: f64,
+    pub side_difference_ratio: f64,
+    pub maximum_mono_difference: f32,
+}
+
+pub fn measure_motion(
+    profile: CoupledMotionProfile,
+    sample_rate: u32,
+) -> Result<CoupledMotionMeasurement, StruckError> {
+    let moving = render_unpresented(profile, sample_rate, true)?;
+    let still = render_unpresented(profile, sample_rate, false)?;
+    let mut side_energy = 0.0;
+    let mut maximum_mono_difference = 0.0_f32;
+    let mut frames = 0;
+    for (moving, still) in moving.chunks_exact(2).zip(still.chunks_exact(2)) {
+        let moving_side = 0.5 * (moving[0] - moving[1]);
+        let still_side = 0.5 * (still[0] - still[1]);
+        side_energy += f64::from(moving_side - still_side).powi(2);
+        maximum_mono_difference =
+            maximum_mono_difference.max(((moving[0] + moving[1]) - (still[0] + still[1])).abs());
+        frames += 1;
+    }
+    let side_difference_rms = (side_energy / frames.max(1) as f64).sqrt();
+    Ok(CoupledMotionMeasurement {
+        side_difference_rms,
+        side_difference_ratio: side_difference_rms / measure_total_rms(&still).max(1.0e-12),
+        maximum_mono_difference,
+    })
+}
+
 #[derive(Clone, Debug)]
 pub struct CoupledMotionPreview {
     pub profile: CoupledMotionProfile,
@@ -618,6 +650,28 @@ mod tests {
                 maximum_difference <= 1.0e-6,
                 "{} {maximum_difference}",
                 profile.slug()
+            );
+        }
+    }
+
+    #[test]
+    fn declared_orbits_create_side_motion_without_mono_motion() {
+        for profile in [
+            CoupledMotionProfile::SlowOrbit,
+            CoupledMotionProfile::FastOrbit,
+        ] {
+            let evidence = measure_motion(profile, 8_000).unwrap();
+            assert!(
+                evidence.side_difference_ratio >= 0.003,
+                "{} {:?}",
+                profile.slug(),
+                evidence
+            );
+            assert!(
+                evidence.maximum_mono_difference <= 1.0e-6,
+                "{} {:?}",
+                profile.slug(),
+                evidence
             );
         }
     }

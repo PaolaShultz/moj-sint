@@ -1,7 +1,7 @@
 use moj_sint::coupled_wire_motion::{
     CoupledMotionEvidence, CoupledMotionProfile, CoupledWireEnvelopeVoice, DEVELOPED_DECAY_SCALE,
-    MOTION_SPLIT_HZ, REFERENCE_GAIN, evaluate as evaluate_motion, preview_developed,
-    render_preview as render_motion_preview, select_shared_gain,
+    MOTION_SPLIT_HZ, REFERENCE_GAIN, evaluate as evaluate_motion, measure_motion,
+    preview_developed, render_preview as render_motion_preview, select_shared_gain,
 };
 use moj_sint::hybrid_subset::SubsetMetrics;
 use moj_sint::struck_object::{
@@ -169,20 +169,24 @@ fn write_envelopes(output: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn write_motion(output: &Path) -> std::io::Result<()> {
+fn write_motion(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = BufWriter::new(File::create(output.join("motion.tsv"))?);
     writeln!(
         file,
-        "profile\tsplit_hz\tpan_rate_hz\tpan_depth\tmono_sum_policy"
+        "profile\tsplit_hz\tpan_rate_hz\tpan_depth\tside_difference_rms\tside_difference_ratio\tmaximum_mono_difference\tmono_sum_policy"
     )?;
     for profile in CoupledMotionProfile::ALL {
         let spec = profile.spec();
+        let evidence = measure_motion(profile, SAMPLE_RATE)?;
         writeln!(
             file,
-            "{}\t{MOTION_SPLIT_HZ:.1}\t{:.3}\t{:.3}\tequal_and_opposite",
+            "{}\t{MOTION_SPLIT_HZ:.1}\t{:.3}\t{:.3}\t{:.9}\t{:.9}\t{:.9}\tequal_and_opposite",
             profile.slug(),
             spec.pan_rate_hz,
-            spec.pan_depth
+            spec.pan_depth,
+            evidence.side_difference_rms,
+            evidence.side_difference_ratio,
+            evidence.maximum_mono_difference
         )?;
     }
     Ok(())
