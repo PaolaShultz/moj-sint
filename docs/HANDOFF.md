@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-07-23, Europe/Zagreb.
+Last updated: 2026-07-24, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -144,11 +144,13 @@ At this checkpoint:
   overcorrected the request for a slightly hotter signal into prolonged
   distortion/noise. Its generated batch was deleted.
 - The current disposable gate combines only three or four exact original
-  hybrid layers. Seven candidates plus the twelve-layer delayed reference use
-  shared fixed gain into a -0.3 dBFS ceiling. All candidates pass the finite,
-  active-level, sparse-crest, tonal, noise, residual, DC, discontinuity,
-  stereo/mono, hash, and deterministic-generation rules. Human listening is
-  open; nothing is selected or integrated.
+  hybrid layers as one voice. Fixed micro-delays finish within 5 or 15 ms,
+  then one shared 25/180/0.88/320 ms master ADSR controls the complete stereo
+  sum. Seven candidates plus a twelve-layer 0-15 ms orientation reference use
+  explicit fixed presentation gains into a -0.3 dBFS ceiling. All eight pass
+  the finite, active-level, sparse-crest, tonal, noise, residual, DC,
+  discontinuity, stereo/mono, hash, and deterministic-generation rules.
+  Human listening is open; nothing is selected or integrated.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -621,38 +623,32 @@ context and should not be copied back into the new prompt:
 Continue Moj Sint in `/home/shome/p/moj-sint` from the current clean `main`.
 Record `git rev-parse --short HEAD` before changing files.
 
-Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, `docs/BASS_IMPACT_RESEARCH.md`, and
-`docs/MICRO_MACHINE_ROUTING.md` before changing files. The current listening
-gate contains three complete hybrid stereo voices: cross-coupled machine,
-spectral shadow, and dual resonant body. Each has single-note, held-chord,
-four-chord progression, and explicit mono-fold files under the ignored
-`artifacts/final-hybrid-sound-lab/` batch.
+Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
+`docs/COMPOSITE_MACHINE_RESEARCH.md` before changing files. The current
+ignored batch is `artifacts/coherent-hybrid-composites/`: one twelve-layer
+orientation reference and seven three- or four-layer composites.
 
-Begin with the user's headphone, speaker, and mono verdict. Do not select the
-least bad result or route anything into `Engine`, presets, or stable macros
-without explicit human acceptance. Preserve the dual-resonant body's severe
-MIDI-36 high-rate residual as a known limitation. If a family is promising,
-identify which source, register, nonlinear, resonant, and stereo connections
-actually create its identity before extracting reusable typed micro-machines.
-If none is promising, document the rejection and delete the batch.
+Begin with the user's human listening verdict. Every file is one summed voice:
+fixed 0-5 or 0-15 ms micro-delays feed one shared master ADSR. Do not audition
+layers as sequential events, select the least bad result, or route anything
+into `Engine`, presets, or stable macros without explicit human acceptance.
+If none works, document the rejection and delete the batch.
 
-Treat integer state as a composable mechanism, not an obligation to build an
-all-integer machine. Keep new listening variations structurally different,
-scalar, deterministic, finite, and allocation-free, with alias/error and true
-stereo/mono evidence. Do not modify SHR-DAW, touch JACK/hardware, add SIMD,
-claim Pi performance, or expand production polyphony without explicit scope
-and native evidence.
+Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
+expand production polyphony without explicit scope and native evidence.
 ```
 
 ## Next action
 
-Listen to `artifacts/original-hybrid-subset-mix/` in README order: the exact
-twelve-layer delayed reference followed by the seven passing three- or
-four-layer combinations. Start with playback volume low. Decide which smaller
-combination, if any, retains the fused and harmonized identity of the reference
-and whether its sparse crest limiting adds useful edge without obvious
-distortion or noise. Stop before selecting a production family, mapping
-controls, extracting the generic graph, or integrating `Engine`.
+Listen to `artifacts/coherent-hybrid-composites/` in README order: the
+twelve-layer fixed-microdelay reference followed by the seven passing three-
+or four-layer combinations. Start with playback volume low. Judge each file as
+one complete composite voice under one master envelope; there are no solo or
+sequential-entry auditions. Decide which smaller combination, if any, retains
+the fused identity of the reference and whether the sparse crest limiting adds
+useful edge without obvious distortion or noise. Stop before selecting a
+production family, mapping controls, extracting a generic graph, or
+integrating `Engine`.
 
 ## Executed foundation checkpoint
 
@@ -1062,9 +1058,9 @@ and its 4.854-29.208% clipping was an excessive interpretation of "slightly
 hotter." The ignored generated batch was deleted. Its reproducible source,
 tests, and negative evidence remain tracked.
 
-## Original hybrid subset checkpoint
+## Superseded original hybrid subset checkpoint
 
-Implemented on 2026-07-24 and awaiting human listening:
+Implemented and rejected as a timing interpretation on 2026-07-24:
 
 - exposed the exact twelve original layers without changing the synchronized
   or delayed 48 kHz reconstruction hashes;
@@ -1086,11 +1082,13 @@ Implemented on 2026-07-24 and awaiting human listening:
   timing, with deterministic aggregate SHA-256
   `5001495920bb0fd23034ee9b91b13b6e87bb5470b326ed2c36982158ed716ddc`.
 
-The current ignored batch is `artifacts/original-hybrid-subset-mix/`. These
-metrics reject obvious defects but do not establish musical value. Nothing is
+The user clarified that these second-scale rebased delays made layers enter as
+separate sounds. The intended variation was only a slight offset inside one
+summed voice under one master envelope. The generated
+`artifacts/original-hybrid-subset-mix/` batch was removed. Nothing from it is
 selected, preserved in Git, mapped to controls, or integrated into `Engine`.
 
-Fresh integrated verification:
+Verification recorded for that superseded batch:
 
 - `cargo fmt --check` and `git diff --check`: exit 0;
 - `cargo test --all-targets --all-features`: 93 library tests, 11 compact
@@ -1105,3 +1103,36 @@ Fresh integrated verification:
   `be3ea0fdd66b4472` and `c919cb57920c520f`; and
 - the final ignored directory contains exactly the reference plus seven
   passing candidate WAVs and no rejected WAV.
+
+## Coherent hybrid composite checkpoint
+
+Implemented on 2026-07-24 and awaiting human listening:
+
+- retained the exact seven three- or four-layer memberships and all original
+  source DSP, scores, seeds, fades, and stereo construction;
+- replaced second-scale launch spacing with fixed `0/2/5 ms` three-layer,
+  `0/4/9/15 ms` four-layer, and
+  `0/1/3/4/5/7/8/9/11/12/14/15 ms` reference offsets;
+- applied equal-power layer trim, then one shared post-sum master ADSR with
+  25 ms attack, 180 ms decay, 0.88 sustain, and 320 ms release;
+- applied one explicit fixed presentation gain per complete composite into a
+  static -0.3 dBFS hard ceiling, with no compressor, automatic limiter, soft
+  saturator, time-varying gain, or post-render normalization;
+- measured all eight files at -10.053 to -10.003 dBFS active RMS with
+  0-0.297% ceiling contact, 100% scheduled tonal coverage, and no noise-like
+  classification;
+- measured 0-0.956 dB mono loss, 0.616-1.000 correlation, absolute DC below
+  0.000134, maximum adjacent-sample jump below 0.188, and eight-times
+  residuals from -6.675 to -2.548 dB;
+- generated two byte-identical 48 kHz batches except volatile workstation
+  timing, with deterministic aggregate SHA-256
+  `e3d88ce822abd66885d79289d1fad56bd8e3e2b171cb8435864666ec949c3e2c`;
+  and
+- retained exactly eight WAVs: one twelve-layer orientation reference and the
+  seven complete composites. No solo, long-delay, diagnostic, sweep, or
+  rejected WAV is present.
+
+The only ignored artifact directory is
+`artifacts/coherent-hybrid-composites/`. Automated evidence rejects obvious
+defects but does not establish musical value. Nothing is selected, preserved
+in Git, mapped to controls, or integrated into `Engine`.

@@ -18,7 +18,40 @@ synchronously. The 30-voice first-four-second inventory is exact only for the
 sample-aligned counterfactual. Historical offsets are unknowable from the
 WAVs; the lab's 0-4110 ms stagger is a controlled estimate.
 
-### 2026-07-24 original-layer subset correction
+### 2026-07-24 coherent original-layer composite correction
+
+The first original-layer subset batch kept rebased second-scale launch delays.
+Human review clarified that this again presented components as separate events.
+The intended reconstruction is one composite voice: selected layers differ
+only by slight fixed offsets, are summed, and then follow one common master
+envelope.
+
+The retained three-layer offsets are `0/2/5 ms`; four-layer offsets are
+`0/4/9/15 ms`; and the twelve-layer orientation reference spreads its exact
+original layers across
+`0/1/3/4/5/7/8/9/11/12/14/15 ms`. Every onset completes inside the common
+25 ms attack. After equal-power layer trim, one post-sum ADSR uses 25 ms
+attack, 180 ms decay, 0.88 sustain, and 320 ms release. One explicit fixed
+presentation gain per complete composite feeds the static -0.3 dBFS ceiling.
+There is no compressor, automatic limiter, soft saturator, time-varying gain,
+or post-render normalization.
+
+At 48 kHz, the orientation reference and all seven candidates measure
+-10.053 to -10.003 dBFS active RMS with 0-0.297% ceiling contact. Scheduled
+tonal coverage is 100% and every noise-like flag is false; spectral flatness
+is 0.138-0.440. Mono loss is 0-0.956 dB, correlation is 0.616-1.000,
+absolute DC is below 0.000134, maximum adjacent-sample jump is below 0.188,
+and eight-times residuals are -6.675 to -2.548 dB.
+
+Two release generations are byte-identical except
+`workstation-cost.txt`. Their deterministic aggregate SHA-256 is
+`e3d88ce822abd66885d79289d1fad56bd8e3e2b171cb8435864666ec949c3e2c`.
+Only `artifacts/coherent-hybrid-composites/` remains. It contains the one
+reference plus seven complete candidates and no solo, long-delay, diagnostic,
+sweep, noise-rejected, or otherwise failed WAV. Human listening remains the
+musical acceptance gate.
+
+### 2026-07-24 superseded original-layer subset attempt
 
 Human listening rejected the compact one-to-three-mechanism batch completely.
 Its sources were newly designed replacements rather than combinations of the
@@ -55,6 +88,10 @@ timing file. The aggregate deterministic SHA-256 is
 `5001495920bb0fd23034ee9b91b13b6e87bb5470b326ed2c36982158ed716ddc`.
 The synchronized and delayed original reconstruction hashes remain exactly
 `be3ea0fdd66b4472` and `c919cb57920c520f`.
+
+This batch was then rejected as a timing interpretation: its rebased
+second-scale offsets made layers enter as separate sounds. Its generated
+artifact directory was removed.
 
 Iteration A rejected a near-duplicate risky junction. Iteration B rejected
 excess junction products. Iteration C retains a distinct three-progression

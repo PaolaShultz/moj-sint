@@ -567,3 +567,64 @@ twelve-layer delayed reference with the seven smaller combinations in README
 order. Automated evidence only confirms that obvious level, clipping, tonal,
 noise-like, residual, DC, discontinuity, stereo/mono, finite, and tail
 failures were not presented.
+
+That batch was subsequently rejected as a timing interpretation. Rebased
+second-scale offsets made layers enter as separate audible events rather than
+varying the sum inside one voice. Its ignored artifact directory was removed.
+
+## 2026-07-24 coherent fixed-microdelay composite experiment
+
+The seven exact-source memberships remain unchanged. Only their combination
+boundary changes:
+
+- three-layer files use fixed `0/2/5 ms` offsets;
+- four-layer files use fixed `0/4/9/15 ms` offsets;
+- the twelve-layer orientation reference uses
+  `0/1/3/4/5/7/8/9/11/12/14/15 ms`;
+- every onset occurs within the common 25 ms attack;
+- equal-power layer trim is applied before summation;
+- one post-sum stereo ADSR uses 25 ms attack, 180 ms decay, 0.88 sustain, and
+  320 ms release; and
+- one reported, explicit fixed presentation gain per complete composite feeds
+  the static -0.3 dBFS hard ceiling.
+
+The source renderer, pitch schedules, deterministic seeds, local safety fades,
+and stereo construction are unchanged. There is no new mechanism, compressor,
+automatic limiter, soft saturator, maximizer, time-varying gain,
+post-render normalization, or separately audible layer envelope.
+
+The 48 kHz fixed presentation gains are:
+
+| composite | linear gain |
+| --- | ---: |
+| twelve-layer reference | 33.50 |
+| three singles | 32.75 |
+| three chords | 44.75 |
+| three stereo progressions | 51.50 |
+| three mono progressions | 54.25 |
+| Cross anchor | 34.75 |
+| Spectral anchor | 33.25 |
+| Dual anchor | 34.50 |
+
+All eight WAVs pass the predeclared gate. Active RMS is -10.053 to
+-10.003 dBFS and ceiling contact is 0-0.297%. Tonal coverage is 100%, spectral
+flatness is 0.138-0.440, and no output is classified as noise-like. Mono loss
+is 0-0.956 dB, correlation is 0.616-1.000, absolute DC is below 0.000134, and
+maximum adjacent-sample jump is below 0.188.
+
+The eight-times post-sum residuals are -4.692 dB for the reference, -3.471 dB
+for singles, -4.355 dB for chords, -3.713 dB for stereo progressions,
+-3.802 dB for mono progressions, -4.996 dB for the Cross anchor, -6.675 dB
+for the Spectral anchor, and -2.553 dB for the Dual anchor. These are
+engineering limitations, not alias-clean or sample-rate-invariant claims.
+
+Two fresh release batches are byte-identical except
+`workstation-cost.txt`. Their deterministic aggregate SHA-256 is
+`e3d88ce822abd66885d79289d1fad56bd8e3e2b171cb8435864666ec949c3e2c`.
+The only ignored artifact directory is
+`artifacts/coherent-hybrid-composites/`; it contains exactly one orientation
+reference and seven complete composites. No solo, long-delay, mono diagnostic,
+sweep, failed, or noise-rejected WAV is present.
+
+This is an open human listening gate. No sound is selected, mapped to controls,
+preserved as a tracked preset, or integrated into `Engine`.
