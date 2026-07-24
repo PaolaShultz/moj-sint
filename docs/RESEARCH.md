@@ -73,7 +73,31 @@ stereo/mono, and sparse-ceiling-contact rules.
 Two release generations are byte-identical except
 `workstation-cost.txt`. Their deterministic aggregate SHA-256 is
 `c495a4d26c572db307502b9a70f9e2593fa955050723f62c508ad451fcf13bbc`.
-Only `artifacts/monophonic-envelope-composites/` remains, with exactly three
+Human listening rejected this batch because its 0.58 sustain still held too
+long and its attack/decay behavior remained too slow. The generated artifact
+batch was moved to Trash.
+
+### 2026-07-24 piano-strike envelope audition
+
+The replacement keeps the same exact three-source D2 body and fixed
+`0/2/5 ms` offsets. Its 800 ms one-shot envelope rises for 2 ms, falls to 0.28
+over 60 ms, follows a curved decay to exact zero at 700 ms, and remains silent
+for the last 100 ms. There is no flat sustain or note-off release.
+
+Each comparison adds one short exact-source pitched D2 strike at fixed 0.30
+mix: Cross for 16 ms, Spectral for 28 ms, or Dual for 42 ms. Every strike has
+a 1 ms rise and curved decay to exact zero. This varies transient source
+mechanism without changing the common body, note, duration, or gain policy.
+
+One shared gain of 137.0 gives -12.932/-12.901/-12.883 dBFS whole-file RMS.
+All three pass tonal, noise-like, DC, jump, stereo/mono, sparse-ceiling,
+finite, and final-silence rules. The 48 kHz ceiling contact is
+0.939/0.999/0.933%.
+
+Two release generations are byte-identical except
+`workstation-cost.txt`. Their deterministic aggregate SHA-256 is
+`423cb4bbdaffd3f5ea65bf9bf0d280e588f3825ca5b340df6267a0e6bcd1cdac`.
+Only `artifacts/piano-strike-envelope-composites/` remains, with exactly three
 WAVs and no rejected output. Human listening remains the musical acceptance
 gate.
 

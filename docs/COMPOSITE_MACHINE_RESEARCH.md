@@ -669,8 +669,48 @@ they do not establish musical quality.
 Two release generations are byte-identical except
 `workstation-cost.txt`. Their deterministic aggregate SHA-256 is
 `c495a4d26c572db307502b9a70f9e2593fa955050723f62c508ad451fcf13bbc`.
-The ignored batch is `artifacts/monophonic-envelope-composites/`, containing
-exactly the three WAVs above and their reports. These are parameter positions
-within one topology for the explicitly requested envelope comparison, not a
-claim of three fundamentally different listening variations. Human listening
-is open; nothing is selected, mapped, or integrated.
+Human listening rejected this batch because its 0.58 sustain held too long and
+its attack/decay behavior remained too slow. The generated batch was moved to
+Trash. Nothing was selected, mapped, or integrated.
+
+## 2026-07-24 piano-strike envelope audition
+
+The replacement retains the exact Cross, Spectral, and Dual single-note D2
+sources as one fixed-microdelay body. Its one-shot body envelope is:
+
+| stage | time | level |
+| --- | ---: | ---: |
+| rise | 0-2 ms | 0.0 to 1.0 |
+| fast curved decay | 2-62 ms | 1.0 to 0.28 |
+| slow curved decay | 62-700 ms | 0.28 to 0.0 |
+| final silence | 700-800 ms | exactly 0.0 |
+
+There is no flat sustain or note-off release. Each file adds one exact-source
+D2 strike at the same onset and fixed 0.30 mix:
+
+| file | strike source | strike length |
+| --- | --- | ---: |
+| `01_piano_cross_strike.wav` | Cross single | 16 ms |
+| `02_piano_spectral_strike.wav` | Spectral single | 28 ms |
+| `03_piano_dual_strike.wav` | Dual single | 42 ms |
+
+Each strike rises for 1 ms and follows a curved decay to exact zero. Prepared
+4 Hz DC control precedes one shared presentation gain of 137.0 and a static
+-0.3 dBFS ceiling. There is no per-profile normalization, compressor,
+automatic limiter, soft saturator, or new oscillator.
+
+| strike | total RMS | ceiling contact | DC | correlation | mono loss |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Cross | -12.932 dBFS | 0.939% | -0.000385 | 0.937 | 0.255 dB |
+| Spectral | -12.901 dBFS | 0.999% | -0.000119 | 0.937 | 0.253 dB |
+| Dual | -12.883 dBFS | 0.933% | -0.000707 | 0.937 | 0.252 dB |
+
+All three retain 100% tonal coverage, are not classified as noise-like, remain
+finite, and reach exact final silence. Two release generations are
+byte-identical except `workstation-cost.txt`; their deterministic aggregate
+SHA-256 is
+`423cb4bbdaffd3f5ea65bf9bf0d280e588f3825ca5b340df6267a0e6bcd1cdac`.
+
+The ignored batch is `artifacts/piano-strike-envelope-composites/`, containing
+exactly the three passing WAVs above and their reports. Human listening is
+open; nothing is selected, mapped, or integrated.

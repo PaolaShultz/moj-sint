@@ -147,16 +147,17 @@ At this checkpoint:
   tones. Although its layers shared a nominal ADSR, the 0.88 sustain held most
   of each long source near a constant level, so it did not expose the requested
   audible envelope shapes. Its generated batch was deleted.
-- The current disposable gate is musically monophonic: one D2 composite made
-  from the exact Cross, Spectral, and Dual single-note sources. Fixed
-  `0/2/5 ms` micro-delays alter the sum without turning layers into separate
-  events. Three 2.4-second renders use one post-sum master envelope with
-  6/35/140 ms attack alternatives and shared 220 ms decay, 0.58 sustain,
-  500 ms release, release at 1.9 seconds, and one fixed gain of 51.5. Whole-file
-  RMS is -10.123 to -10.039 dBFS, all three pass the -14 dBFS minimum and the
-  finite, sparse-crest, tonal, noise, tail, DC, discontinuity, stereo/mono, and
-  deterministic-generation gates. Human listening is open; nothing is
-  selected or integrated.
+- Human listening rejected the 2.4-second monophonic envelope batch: its 0.58
+  sustain still held too long, and its attack/decay behavior was too slow. The
+  generated batch was moved to Trash.
+- The current disposable gate keeps the same exact three-source D2 body but
+  uses an 800 ms piano-like one-shot: 2 ms rise, 60 ms fast decay, curved decay
+  to zero by 700 ms, then exact silence. It has no flat sustain or note-off
+  release. Three files vary a brief exact-source D2 strike: Cross 16 ms,
+  Spectral 28 ms, and Dual 42 ms. One shared gain of 137.0 produces whole-file
+  RMS of -12.932 to -12.883 dBFS. All pass the finite, sparse-crest, tonal,
+  noise, tail, DC, discontinuity, stereo/mono, and deterministic-generation
+  gates. Human listening is open; nothing is selected or integrated.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -631,15 +632,14 @@ Record `git rev-parse --short HEAD` before changing files.
 
 Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
 `docs/COMPOSITE_MACHINE_RESEARCH.md` before changing files. The current
-ignored batch is `artifacts/monophonic-envelope-composites/`: exactly three
-versions of one three-source, single-note composite.
+ignored batch is `artifacts/piano-strike-envelope-composites/`: exactly three
+versions of one three-source, single-note body with varied pitched strikes.
 
 Begin with the user's human listening verdict. Every file contains the same D2
-composite with fixed 0/2/5 ms micro-delays and one shared master envelope; only
-its 6/35/140 ms attack changes. Do not treat these as three source-mechanism
-variations or route anything into `Engine`, presets, or stable macros without
-explicit human acceptance. If none works, document the rejection and delete
-the batch.
+body with fixed 0/2/5 ms micro-delays and one no-sustain piano-like envelope;
+only its brief exact-source D2 strike changes. Do not route anything into
+`Engine`, presets, or stable macros without explicit human acceptance. If none
+works, document the rejection and delete the batch.
 
 Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
 expand production polyphony without explicit scope and native evidence.
@@ -647,12 +647,12 @@ expand production polyphony without explicit scope and native evidence.
 
 ## Next action
 
-Listen to `artifacts/monophonic-envelope-composites/` in README order: 6 ms,
-35 ms, then 140 ms attack. Start with playback volume low. Judge how the same
-complete monophonic composite responds to the three audible onset shapes.
-There are no chords, solos, sequential layer entries, or low-RMS files. Stop
-before selecting a production family, mapping controls, extracting a generic
-graph, or integrating `Engine`.
+Listen to `artifacts/piano-strike-envelope-composites/` in README order: Cross,
+Spectral, then Dual strike. Start with playback volume low. Judge whether the
+16/28/42 ms pitched strike additions create a useful piano/bat onset over the
+same short, no-sustain body. There are no chords, solos, sequential layer
+entries, or low-RMS files. Stop before selecting a production family, mapping
+controls, extracting a generic graph, or integrating `Engine`.
 
 ## Executed foundation checkpoint
 
@@ -1160,7 +1160,7 @@ Fresh integrated verification:
 
 ## Monophonic envelope audition checkpoint
 
-Implemented on 2026-07-24 and awaiting human listening:
+Implemented and rejected by human listening on 2026-07-24:
 
 - retained only the exact Cross, Spectral, and Dual single-note D2 sources;
 - summed their fixed `0/2/5 ms` offsets as one voice before applying one shared
@@ -1180,18 +1180,61 @@ Implemented on 2026-07-24 and awaiting human listening:
   timing, with deterministic aggregate SHA-256
   `c495a4d26c572db307502b9a70f9e2593fa955050723f62c508ad451fcf13bbc`.
 
-The only ignored artifact directory is
-`artifacts/monophonic-envelope-composites/`. It contains exactly three WAVs
-and their reports; no chord, progression, solo, old steady-tone batch, failed,
-weak-RMS, or noise-rejected WAV remains. These are attack positions of one
-source topology for a focused envelope audition, not three fundamentally
-different sound mechanisms. Nothing is selected, preserved in Git, mapped to
+The user found the sustain too long and requested much shorter attack and
+decay plus a varied piano-like bat/hammer tone. The generated artifact batch
+was moved to Trash. Nothing was selected, preserved in Git, mapped to
 controls, or integrated into `Engine`.
 
 Fresh integrated verification:
 
 - `cargo fmt --check` and `git diff --check`: exit 0;
 - `cargo test --all-targets --all-features`: 102 library tests, 11 compact
+  contract tests, four deterministic lab integration tests, and six offline
+  CLI tests passed with zero failures;
+- Clippy with warnings denied and the release build: exit 0;
+- `cargo audit`: 35 locked crate dependencies scanned with no vulnerability;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- AArch64 target check: exit 0, compile evidence only;
+- two final 48 kHz generations compared byte-identical except
+  `workstation-cost.txt`; and
+- artifact hygiene confirmed one ignored directory, exactly three WAVs, and
+  no rejected output.
+
+## Piano-strike envelope audition checkpoint
+
+Implemented on 2026-07-24 and awaiting human listening:
+
+- retained the same exact Cross, Spectral, and Dual single-note D2 body with
+  fixed `0/2/5 ms` offsets and equal-power trim;
+- replaced the held ADSR with an 800 ms one-shot body: 2 ms rise, 60 ms fast
+  decay to 0.28, curved decay to exact zero at 700 ms, and 100 ms final
+  silence;
+- added no flat sustain or note-off release;
+- varied one short exact-source pitched D2 strike per file: Cross 16 ms,
+  Spectral 28 ms, and Dual 42 ms, each with a 1 ms rise and fixed 0.30 mix;
+- applied prepared 4 Hz DC control, one shared gain of 137.0, and a static
+  -0.3 dBFS ceiling, with no per-file normalization, compressor, automatic
+  limiter, or soft saturator;
+- rejected any profile below -14 dBFS whole-file RMS instead of writing its
+  WAV; the retained files measure -12.932, -12.901, and -12.883 dBFS;
+- retained 100% tonal coverage, no noise-like classification, 0.933-0.999%
+  ceiling contact, correlation above 0.936, mono loss below 0.256 dB, absolute
+  DC below 0.000708, finite output, exact final silence, and bounded jumps; and
+- generated two byte-identical 48 kHz batches except volatile workstation
+  timing, with deterministic aggregate SHA-256
+  `423cb4bbdaffd3f5ea65bf9bf0d280e588f3825ca5b340df6267a0e6bcd1cdac`.
+
+The only ignored artifact directory is
+`artifacts/piano-strike-envelope-composites/`. It contains exactly three WAVs
+and their reports; no old envelope batch, chord, progression, solo, failed,
+weak-RMS, or noise-rejected WAV remains. Nothing is selected, preserved in
+Git, mapped to controls, or integrated into `Engine`.
+
+Fresh integrated verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 103 library tests, 11 compact
   contract tests, four deterministic lab integration tests, and six offline
   CLI tests passed with zero failures;
 - Clippy with warnings denied and the release build: exit 0;
