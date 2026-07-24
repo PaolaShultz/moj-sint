@@ -10,6 +10,7 @@ pub mod dsp;
 pub mod engine;
 pub mod envelope;
 pub mod hybrid;
+pub mod hybrid_subset;
 pub mod offline;
 pub mod preset;
 pub mod research;
