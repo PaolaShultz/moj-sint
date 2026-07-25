@@ -1,5 +1,16 @@
 # Repository Instructions
 
+- For planning, architecture, listening decisions, handoffs, or ambiguous
+  context, consult the `Moj Sint` index in
+  `/home/shome/Documents/knowledge` with `zk`, then verify against
+  `docs/HANDOFF.md`, repository source/tests, and live Git state.
+- `docs/HANDOFF.md` remains the durable project source of truth. After material
+  state, workflow, or decision changes, update it first, then update the
+  relevant concise knowledge note and run
+  `/home/shome/Documents/knowledge/.zk/validate.sh`.
+- Agents own knowledge organization and synchronization; the user is not
+  expected to edit notes. Never store exact HEAD, clean/ahead status, or
+  disposable artifact existence as current knowledge.
 - Moj Sint is a fourth external SHR-DAW instrument. Never disguise its presets,
   controls, or process as synthv1.
 - Keep `Engine` and DSP independent of JACK, ALSA, files, processes, and clocks.
