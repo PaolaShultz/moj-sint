@@ -16,6 +16,19 @@ enum ContourStage {
     Release,
 }
 
+fn prepared_sample_count(seconds: f32, sample_rate: f32) -> Result<u32, ModelDError> {
+    let samples = f64::from(seconds) * f64::from(sample_rate);
+    if !samples.is_finite() || samples < 1.0 || samples >= f64::from(u32::MAX) {
+        return Err(ModelDError::InvalidConfig);
+    }
+
+    let rounded = samples.round();
+    if rounded < 1.0 || rounded >= f64::from(u32::MAX) {
+        return Err(ModelDError::InvalidConfig);
+    }
+    Ok(rounded as u32)
+}
+
 /// A fixed-state Model D style ADS contour with the decay time reused for release.
 #[derive(Clone, Copy, Debug)]
 pub struct ModelDContour {
@@ -24,9 +37,12 @@ pub struct ModelDContour {
     level: f32,
     attack_step: f32,
     decay_step: f32,
-    decay_samples: f32,
+    attack_samples: u32,
+    decay_samples: u32,
+    attack_remaining: u32,
+    decay_remaining: u32,
     release_step: f32,
-    release_remaining: f32,
+    release_remaining: u32,
 }
 
 impl ModelDContour {
@@ -43,33 +59,47 @@ impl ModelDContour {
         {
             return Err(ModelDError::InvalidConfig);
         }
+        let attack_samples = prepared_sample_count(config.attack_seconds, sample_rate)?;
+        let decay_samples = prepared_sample_count(config.decay_seconds, sample_rate)?;
 
         Ok(Self {
             config,
             stage: ContourStage::Idle,
             level: 0.0,
-            attack_step: 1.0 / (config.attack_seconds * sample_rate),
-            decay_step: (1.0 - config.sustain_level) / (config.decay_seconds * sample_rate),
-            decay_samples: config.decay_seconds * sample_rate,
+            attack_step: 1.0 / attack_samples as f32,
+            decay_step: (1.0 - config.sustain_level) / decay_samples as f32,
+            attack_samples,
+            decay_samples,
+            attack_remaining: 0,
+            decay_remaining: 0,
             release_step: 0.0,
-            release_remaining: 0.0,
+            release_remaining: 0,
         })
     }
 
     pub fn note_on(&mut self) {
+        self.attack_remaining = self.attack_samples;
+        self.release_step = 0.0;
+        self.release_remaining = 0;
         self.stage = ContourStage::Attack;
     }
 
     pub fn restart(&mut self) {
         self.level = 0.0;
+        self.attack_remaining = self.attack_samples;
+        self.decay_remaining = 0;
         self.release_step = 0.0;
-        self.release_remaining = 0.0;
+        self.release_remaining = 0;
         self.stage = ContourStage::Attack;
     }
 
     pub fn note_off(&mut self) {
         if self.stage != ContourStage::Idle {
-            self.release_step = self.level / self.decay_samples;
+            if self.level <= 0.0 {
+                self.reset();
+                return;
+            }
+            self.release_step = self.level / self.decay_samples as f32;
             self.release_remaining = self.decay_samples;
             self.stage = ContourStage::Release;
         }
@@ -80,28 +110,35 @@ impl ModelDContour {
         match self.stage {
             ContourStage::Idle => self.level = 0.0,
             ContourStage::Attack => {
-                self.level += self.attack_step;
-                if self.level >= 1.0 {
+                if self.attack_remaining <= 1 {
                     self.level = 1.0;
+                    self.attack_remaining = 0;
+                    self.decay_remaining = self.decay_samples;
                     self.stage = ContourStage::Decay;
+                } else {
+                    self.level += self.attack_step;
+                    self.attack_remaining -= 1;
                 }
             }
             ContourStage::Decay => {
-                self.level -= self.decay_step;
-                if self.level <= self.config.sustain_level {
+                if self.decay_remaining <= 1 {
                     self.level = self.config.sustain_level;
+                    self.decay_remaining = 0;
                     self.stage = ContourStage::Sustain;
+                } else {
+                    self.level -= self.decay_step;
+                    self.decay_remaining -= 1;
                 }
             }
             ContourStage::Sustain => self.level = self.config.sustain_level,
             ContourStage::Release => {
-                if self.release_remaining <= 1.0 {
+                if self.release_remaining <= 1 {
                     self.level = 0.0;
-                    self.release_remaining = 0.0;
+                    self.release_remaining = 0;
                     self.stage = ContourStage::Idle;
                 } else {
                     self.level -= self.release_step;
-                    self.release_remaining -= 1.0;
+                    self.release_remaining -= 1;
                 }
             }
         }
@@ -118,8 +155,10 @@ impl ModelDContour {
 
     pub fn reset(&mut self) {
         self.level = 0.0;
+        self.attack_remaining = 0;
+        self.decay_remaining = 0;
         self.release_step = 0.0;
-        self.release_remaining = 0.0;
+        self.release_remaining = 0;
         self.stage = ContourStage::Idle;
     }
 }
@@ -158,6 +197,37 @@ mod tests {
         assert_eq!(contour.advance(), 0.0);
         assert!(contour.is_idle());
         assert_eq!(contour.level(), 0.0);
+    }
+
+    #[test]
+    fn exact_sample_counts_complete_attack_decay_and_release_on_the_final_sample() {
+        let mut contour = ModelDContour::new(
+            1_000.0,
+            ContourConfig {
+                attack_seconds: 0.012,
+                decay_seconds: 0.003,
+                sustain_level: 0.4,
+            },
+        )
+        .unwrap();
+        contour.note_on();
+
+        for _ in 0..11 {
+            assert!(contour.advance() < 1.0);
+        }
+        assert_eq!(contour.advance(), 1.0);
+
+        for _ in 0..2 {
+            assert!(contour.advance() > 0.4);
+        }
+        assert_eq!(contour.advance(), 0.4);
+
+        contour.note_off();
+        for _ in 0..2 {
+            assert!(contour.advance() > 0.0);
+        }
+        assert_eq!(contour.advance(), 0.0);
+        assert!(contour.is_idle());
     }
 
     #[test]
@@ -217,6 +287,60 @@ mod tests {
             .is_err()
         );
         assert!(ModelDContour::new(f32::NAN, config()).is_err());
+    }
+
+    #[test]
+    fn rejects_overflowing_zero_and_unrepresentable_derived_sample_counts() {
+        assert!(
+            ModelDContour::new(
+                48_000.0,
+                ContourConfig {
+                    attack_seconds: f32::MAX,
+                    ..config()
+                },
+            )
+            .is_err()
+        );
+        assert!(
+            ModelDContour::new(
+                48_000.0,
+                ContourConfig {
+                    decay_seconds: f32::MAX,
+                    ..config()
+                },
+            )
+            .is_err()
+        );
+        assert!(
+            ModelDContour::new(
+                48_000.0,
+                ContourConfig {
+                    attack_seconds: f32::MIN_POSITIVE,
+                    ..config()
+                },
+            )
+            .is_err()
+        );
+        assert!(
+            ModelDContour::new(
+                48_000.0,
+                ContourConfig {
+                    decay_seconds: f32::MIN_POSITIVE,
+                    ..config()
+                },
+            )
+            .is_err()
+        );
+        assert!(
+            ModelDContour::new(
+                48_000.0,
+                ContourConfig {
+                    attack_seconds: 100_000.0,
+                    ..config()
+                },
+            )
+            .is_err()
+        );
     }
 
     #[test]
