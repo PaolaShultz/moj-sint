@@ -1,6 +1,7 @@
 //! Isolated circuit-informed Model D character research modules.
 
 pub mod contour;
+pub mod ladder;
 pub mod mixer;
 pub mod vco;
 
