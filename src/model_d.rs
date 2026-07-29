@@ -4,6 +4,7 @@ pub mod contour;
 pub mod ladder;
 pub mod mixer;
 pub mod vco;
+pub mod voice;
 
 use thiserror::Error;
 
