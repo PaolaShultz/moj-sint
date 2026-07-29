@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
-use std::process::{Command, ExitStatus};
+use std::process::{Command, ExitStatus, Output};
 
 const WAV_NAMES: [&str; 7] = [
     "01_full_bass_phrase.wav",
@@ -262,40 +262,62 @@ fn destination_backup_rename_failure_cleans_populated_stage() {
 }
 
 #[test]
-fn backup_cleanup_failure_rolls_back_to_one_usable_destination_and_does_not_block_retry() {
+fn partial_retired_cleanup_keeps_new_destination_authoritative_and_does_not_block_retry() {
     let root = tempfile::tempdir().unwrap();
     let output = root.path().join("audition");
     fs::create_dir(&output).unwrap();
     fs::write(output.join("sentinel.txt"), "old destination").unwrap();
 
-    let status = run_lab_status(
+    let first = run_lab_output(
         &output,
         &[(
-            "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_BACKUP_CLEANUP",
+            "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_RETIRED_PARTIAL_CLEANUP",
             std::ffi::OsStr::new("1"),
         )],
     );
-    assert!(!status.success());
-    assert_eq!(
-        file_names(&output),
-        BTreeSet::from(["sentinel.txt".to_owned()])
+    assert!(first.status.success(), "{first:?}");
+    let stderr = String::from_utf8(first.stderr).unwrap();
+    assert!(
+        stderr.contains("warning: publication succeeded"),
+        "{stderr}"
     );
-    assert_eq!(
-        fs::read_to_string(output.join("sentinel.txt")).unwrap(),
-        "old destination"
+    assert!(
+        stderr.contains("retired previous destination cleanup incomplete"),
+        "{stderr}"
     );
+    let expected = WAV_NAMES
+        .into_iter()
+        .chain(REPORT_NAMES)
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(file_names(&output), expected);
+    assert!(!output.join("sentinel.txt").exists());
     assert!(!root.path().join(".audition.model-d-lab-stage").exists());
     assert!(!root.path().join(".audition.model-d-lab-backup").exists());
+    let retired = retired_paths(root.path(), "audition");
+    assert_eq!(retired.len(), 1, "{retired:?}");
+    assert!(retired[0].is_dir());
+    assert!(
+        stderr.contains(&retired[0].display().to_string()),
+        "{stderr}"
+    );
 
     let retry = run_lab_status(&output, &[]);
     assert!(retry.success());
     assert_eq!(
-        file_names(&output).len(),
-        WAV_NAMES.len() + REPORT_NAMES.len()
+        file_names(&output),
+        WAV_NAMES
+            .into_iter()
+            .chain(REPORT_NAMES)
+            .map(str::to_owned)
+            .collect()
     );
-    assert!(!output.join("sentinel.txt").exists());
     assert!(!root.path().join(".audition.model-d-lab-stage").exists());
     assert!(!root.path().join(".audition.model-d-lab-backup").exists());
+    assert_eq!(retired_paths(root.path(), "audition"), retired);
+
+    fs::remove_dir_all(&retired[0]).unwrap();
+    assert!(retired_paths(root.path(), "audition").is_empty());
 }
 
 fn run_lab(output: &Path) {
@@ -310,6 +332,29 @@ fn run_lab_status(output: &Path, environment: &[(&str, &std::ffi::OsStr)]) -> Ex
         command.env(name, value);
     }
     command.status().unwrap()
+}
+
+fn run_lab_output(output: &Path, environment: &[(&str, &std::ffi::OsStr)]) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_model-d-lab"));
+    command.arg("render-test").arg(output);
+    for (name, value) in environment {
+        command.env(name, value);
+    }
+    command.output().unwrap()
+}
+
+fn retired_paths(parent: &Path, destination_name: &str) -> Vec<std::path::PathBuf> {
+    let prefix = format!(".{destination_name}.model-d-lab-retired-");
+    let mut paths = fs::read_dir(parent)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with(&prefix))
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths
 }
 
 fn file_names(directory: &Path) -> BTreeSet<String> {

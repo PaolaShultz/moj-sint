@@ -374,8 +374,9 @@ statements that there is no normalization, limiter, copied preset, hardware
 equivalence claim, or production integration.
 Require exact nine-row pitch/drift and fifteen-row waveform matrices, three
 controlled passing alias rows, three full-path `diagnostic_fail` rows, and a
-cleanup-failure injection proving rollback leaves one usable destination and
-does not block the next run.
+partial retired-cleanup injection proving the promoted destination remains
+authoritative, the warning names a unique nonblocking retired sibling, and the
+next run succeeds without treating partially deleted old data as recoverable.
 
 - [ ] **Step 2: Run the CLI test and verify RED** — historical command output
   was not preserved; no retrospective RED claim is made.

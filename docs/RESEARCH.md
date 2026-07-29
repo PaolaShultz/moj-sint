@@ -715,23 +715,23 @@ The three full-path files measure:
 
 | file | peak | RMS | DC | maximum jump | headroom dBFS |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| bass | 0.062773 | 0.023693 | -0.003285 | 0.003856 | 24.044542 |
-| lead | 0.043793 | 0.020241 | 0.004667 | 0.010711 | 27.171910 |
-| filter articulation | 0.107463 | 0.026807 | -0.003219 | 0.027032 | 19.374855 |
+| bass | 0.062773 | 0.023689 | -0.003295 | 0.003856 | 24.044527 |
+| lead | 0.043744 | 0.020234 | 0.004664 | 0.010627 | 27.181656 |
+| filter articulation | 0.107469 | 0.026794 | -0.003326 | 0.027015 | 19.374320 |
 
 Every file is finite and has an exact zero tail. Matched residual RMS against
-the full bass is 0.067203 for the idealized path, 0.018528 for the linear
-mixer, 0.004531 for the linear ladder, and 0.003852 without drift/feedback.
+the full bass is 0.067214 for the idealized path, 0.018535 for the linear
+mixer, 0.004535 for the linear ladder, and 0.003867 without drift/feedback.
 These residuals prove that each substitution changes the render; they do not
 prove that every change is perceptually useful.
 
 The linear low-drive ladder probes measure:
 
-- 125.555/498.804/2000.137/7999.453 Hz for
+- 125.555420/498.803711/2000.136719/7999.453125 Hz for
   125/500/2000/8000 Hz cutoff targets;
-- 23.113 dB/octave in the declared stop-band region; and
-- resonance peak ratios of 2.008 from low to middle resonance and 2.188 from
-  middle to high resonance.
+- 23.113182 dB/octave in the declared stop-band region; and
+- resonance peak ratios of 2.008079 from low to middle resonance and 2.187911
+  from middle to high resonance.
 
 These are digital-model calibration checks, not measurements of Model D
 hardware.
@@ -742,7 +742,8 @@ The design initially proposed accepting a raw time-domain 48/192 kHz
 residual. That method was rejected during implementation because it conflates
 ordinary transfer and phase differences with foldback. Even after fixed sinc
 resampling and alignment for the ladder FIR's 7.75-host-sample delay, the
-retained diagnostic residuals are -29.880/-30.957/-22.678 dB for MIDI
+controlled-probe diagnostic residuals are
+-29.879594/-30.956849/-22.678313 dB for MIDI
 36/60/84 and are not acceptance values.
 
 The implemented engineering gate uses native-rate Blackman-Harris spectra over
@@ -755,17 +756,17 @@ reported as resolved.
 
 | MIDI | 48 kHz proxy dB | 192 kHz floor dB | classification | resolved excess dB | mask coverage | bound dB |
 | ---: | ---: | ---: | --- | ---: | ---: | ---: |
-| 36 | -64.393 | -62.360 | floor-limited | n/a | 0.100662 | -45 |
-| 60 | -55.921 | -62.289 | resolved | -57.061 | 0.025131 | -45 |
-| 84 | -36.928 | -52.209 | resolved | -37.058 | 0.006180 | -35 |
+| 36 | -64.393327 | -62.360012 | floor-limited | n/a | 0.100662 | -45 |
+| 60 | -55.921169 | -62.288916 | resolved | -57.060745 | 0.025131 | -45 |
+| 84 | -36.927605 | -52.208880 | resolved | -37.058275 | 0.006180 | -35 |
 
 Acceptance uses the conservative maximum of the 48 kHz proxy and the 192 kHz
 floor, so the unchanged bounds pass without inventing a below-floor estimate.
 The metric has a declared blind spot: energy that folds onto or near expected
 harmonics lies inside the masks and is not bounded. A matched linear/nonlinear
-overtone-magnitude diagnostic measures -8.868/-9.268/-15.504 dB and confirms
-that the nonlinear probe did not merely reproduce the linear harmonic
-spectrum.
+overtone-magnitude diagnostic measures
+-8.868041/-9.268071/-15.504032 dB and confirms that the nonlinear probe did
+not merely reproduce the linear harmonic spectrum.
 
 This acceptance table applies only to its controlled probe: oscillators are
 idealized, drift and feedback are disabled, source levels are
@@ -773,24 +774,34 @@ idealized, drift and feedback are disabled, source levels are
 missing evidence sets. First, `oscillators.tsv` now carries the exact
 MIDI-36/60/84 x 44.1/48/96 kHz configured pitch/drift matrix and fifteen
 MIDI-96 waveform-specific proxy rows. Triangle's former untreated slope
-corners measured -36.477/-37.889/-47.268 dB at 44.1/48/96 kHz; the PolyBLAMP
-correction measures -48.128/-49.678/-59.820 dB. The periodic saw warp measures
--28.269/-28.854/-31.446 dB. Rectangle measures
--28.644/-31.864/-32.335 dB, and wide/narrow pulses both measure
--26.354/-24.572/-26.663 dB. These proxy rows retain the harmonic-mask blind
+corners measured -36.477373/-37.888794/-47.268042 dB at 44.1/48/96 kHz; the
+PolyBLAMP correction measures -48.128146/-49.678474/-59.819637 dB. The
+periodic saw warp measures -28.269403/-28.854447/-31.445767 dB. Rectangle
+measures -28.643688/-31.864009/-32.335421 dB; wide pulse measures
+-26.353655/-24.572373/-26.663287 dB; and narrow pulse measures
+-26.353658/-24.572258/-26.663348 dB. These proxy rows retain the harmonic-mask blind
 spot and are not called alias-free.
 
 Second, the full-authored-bass diagnostic retains source levels
 `0.88/0.72/0.14`, mixer drive `2.4`, ladder drive `2.2`, static oscillator
 imperfections, and feedback; only drift is frozen. Its 48-vs-192 kHz spectral
-magnitude alias/error estimates are -34.100/-32.786/-26.817 dB for MIDI
-36/60/84. The 192-vs-768 kHz floors are -23.155/-24.411/-27.472 dB, producing
-conservative -23.155/-24.411/-26.817 dB values that fail the unchanged
+magnitude alias/error estimates are -34.099830/-32.786449/-26.817410 dB for
+MIDI 36/60/84. The 192-vs-768 kHz floors are
+-23.154683/-24.411124/-27.471559 dB, producing conservative
+-23.154683/-24.411124/-26.817410 dB values that fail the unchanged
 -45/-45/-35 dB bounds. Those rows are `diagnostic_fail`, not acceptance
 passes. Their matched nonlinear harmonic differences are
--4.790/-8.672/-13.051 dB, so the diagnostic did not obtain a cleaner number by
-removing the authored nonlinearity. The full path therefore has no passing
-alias claim.
+-4.790412/-8.672100/-13.050540 dB, so the diagnostic did not obtain a cleaner
+number by removing the authored nonlinearity. The full path therefore has no
+passing alias claim.
+
+The lab's filesystem publication contract follows the same evidence boundary:
+after staged output replaces the destination, the new batch is authoritative.
+The old destination is moved to a unique validated retired sibling before
+recursive deletion. A partially failed retired cleanup is reported as a
+warning with its exact nonblocking path and cannot trigger restoration of
+partially deleted data; subsequent runs proceed normally. Successful cleanup
+leaves no retired residue.
 
 The resulting model is circuit-informed and causally inspectable, not
 hardware-calibrated or hardware-equivalent. It has no individual-unit

@@ -127,40 +127,59 @@ impl PublishPaths {
             };
         }
         if had_destination {
-            let cleanup_result =
-                if test_failure_enabled(test_mode, "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_BACKUP_CLEANUP")
-                {
-                    Err(std::io::Error::other("injected backup cleanup failure"))
-                } else {
-                    remove_exact_path(&self.backup)
-                };
+            let retired = self.unique_retired_path()?;
+            fs::rename(&self.backup, &retired)?;
+            let cleanup_result = if test_failure_enabled(
+                test_mode,
+                "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_RETIRED_PARTIAL_CLEANUP",
+            ) {
+                inject_partial_retired_cleanup(&retired)
+            } else {
+                remove_exact_path(&retired)
+            };
             if let Err(cleanup_error) = cleanup_result {
-                let move_new_result = fs::rename(&self.destination, &self.stage);
-                let restore_old_result = if move_new_result.is_ok() {
-                    fs::rename(&self.backup, &self.destination)
-                } else {
-                    Err(std::io::Error::other(
-                        "new destination could not be moved aside",
-                    ))
-                };
-                let discard_new_result = if restore_old_result.is_ok() {
-                    remove_exact_path(&self.stage)
-                } else {
-                    Ok(())
-                };
-                return match (move_new_result, restore_old_result, discard_new_result) {
-                    (Ok(()), Ok(()), Ok(())) => Err(format!(
-                        "backup cleanup failed after promotion and the prior destination was restored: {cleanup_error}"
-                    )
-                    .into()),
-                    (move_new, restore_old, discard_new) => Err(format!(
-                        "backup cleanup failed after promotion: {cleanup_error}; move new destination aside: {move_new:?}; restore prior destination: {restore_old:?}; discard rejected new batch: {discard_new:?}"
-                    )
-                    .into()),
-                };
+                eprintln!(
+                    "warning: publication succeeded at {}; retired previous destination cleanup incomplete at {}: {cleanup_error}",
+                    self.destination.display(),
+                    retired.display()
+                );
             }
         }
         Ok(())
+    }
+
+    fn unique_retired_path(&self) -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let parent = self
+            .destination
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let file_name = self
+            .destination
+            .file_name()
+            .filter(|name| !name.is_empty())
+            .ok_or("output directory must have a final path component")?;
+        for attempt in 0..1_024_u16 {
+            let mut retired_name = OsString::from(".");
+            retired_name.push(file_name);
+            retired_name.push(".model-d-lab-retired-");
+            retired_name.push(std::process::id().to_string());
+            retired_name.push("-");
+            retired_name.push(attempt.to_string());
+            let candidate = parent.join(retired_name);
+            if candidate.parent() != Some(parent)
+                || candidate.file_name().is_none()
+                || candidate == self.destination
+                || candidate == self.stage
+                || candidate == self.backup
+            {
+                return Err("invalid retired destination path".into());
+            }
+            if !path_exists(&candidate) {
+                return Ok(candidate);
+            }
+        }
+        Err("could not allocate a unique retired destination path".into())
     }
 }
 
@@ -175,6 +194,22 @@ fn remove_exact_path(path: &Path) -> std::io::Result<()> {
     } else {
         fs::remove_file(path)
     }
+}
+
+fn inject_partial_retired_cleanup(retired: &Path) -> std::io::Result<()> {
+    let child = fs::read_dir(retired)?
+        .next()
+        .ok_or_else(|| std::io::Error::other("retired directory was unexpectedly empty"))??
+        .path();
+    if child.parent() != Some(retired) {
+        return Err(std::io::Error::other(
+            "refusing partial cleanup outside retired directory",
+        ));
+    }
+    remove_exact_path(&child)?;
+    Err(std::io::Error::other(
+        "injected failure after partial retired cleanup",
+    ))
 }
 
 fn cleanup_stage_after_error(
