@@ -17,6 +17,7 @@ const ALIAS_WARMUP_FRAMES_48K: usize = 48_000;
 const ALIAS_MEASUREMENT_FRAMES: usize = 131_072;
 pub const MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS: usize = 4;
 pub const MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB: f64 = 6.0;
+pub const MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_POWER_RATIO: f64 = 3.981_071_705_534_972_2;
 pub const MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB: f64 = -24.0;
 pub const MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB: f64 = -6.0;
 
@@ -253,15 +254,18 @@ pub struct ModelDRender {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ModelDAliasEvidence {
-    /// Non-harmonic 48 kHz spectral energy relative to target signal energy.
-    pub target_residual_db: f64,
-    /// Non-harmonic native 192 kHz energy in the same physical 0–24 kHz band.
-    pub reference_floor_db: f64,
-    /// Positive target residual power above the independently measured floor.
+    /// Nonharmonic 48 kHz out-of-mask energy relative to target signal energy.
+    /// This proxy deliberately excludes energy on or near legitimate harmonic
+    /// bins, whose coverage and half-width are reported separately.
+    pub nonharmonic_foldback_proxy_db: f64,
+    /// Native 192 kHz floor for the same nonharmonic out-of-mask proxy and
+    /// physical 0–24 kHz band.
+    pub reference_nonharmonic_floor_db: f64,
+    /// Positive nonharmonic proxy power above the independently measured floor.
     /// `None` means that the estimate is floor-limited, so no excess can be
     /// resolved without inventing a number below the reference floor.
-    pub excess_residual_db: Option<f64>,
-    pub floor_limited: bool,
+    pub excess_nonharmonic_foldback_proxy_db: Option<f64>,
+    pub nonharmonic_proxy_floor_limited: bool,
     /// Raw time residual after fixed sinc resampling and the declared 7.75-host
     /// sample ladder-FIR alignment. It deliberately remains a non-acceptance
     /// diagnostic because it conflates transfer and phase with alias energy.
@@ -295,13 +299,18 @@ pub fn render_audition(kind: AuditionKind, sample_rate: u32) -> Result<ModelDRen
     Ok(ModelDRender { samples, metrics })
 }
 
-/// Returns the conservative alias upper bound, using the native reference floor
-/// whenever the target estimate is floor-limited.
+/// Returns the conservative value of the nonharmonic out-of-mask foldback
+/// proxy, using the native reference floor whenever the target estimate is
+/// floor-limited. This is not a bound on alias energy inside harmonic masks.
 pub fn measure_alias_residual(note: u8) -> Result<f64, ModelDError> {
     let evidence = measure_alias_evidence(note)?;
-    Ok(evidence.target_residual_db.max(evidence.reference_floor_db))
+    Ok(evidence
+        .nonharmonic_foldback_proxy_db
+        .max(evidence.reference_nonharmonic_floor_db))
 }
 
+/// Measures nonharmonic out-of-mask foldback evidence and its explicit
+/// harmonic-mask blind spot; it does not bound energy inside masked bins.
 pub fn measure_alias_evidence(note: u8) -> Result<ModelDAliasEvidence, ModelDError> {
     if !(24..=108).contains(&note) {
         return Err(ModelDError::InvalidConfig);
@@ -330,32 +339,31 @@ pub fn measure_alias_evidence(note: u8) -> Result<ModelDAliasEvidence, ModelDErr
         fundamental_note,
         CANONICAL_SAMPLE_RATE * ANALYSIS_RATE_FACTOR as u32,
     );
-    let target_spectral = measure_spectral_foldback(
+    let target_proxy = measure_nonharmonic_foldback_proxy(
         target,
         CANONICAL_SAMPLE_RATE,
         target_fundamental_hz,
         24_000.0,
     );
-    let reference_spectral = measure_spectral_foldback(
+    let reference_proxy = measure_nonharmonic_foldback_proxy(
         native_reference,
         CANONICAL_SAMPLE_RATE * ANALYSIS_RATE_FACTOR as u32,
         reference_fundamental_hz,
         24_000.0,
     );
-    let floor_limited = target_spectral.ratio <= reference_spectral.ratio;
-    let excess_residual_db =
-        (!floor_limited).then(|| ratio_db(target_spectral.ratio - reference_spectral.ratio));
+    let (nonharmonic_proxy_floor_limited, excess_nonharmonic_foldback_proxy_db) =
+        classify_nonharmonic_foldback_proxy(target_proxy.ratio, reference_proxy.ratio);
     Ok(ModelDAliasEvidence {
-        target_residual_db: ratio_db(target_spectral.ratio),
-        reference_floor_db: ratio_db(reference_spectral.ratio),
-        excess_residual_db,
-        floor_limited,
+        nonharmonic_foldback_proxy_db: ratio_db(target_proxy.ratio),
+        reference_nonharmonic_floor_db: ratio_db(reference_proxy.ratio),
+        excess_nonharmonic_foldback_proxy_db,
+        nonharmonic_proxy_floor_limited,
         transfer_conflated_residual_db: fitted_residual_db(target, &reference),
         target_fundamental_hz,
         reference_fundamental_hz,
-        resolution_hz: target_spectral.resolution_hz,
+        resolution_hz: target_proxy.resolution_hz,
         harmonic_mask_half_width_bins: MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS,
-        harmonic_mask_coverage: target_spectral.coverage,
+        harmonic_mask_coverage: target_proxy.coverage,
         nonlinear_overtone_magnitude_difference_db: overtone_magnitude_difference_db(
             target,
             linear_target,
@@ -364,6 +372,16 @@ pub fn measure_alias_evidence(note: u8) -> Result<ModelDAliasEvidence, ModelDErr
             24_000.0,
         ),
     })
+}
+
+fn classify_nonharmonic_foldback_proxy(
+    target_ratio: f64,
+    reference_ratio: f64,
+) -> (bool, Option<f64>) {
+    let floor_limited =
+        target_ratio < reference_ratio * MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_POWER_RATIO;
+    let excess_db = (!floor_limited).then(|| ratio_db(target_ratio - reference_ratio));
+    (floor_limited, excess_db)
 }
 
 fn validate_render_sample_rate(sample_rate: u32) -> Result<(), ModelDError> {
@@ -606,18 +624,18 @@ fn prepared_fundamental_hz(note: u8, sample_rate: u32) -> f64 {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct SpectralFoldback {
+struct NonharmonicFoldbackProxy {
     ratio: f64,
     coverage: f64,
     resolution_hz: f64,
 }
 
-fn measure_spectral_foldback(
+fn measure_nonharmonic_foldback_proxy(
     samples: &[f32],
     sample_rate: u32,
     fundamental_hz: f64,
     maximum_hz: f64,
-) -> SpectralFoldback {
+) -> NonharmonicFoldbackProxy {
     assert!(samples.len().is_power_of_two());
     let sample_count = samples.len();
     let resolution_hz = f64::from(sample_rate) / sample_count as f64;
@@ -635,7 +653,7 @@ fn measure_spectral_foldback(
         }
     }
     let masked_bins = harmonic_mask[1..].iter().filter(|masked| **masked).count();
-    SpectralFoldback {
+    NonharmonicFoldbackProxy {
         ratio: (residual_energy / total_energy.max(1.0e-24)).max(1.0e-24),
         coverage: masked_bins as f64 / maximum_bin.max(1) as f64,
         resolution_hz,
@@ -1017,7 +1035,7 @@ mod tests {
     }
 
     #[test]
-    fn steady_nonlinear_high_rate_alias_evidence_is_resolved_and_within_bounds() {
+    fn steady_nonlinear_high_rate_nonharmonic_proxy_is_classified_and_within_bounds() {
         for (note, maximum_db) in [(36, -45.0), (60, -45.0), (84, -35.0)] {
             let evidence = measure_alias_evidence(note).unwrap();
             let first = measure_alias_residual(note).unwrap();
@@ -1025,7 +1043,9 @@ mod tests {
             assert_eq!(first, second, "note={note}");
             assert_eq!(
                 first,
-                evidence.target_residual_db.max(evidence.reference_floor_db),
+                evidence
+                    .nonharmonic_foldback_proxy_db
+                    .max(evidence.reference_nonharmonic_floor_db),
                 "note={note}"
             );
             assert!(first.is_finite(), "note={note}, residual_db={first}");
@@ -1034,25 +1054,30 @@ mod tests {
                 "note={note}, residual_db={first}, maximum_db={maximum_db}, evidence={evidence:?}"
             );
             assert!(
-                evidence.reference_floor_db <= maximum_db,
+                evidence.reference_nonharmonic_floor_db <= maximum_db,
                 "note={note}, evidence={evidence:?}"
             );
-            if evidence.floor_limited {
-                assert_eq!(evidence.excess_residual_db, None, "{evidence:?}");
+            if evidence.nonharmonic_proxy_floor_limited {
+                assert_eq!(
+                    evidence.excess_nonharmonic_foldback_proxy_db, None,
+                    "{evidence:?}"
+                );
                 assert!(
-                    evidence.target_residual_db <= evidence.reference_floor_db,
+                    evidence.nonharmonic_foldback_proxy_db
+                        < evidence.reference_nonharmonic_floor_db
+                            + super::MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB,
                     "{evidence:?}"
                 );
             } else {
                 assert!(
-                    evidence.reference_floor_db
-                        <= evidence.target_residual_db
+                    evidence.reference_nonharmonic_floor_db
+                        <= evidence.nonharmonic_foldback_proxy_db
                             - super::MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB,
                     "note={note}, evidence={evidence:?}"
                 );
                 assert!(
                     evidence
-                        .excess_residual_db
+                        .excess_nonharmonic_foldback_proxy_db
                         .is_some_and(|db| db <= maximum_db),
                     "note={note}, evidence={evidence:?}"
                 );
@@ -1083,18 +1108,47 @@ mod tests {
                     .contains(&evidence.nonlinear_overtone_magnitude_difference_db),
                 "note={note}, evidence={evidence:?}"
             );
-            assert_eq!(evidence.floor_limited, note == 36, "{evidence:?}");
+            assert_eq!(
+                evidence.nonharmonic_proxy_floor_limited,
+                note == 36,
+                "{evidence:?}"
+            );
         }
         assert!(measure_alias_residual(127).is_err());
     }
 
     #[test]
-    fn note_36_spectral_mask_retains_low_mid_and_high_folded_components() {
+    fn reference_margin_classification_includes_below_exact_and_above_boundary() {
+        assert!(
+            (super::ratio_db(super::MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_POWER_RATIO)
+                - super::MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB)
+                .abs()
+                <= f64::EPSILON
+        );
+        let reference = 1.0e-8;
+        let required = reference * super::MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_POWER_RATIO;
+        assert_eq!(
+            super::classify_nonharmonic_foldback_proxy(required * (1.0 - 1.0e-12), reference),
+            (true, None)
+        );
+        let exact = super::classify_nonharmonic_foldback_proxy(required, reference);
+        assert!(!exact.0);
+        assert!(exact.1.is_some());
+        let above =
+            super::classify_nonharmonic_foldback_proxy(required * (1.0 + 1.0e-12), reference);
+        assert!(!above.0);
+        assert!(above.1.is_some());
+    }
+
+    #[test]
+    fn note_36_proxy_detects_off_grid_foldback_but_excludes_on_grid_energy() {
         const FRAMES: usize = 131_072;
         const FOLDED_LEVEL: f64 = 0.01;
         let fundamental_hz = super::prepared_fundamental_hz(24, SAMPLE_RATE);
         let folded_frequencies = [1_000.0, 8_000.0, 18_000.0]
             .map(|near_hz| ((near_hz / fundamental_hz).floor() + 0.5) * fundamental_hz);
+        let on_grid_frequencies = [1_000.0, 8_000.0, 18_000.0]
+            .map(|near_hz| (near_hz / fundamental_hz).round() * fundamental_hz);
         let clean: Vec<_> = (0..FRAMES)
             .map(|frame| {
                 let phase =
@@ -1115,15 +1169,49 @@ mod tests {
                 })
             })
             .collect();
-        let clean = super::measure_spectral_foldback(&clean, SAMPLE_RATE, fundamental_hz, 24_000.0);
-        let folded =
-            super::measure_spectral_foldback(&folded, SAMPLE_RATE, fundamental_hz, 24_000.0);
+        let on_grid: Vec<_> = clean
+            .iter()
+            .enumerate()
+            .map(|(frame, clean)| {
+                on_grid_frequencies
+                    .iter()
+                    .fold(*clean, |sample, frequency| {
+                        sample
+                            + (FOLDED_LEVEL
+                                * (std::f64::consts::TAU * frequency * frame as f64
+                                    / f64::from(SAMPLE_RATE))
+                                .sin()) as f32
+                    })
+            })
+            .collect();
+        let clean = super::measure_nonharmonic_foldback_proxy(
+            &clean,
+            SAMPLE_RATE,
+            fundamental_hz,
+            24_000.0,
+        );
+        let folded = super::measure_nonharmonic_foldback_proxy(
+            &folded,
+            SAMPLE_RATE,
+            fundamental_hz,
+            24_000.0,
+        );
+        let on_grid = super::measure_nonharmonic_foldback_proxy(
+            &on_grid,
+            SAMPLE_RATE,
+            fundamental_hz,
+            24_000.0,
+        );
         let expected_ratio = 3.0 * FOLDED_LEVEL.powi(2) / (1.0 + 0.3_f64.powi(2) + 0.2_f64.powi(2));
         let expected_db = super::ratio_db(expected_ratio);
         assert!(super::ratio_db(clean.ratio) <= -45.0, "{clean:?}");
         assert!(
             (super::ratio_db(folded.ratio) - expected_db).abs() <= 0.5,
             "expected_db={expected_db}, folded={folded:?}"
+        );
+        assert!(
+            (super::ratio_db(on_grid.ratio) - super::ratio_db(clean.ratio)).abs() <= 1.0,
+            "clean={clean:?}, on_grid={on_grid:?}"
         );
         assert!(folded.coverage <= 0.15, "{folded:?}");
     }
