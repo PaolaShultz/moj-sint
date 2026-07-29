@@ -765,12 +765,28 @@ fn validate_render_sample_rate(sample_rate: u32) -> Result<(), ModelDError> {
     Ok(())
 }
 
+/// Prepare the exact voice configuration used by
+/// `04_matched_idealized_path.wav`.
+///
+/// The listening render and native benchmark share this constructor so the
+/// benchmark cannot silently substitute a cheaper production or diagnostic
+/// voice.
+pub fn idealized_bass_voice(sample_rate: f32) -> Result<ModelDVoice, ModelDError> {
+    let mut patch = ModelDPatch::bass();
+    patch.source_levels[2] = BASS_THIRD_OSCILLATOR_LEVEL;
+    ModelDVoice::new(sample_rate, patch, ModelDDiagnostics::idealized_path())
+}
+
 fn render_score(kind: AuditionKind, sample_rate: u32) -> Result<Vec<f32>, ModelDError> {
-    let mut patch = kind.patch();
-    if kind.uses_bass_score() {
-        patch.source_levels[2] = BASS_THIRD_OSCILLATOR_LEVEL;
-    }
-    let mut voice = ModelDVoice::new(sample_rate as f32, patch, kind.diagnostics())?;
+    let mut voice = if kind == AuditionKind::MatchedIdealizedPath {
+        idealized_bass_voice(sample_rate as f32)?
+    } else {
+        let mut patch = kind.patch();
+        if kind.uses_bass_score() {
+            patch.source_levels[2] = BASS_THIRD_OSCILLATOR_LEVEL;
+        }
+        ModelDVoice::new(sample_rate as f32, patch, kind.diagnostics())?
+    };
     let frame_count = scale_frame(kind.duration_frames_48k(), sample_rate);
     let mut events = kind.score_events().iter().peekable();
     let mut samples = Vec::with_capacity(frame_count);

@@ -114,9 +114,12 @@ At this checkpoint:
   presented the same weak source under similar treatments rather than distinct
   sound identities. It is not an accepted factory sound or macro mapping.
 - The foundation engine can preallocate multiple voices, but this is not a
-  final polyphony commitment. The next oscillator-system design and listening
-  work is explicitly monophonic; native Raspberry Pi evidence gates later
-  polyphonic expansion.
+  final whole-system polyphony commitment. Native Raspberry Pi 5 callback
+  simulation at 48 kHz/64 frames established an engine-budget provisional cap
+  of eight tested voices: the corrected ten-minute rapid-control soak had zero
+  deadline misses, 3.992% p99.9 period use, 9.751% maximum period use, finite
+  output, flat RSS, and no new throttling. Moj still has no live host, so final
+  SHR/JACK polyphony remains open.
 - User-local stable Rust 1.97.1, Cargo, rustfmt, Clippy, cargo-audit, and
   cargo-deny are installed.
 - The live JACK/ALSA host is not implemented and no audio service or hardware

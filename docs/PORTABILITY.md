@@ -3,7 +3,14 @@
 ## Current evidence
 
 The source is scalar Rust with `f32` audio and no native library dependency.
-The authoritative development check is the native x86_64 Ubuntu test/build.
+Native Raspberry Pi 5 callback simulation now establishes an engine-budget
+provisional cap of eight tested voices at 48 kHz/64 frames. A corrected
+ten-minute eight-voice rapid-control soak used 3.992% of the period at p99.9
+and 9.751% at maximum, with zero deadline misses, finite output, flat RSS, and
+no new throttling. This does not establish whole-system SHR/JACK polyphony:
+Moj Sint still has no live host and was not measured inside SHR's audio graph.
+
+The native x86_64 Ubuntu test/build remains the other development check.
 An `aarch64-unknown-linux-gnu` compile check proves Rust-level portability only;
 it does not prove that the binary links, runs, meets deadlines, or sounds right
 on Raspberry Pi OS.

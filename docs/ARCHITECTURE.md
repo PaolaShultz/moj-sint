@@ -81,6 +81,10 @@ possible product result; eight has no special status and is not required.
   unaccepted research mapping, `EDGE` controls character drive/intensity and
   `COUPLE` controls return interaction. `COUPLE=0` is sample-identical and
   independent of `EDGE`.
+- `native_bench`: reusable native callback-simulation cases for the exact
+  allocation-free `Engine::render_block` boundary and the separate isolated
+  Model-D idealized research path. It prepares voices, buffers, and bounded
+  events before timing; it is neither a JACK host nor production integration.
 - `analysis`: non-real-time candidate comparison against finite band-limited
   Fourier references. Its `alias_error_db` is explicitly a conservative sum
   of alias energy and amplitude/phase deviation after DC removal and fitted
