@@ -70,17 +70,28 @@ mod tests {
 
     #[test]
     fn reset_restores_the_same_deterministic_waveform() {
-        let mut first = ModelDVco::new(48_000.0, config(ModelDWaveform::Saw)).unwrap();
-        let mut second = ModelDVco::new(48_000.0, config(ModelDWaveform::Saw)).unwrap();
+        let config = VcoConfig {
+            drift_cents: 1.5,
+            drift_hz: 0.25,
+            reset_phase: 0.37,
+            ..config(ModelDWaveform::Saw)
+        };
+        let mut first = ModelDVco::new(48_000.0, config).unwrap();
+        let mut second = ModelDVco::new(48_000.0, config).unwrap();
         first.set_note(60);
         second.set_note(60);
-        let expected: Vec<_> = (0..2_048).map(|_| first.sample()).collect();
-        let actual: Vec<_> = (0..2_048).map(|_| second.sample()).collect();
+        let expected: Vec<_> = (0..513).map(|_| first.sample()).collect();
+        let actual: Vec<_> = (0..513).map(|_| second.sample()).collect();
         assert_eq!(actual, expected);
+        assert_ne!(first.drift_sine, first.reset_drift_sine);
+        assert_eq!(first.drift_samples_since_normalize, 1);
         first.reset();
+        assert_eq!(first.drift_sine, first.reset_drift_sine);
+        assert_eq!(first.drift_cosine, first.reset_drift_cosine);
+        assert_eq!(first.drift_samples_since_normalize, 0);
         assert_eq!(
-            (0..512).map(|_| first.sample()).collect::<Vec<_>>(),
-            expected[..512]
+            (0..513).map(|_| first.sample()).collect::<Vec<_>>(),
+            expected
         );
     }
 
