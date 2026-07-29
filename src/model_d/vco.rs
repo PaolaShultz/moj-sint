@@ -102,6 +102,36 @@ mod tests {
     }
 
     #[test]
+    fn drift_excursion_stays_within_its_declared_bound_over_long_low_rate_runs() {
+        for (sample_rate, drift_hz) in [(44_100.0, 0.01), (48_000.0, 0.25)] {
+            let mut vco = ModelDVco::new(
+                sample_rate,
+                VcoConfig {
+                    drift_cents: 1.5,
+                    drift_hz,
+                    reset_phase: 0.25,
+                    ..config(ModelDWaveform::Triangle)
+                },
+            )
+            .unwrap();
+            vco.set_note(60);
+            let nominal_increment = vco.base_increment * vco.static_ratio;
+            let mut minimum_cents = f32::INFINITY;
+            let mut maximum_cents = f32::NEG_INFINITY;
+            for _ in 0..(sample_rate as usize * 60 * 10) {
+                let observed_cents = 1_200.0 * (vco.phase_increment() / nominal_increment).log2();
+                minimum_cents = minimum_cents.min(observed_cents);
+                maximum_cents = maximum_cents.max(observed_cents);
+                vco.sample();
+            }
+            assert!(
+                minimum_cents >= -1.5 && maximum_cents <= 1.5,
+                "sample_rate={sample_rate}, drift_hz={drift_hz}, minimum_cents={minimum_cents}, maximum_cents={maximum_cents}"
+            );
+        }
+    }
+
+    #[test]
     fn triangle_mean_pitch_tracks_midi_notes_across_supported_sample_rates() {
         for sample_rate in SAMPLE_RATES {
             for note in NOTES {
@@ -187,6 +217,7 @@ const MAX_LEVEL_OFFSET: f32 = 0.5;
 const MIN_PULSE_WIDTH: f32 = 0.10;
 const MAX_PULSE_WIDTH: f32 = 0.90;
 const MAX_PHASE_INCREMENT: f32 = 0.49;
+const DRIFT_NORMALIZE_PERIOD: u16 = 256;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ModelDWaveform {
@@ -233,6 +264,7 @@ pub struct ModelDVco {
     reset_drift_cosine: f32,
     drift_rotation_sine: f32,
     drift_rotation_cosine: f32,
+    drift_samples_since_normalize: u16,
     drift_up_scale: f32,
     drift_down_scale: f32,
     triangle_peak: f32,
@@ -259,7 +291,7 @@ impl ModelDVco {
         let (drift_rotation_sine, drift_rotation_cosine) = rotation_angle.sin_cos();
         let static_ratio = cents_ratio(config.cents_offset);
         let drift_up_scale = cents_ratio(config.drift_cents) - 1.0;
-        let drift_down_scale = cents_ratio(-config.drift_cents) - 1.0;
+        let drift_down_scale = next_positive_f32(cents_ratio(-config.drift_cents)) - 1.0;
         let asymmetry = config.asymmetry.clamp(-1.0, 1.0);
         let base_pulse_width = match config.waveform {
             ModelDWaveform::Rectangle => 0.50,
@@ -286,6 +318,7 @@ impl ModelDVco {
             reset_drift_cosine,
             drift_rotation_sine,
             drift_rotation_cosine,
+            drift_samples_since_normalize: 0,
             drift_up_scale,
             drift_down_scale,
             triangle_peak: (0.50 + 0.20 * asymmetry).clamp(0.20, 0.80),
@@ -337,6 +370,7 @@ impl ModelDVco {
         self.phase = self.reset_phase;
         self.drift_sine = self.reset_drift_sine;
         self.drift_cosine = self.reset_drift_cosine;
+        self.drift_samples_since_normalize = 0;
     }
 
     #[inline]
@@ -346,10 +380,11 @@ impl ModelDVco {
 
     #[inline]
     fn phase_increment(&self) -> f32 {
-        let drift_ratio = if self.drift_sine >= 0.0 {
-            1.0 + self.drift_sine * self.drift_up_scale
+        let bounded_drift_sine = self.drift_sine.clamp(-1.0, 1.0);
+        let drift_ratio = if bounded_drift_sine >= 0.0 {
+            1.0 + bounded_drift_sine * self.drift_up_scale
         } else {
-            1.0 - self.drift_sine * self.drift_down_scale
+            1.0 - bounded_drift_sine * self.drift_down_scale
         };
         self.base_increment * self.static_ratio * drift_ratio
     }
@@ -366,6 +401,15 @@ impl ModelDVco {
             - self.drift_sine * self.drift_rotation_sine;
         self.drift_sine = drift_sine;
         self.drift_cosine = drift_cosine;
+        self.drift_samples_since_normalize += 1;
+        if self.drift_samples_since_normalize == DRIFT_NORMALIZE_PERIOD {
+            let scale = (self.drift_sine * self.drift_sine + self.drift_cosine * self.drift_cosine)
+                .sqrt()
+                .recip();
+            self.drift_sine *= scale;
+            self.drift_cosine *= scale;
+            self.drift_samples_since_normalize = 0;
+        }
     }
 }
 
@@ -386,6 +430,12 @@ fn valid_config(config: VcoConfig) -> bool {
 #[inline]
 fn cents_ratio(cents: f32) -> f32 {
     2.0_f32.powf(cents / 1_200.0)
+}
+
+#[inline]
+fn next_positive_f32(value: f32) -> f32 {
+    debug_assert!(value.is_finite() && value > 0.0);
+    f32::from_bits(value.to_bits() + 1)
 }
 
 #[inline]
