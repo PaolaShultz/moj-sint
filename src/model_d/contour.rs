@@ -78,6 +78,7 @@ impl ModelDContour {
     }
 
     pub fn note_on(&mut self) {
+        self.attack_step = (1.0 - self.level) / self.attack_samples as f32;
         self.attack_remaining = self.attack_samples;
         self.release_step = 0.0;
         self.release_remaining = 0;
@@ -86,6 +87,7 @@ impl ModelDContour {
 
     pub fn restart(&mut self) {
         self.level = 0.0;
+        self.attack_step = 1.0 / self.attack_samples as f32;
         self.attack_remaining = self.attack_samples;
         self.decay_remaining = 0;
         self.release_step = 0.0;
@@ -228,6 +230,70 @@ mod tests {
         }
         assert_eq!(contour.advance(), 0.0);
         assert!(contour.is_idle());
+    }
+
+    #[test]
+    fn note_on_retriggers_from_sustain_without_exceeding_unity() {
+        let mut contour = ModelDContour::new(
+            1_000.0,
+            ContourConfig {
+                attack_seconds: 0.004,
+                decay_seconds: 0.002,
+                sustain_level: 0.4,
+            },
+        )
+        .unwrap();
+        contour.note_on();
+        for _ in 0..4 {
+            contour.advance();
+        }
+        for _ in 0..2 {
+            contour.advance();
+        }
+        assert_eq!(contour.level(), 0.4);
+
+        contour.note_on();
+        assert_eq!(contour.level(), 0.4);
+        for index in 0..4 {
+            let level = contour.advance();
+            assert!((0.4..=1.0).contains(&level), "index={index}, level={level}");
+        }
+        assert_eq!(contour.level(), 1.0);
+    }
+
+    #[test]
+    fn note_on_retriggers_from_release_without_exceeding_unity() {
+        let mut contour = ModelDContour::new(
+            1_000.0,
+            ContourConfig {
+                attack_seconds: 0.004,
+                decay_seconds: 0.004,
+                sustain_level: 0.4,
+            },
+        )
+        .unwrap();
+        contour.note_on();
+        for _ in 0..4 {
+            contour.advance();
+        }
+        for _ in 0..4 {
+            contour.advance();
+        }
+        contour.note_off();
+        contour.advance();
+        let released_level = contour.level();
+        assert!(released_level > 0.0 && released_level < 0.4);
+
+        contour.note_on();
+        assert_eq!(contour.level(), released_level);
+        for index in 0..4 {
+            let level = contour.advance();
+            assert!(
+                (released_level..=1.0).contains(&level),
+                "index={index}, level={level}"
+            );
+        }
+        assert_eq!(contour.level(), 1.0);
     }
 
     #[test]
