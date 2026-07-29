@@ -2,15 +2,14 @@ use super::ModelDError;
 
 const OVERSAMPLE_FACTOR: usize = 4;
 const CUTOFF_TABLE_SIZE: usize = 2_049;
+const DECIMATOR_TAPS: usize = 63;
+const DECIMATOR_CUTOFF: f32 = 0.078_125;
 const MIN_CUTOFF_HZ: f32 = 20.0;
 const MAX_CUTOFF_HZ: f32 = 8_000.0;
 const MAX_CUTOFF_RATIO: f32 = 0.2;
 const MIN_DRIVE: f32 = 1.0;
 const MAX_DRIVE: f32 = 4.0;
 const MAX_RESONANCE_FEEDBACK: f32 = 3.5;
-// Four equal one-pole stages reach -3 dB at
-// `stage_cutoff * sqrt(2^(1/4) - 1)`.
-const FOUR_POLE_CUTOFF_CORRECTION: f32 = 2.298_959;
 const MAX_INPUT: f32 = 16.0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -35,11 +34,21 @@ pub struct LadderConfig {
 /// arithmetic and table interpolation.
 #[derive(Clone, Debug)]
 pub struct ModelDLadder {
-    coefficient_table: [f32; CUTOFF_TABLE_SIZE],
+    coefficient_table: [CutoffCoefficients; CUTOFF_TABLE_SIZE],
+    decimator_coefficients: [f32; DECIMATOR_TAPS],
+    decimator_history: [f32; DECIMATOR_TAPS],
+    decimator_index: usize,
     states: [f32; 4],
+    resonance_tuning: f32,
     resonance_feedback: f32,
     drive: f32,
     mode: LadderMode,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct CutoffCoefficients {
+    flat: f32,
+    resonant: f32,
 }
 
 impl ModelDLadder {
@@ -57,20 +66,32 @@ impl ModelDLadder {
             return Err(ModelDError::InvalidConfig);
         }
 
+        let decimator_coefficients = design_decimator();
         let cutoff_ratio = maximum_cutoff / MIN_CUTOFF_HZ;
-        let mut coefficient_table = [0.0; CUTOFF_TABLE_SIZE];
-        for (index, coefficient) in coefficient_table.iter_mut().enumerate() {
+        let mut coefficient_table = [CutoffCoefficients::default(); CUTOFF_TABLE_SIZE];
+        for (index, coefficients) in coefficient_table.iter_mut().enumerate() {
             let normalized = index as f32 / (CUTOFF_TABLE_SIZE - 1) as f32;
             let requested_cutoff = MIN_CUTOFF_HZ * cutoff_ratio.powf(normalized);
-            let stage_cutoff = requested_cutoff * FOUR_POLE_CUTOFF_CORRECTION;
-            *coefficient =
-                1.0 - (-core::f32::consts::TAU * stage_cutoff / internal_sample_rate).exp();
+            let omega = core::f32::consts::TAU * requested_cutoff / internal_sample_rate;
+            coefficients.flat =
+                calibrated_flat_coefficient(omega, &decimator_coefficients, OVERSAMPLE_FACTOR);
+            coefficients.resonant = resonant_coefficient(omega);
         }
 
+        let resonance = config.resonance.clamp(0.0, 1.0);
+        let resonance_tuning = if resonance > 0.0 {
+            resonance / (0.1 + 0.9 * resonance)
+        } else {
+            0.0
+        };
         Ok(Self {
             coefficient_table,
+            decimator_coefficients,
+            decimator_history: [0.0; DECIMATOR_TAPS],
+            decimator_index: 0,
             states: [0.0; 4],
-            resonance_feedback: config.resonance.clamp(0.0, 1.0) * MAX_RESONANCE_FEEDBACK,
+            resonance_tuning,
+            resonance_feedback: resonance * MAX_RESONANCE_FEEDBACK,
             drive: config.drive.clamp(MIN_DRIVE, MAX_DRIVE),
             mode: config.mode,
         })
@@ -87,10 +108,12 @@ impl ModelDLadder {
         let lower_index = (table_position as usize).min(CUTOFF_TABLE_SIZE - 2);
         let fraction = table_position - lower_index as f32;
         let lower = self.coefficient_table[lower_index];
-        let coefficient = lower + fraction * (self.coefficient_table[lower_index + 1] - lower);
+        let upper = self.coefficient_table[lower_index + 1];
+        let flat = lower.flat + fraction * (upper.flat - lower.flat);
+        let resonant = lower.resonant + fraction * (upper.resonant - lower.resonant);
+        let coefficient = flat + self.resonance_tuning * (resonant - flat);
         let input = input.clamp(-MAX_INPUT, MAX_INPUT);
 
-        let mut decimator_sum = 0.0;
         for _ in 0..OVERSAMPLE_FACTOR {
             let feedback_output = match self.mode {
                 LadderMode::Linear => self.states[3],
@@ -109,10 +132,14 @@ impl ModelDLadder {
                     LadderMode::Nonlinear => bounded_odd(*state),
                 };
             }
-            decimator_sum += stage_input;
+            self.decimator_history[self.decimator_index] = stage_input;
+            self.decimator_index += 1;
+            if self.decimator_index == DECIMATOR_TAPS {
+                self.decimator_index = 0;
+            }
         }
 
-        let output = decimator_sum / OVERSAMPLE_FACTOR as f32;
+        let output = self.decimated_output();
         if output.is_finite() {
             output
         } else {
@@ -123,7 +150,91 @@ impl ModelDLadder {
 
     pub fn reset(&mut self) {
         self.states = [0.0; 4];
+        self.decimator_history = [0.0; DECIMATOR_TAPS];
+        self.decimator_index = 0;
     }
+
+    #[inline]
+    fn decimated_output(&self) -> f32 {
+        let mut output = 0.0;
+        for tap in 0..DECIMATOR_TAPS {
+            let history_index = if self.decimator_index > tap {
+                self.decimator_index - tap - 1
+            } else {
+                DECIMATOR_TAPS + self.decimator_index - tap - 1
+            };
+            output += self.decimator_coefficients[tap] * self.decimator_history[history_index];
+        }
+        output
+    }
+}
+
+fn design_decimator() -> [f32; DECIMATOR_TAPS] {
+    let mut coefficients = [0.0; DECIMATOR_TAPS];
+    let order = (DECIMATOR_TAPS - 1) as f32;
+    let center = 0.5 * order;
+    let mut sum = 0.0;
+    for (index, coefficient) in coefficients.iter_mut().enumerate() {
+        let offset = index as f32 - center;
+        let sinc = if offset == 0.0 {
+            2.0 * DECIMATOR_CUTOFF
+        } else {
+            (core::f32::consts::TAU * DECIMATOR_CUTOFF * offset).sin()
+                / (core::f32::consts::PI * offset)
+        };
+        let window_phase = core::f32::consts::TAU * index as f32 / order;
+        let window = 0.42 - 0.5 * window_phase.cos() + 0.08 * (2.0 * window_phase).cos();
+        *coefficient = sinc * window;
+        sum += *coefficient;
+    }
+    for coefficient in &mut coefficients {
+        *coefficient /= sum;
+    }
+    coefficients
+}
+
+fn calibrated_flat_coefficient(
+    omega: f32,
+    decimator: &[f32; DECIMATOR_TAPS],
+    hold_samples: usize,
+) -> f32 {
+    let half_omega = 0.5 * omega;
+    let hold_gain =
+        (hold_samples as f32 * half_omega).sin() / (hold_samples as f32 * half_omega.sin());
+    let decimator_gain = fir_magnitude(decimator, omega);
+    let external_gain = (hold_gain * decimator_gain).max(f32::EPSILON);
+    let cascade_target = (core::f32::consts::FRAC_1_SQRT_2 / external_gain).min(0.999_999);
+    let stage_target = cascade_target.sqrt().sqrt();
+    let cosine = omega.cos();
+    let mut lower = 0.0;
+    let mut upper = 1.0;
+    for _ in 0..32 {
+        let coefficient = 0.5 * (lower + upper);
+        let memory = 1.0 - coefficient;
+        let denominator = (1.0 + memory * memory - 2.0 * memory * cosine).sqrt();
+        let magnitude = coefficient / denominator;
+        if magnitude < stage_target {
+            lower = coefficient;
+        } else {
+            upper = coefficient;
+        }
+    }
+    0.5 * (lower + upper)
+}
+
+fn resonant_coefficient(omega: f32) -> f32 {
+    (1.0 - 1.0 / (omega.sin() + omega.cos())).clamp(0.0, 1.0)
+}
+
+fn fir_magnitude(coefficients: &[f32; DECIMATOR_TAPS], omega: f32) -> f32 {
+    let mut real = 0.0;
+    let mut imaginary = 0.0;
+    for (index, coefficient) in coefficients.iter().enumerate() {
+        let phase = omega * index as f32;
+        real += *coefficient * phase.cos();
+        imaginary -= *coefficient * phase.sin();
+    }
+    real.hypot(imaginary)
 }
 
 #[inline]
@@ -222,6 +333,48 @@ mod tests {
             cosine += f64::from(*sample) * phase.cos();
         }
         sine.hypot(cosine)
+    }
+
+    fn nonlinear_probe_components(sample_rate: f32, frequencies: [f32; 3]) -> [f64; 3] {
+        let mut ladder = ModelDLadder::new(
+            sample_rate,
+            LadderConfig {
+                resonance: 0.0,
+                drive: 4.0,
+                mode: LadderMode::Nonlinear,
+            },
+        )
+        .unwrap();
+        let cutoff = normalized_cutoff(8_000.0);
+        let tone_hz = 9_000.0;
+        let phase_step = core::f32::consts::TAU * tone_hz / sample_rate;
+        let warmup_samples = (sample_rate / SAMPLE_RATE * 8_192.0) as usize;
+        let analysis_samples = (sample_rate / SAMPLE_RATE * 16_384.0) as usize;
+        let mut phase = 0.0_f32;
+        for _ in 0..warmup_samples {
+            ladder.sample(0.95 * phase.sin(), cutoff);
+            phase = (phase + phase_step).rem_euclid(core::f32::consts::TAU);
+        }
+
+        let mut sine = [0.0_f64; 3];
+        let mut cosine = [0.0_f64; 3];
+        for index in 0..analysis_samples {
+            let output = f64::from(ladder.sample(0.95 * phase.sin(), cutoff));
+            for probe in 0..frequencies.len() {
+                let probe_phase =
+                    core::f64::consts::TAU * f64::from(frequencies[probe]) * index as f64
+                        / f64::from(sample_rate);
+                sine[probe] += output * probe_phase.sin();
+                cosine[probe] += output * probe_phase.cos();
+            }
+            phase = (phase + phase_step).rem_euclid(core::f32::consts::TAU);
+        }
+        let scale = 2.0 / analysis_samples as f64;
+        [
+            scale * sine[0].hypot(cosine[0]),
+            scale * sine[1].hypot(cosine[1]),
+            scale * sine[2].hypot(cosine[2]),
+        ]
     }
 
     #[test]
@@ -360,7 +513,7 @@ mod tests {
 
     #[test]
     fn measured_cutoff_is_monotonic_and_within_eight_percent_at_calibration_points() {
-        let targets = [125.0_f32, 500.0, 2_000.0];
+        let targets = [125.0_f32, 500.0, 2_000.0, 8_000.0];
         let mut previous = 0.0;
         for target in targets {
             let measured = measured_cutoff_hz(target);
@@ -400,6 +553,26 @@ mod tests {
         let high = peak(0.8);
         assert!(middle > low * 1.05, "low={low}, middle={middle}");
         assert!(high > middle * 1.05, "middle={middle}, high={high}");
+    }
+
+    #[test]
+    fn resonance_peak_location_stays_near_the_requested_cutoff() {
+        for resonance in [0.45, 0.8] {
+            let mut peak_frequency = 0.0;
+            let mut peak_gain = 0.0;
+            for step in 0..=18 {
+                let frequency = 600.0 + step as f32 * 50.0;
+                let gain = response(1_000.0, frequency, resonance, 1.0, LadderMode::Linear);
+                if gain > peak_gain {
+                    peak_gain = gain;
+                    peak_frequency = frequency;
+                }
+            }
+            assert!(
+                (800.0..=1_250.0).contains(&peak_frequency),
+                "resonance={resonance}, peak_frequency={peak_frequency}, peak_gain={peak_gain}"
+            );
+        }
     }
 
     #[test]
@@ -448,6 +621,23 @@ mod tests {
         assert!(
             nonlinear_third > linear_third * 100.0,
             "linear_third={linear_third}, nonlinear_third={nonlinear_third}"
+        );
+    }
+
+    #[test]
+    fn fixed_decimator_suppresses_nonlinear_foldback_against_high_rate_reference() {
+        let low_rate = nonlinear_probe_components(SAMPLE_RATE, [9_000.0, 21_000.0, 21_000.0]);
+        let high_rate =
+            nonlinear_probe_components(4.0 * SAMPLE_RATE, [9_000.0, 21_000.0, 27_000.0]);
+        assert!(
+            high_rate[2] > high_rate[0] * 1.0e-3,
+            "reference excitation produced no measurable third harmonic: {high_rate:?}"
+        );
+        let alias_excess = (low_rate[1] - high_rate[1]).max(1.0e-12);
+        let alias_db = 20.0 * (alias_excess / low_rate[0]).log10();
+        assert!(
+            alias_db <= -40.0,
+            "low_rate={low_rate:?}, high_rate={high_rate:?}, alias_db={alias_db}"
         );
     }
 
