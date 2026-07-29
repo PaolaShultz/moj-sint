@@ -1,10 +1,14 @@
+use moj_sint::model_d::vco::ModelDWaveform;
 use moj_sint::model_d_lab::{
     AuditionKind, MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB, MODEL_D_FILTER_CUTOFF_ERROR_MAX,
     MODEL_D_FILTER_RESONANCE_RATIO_MIN, MODEL_D_FILTER_SLOPE_MAX_DB_PER_OCTAVE,
-    MODEL_D_FILTER_SLOPE_MIN_DB_PER_OCTAVE, MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB,
-    MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB, ModelDAliasEvidence, ModelDFilterEvidence,
-    ModelDRender, hash_sample_stream, measure_alias_evidence, measure_filter_evidence,
-    render_audition,
+    MODEL_D_FILTER_SLOPE_MIN_DB_PER_OCTAVE, MODEL_D_FULL_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB,
+    MODEL_D_FULL_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB,
+    MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB, MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB,
+    ModelDAliasEvidence, ModelDAliasProbeConfiguration, ModelDFilterEvidence, ModelDRender,
+    ModelDVcoAliasEvidence, ModelDVcoPitchEvidence, hash_sample_stream, measure_alias_evidence,
+    measure_filter_evidence, measure_full_alias_evidence, measure_vco_pitch_matrix,
+    measure_vco_waveform_alias_matrix, render_audition,
 };
 use std::ffi::OsString;
 use std::fs::{self, File};
@@ -26,6 +30,22 @@ struct AliasProbe {
     note: u8,
     bound_db: f64,
     evidence: ModelDAliasEvidence,
+}
+
+struct LabEvidence {
+    aliases: Vec<AliasProbe>,
+    oscillator_pitch: Vec<ModelDVcoPitchEvidence>,
+    oscillator_alias: Vec<ModelDVcoAliasEvidence>,
+    filter: ModelDFilterEvidence,
+}
+
+impl AliasProbe {
+    fn passes_bound(&self) -> bool {
+        self.evidence
+            .nonharmonic_foldback_proxy_db
+            .max(self.evidence.reference_nonharmonic_floor_db)
+            <= self.bound_db
+    }
 }
 
 struct PublishPaths {
@@ -107,7 +127,38 @@ impl PublishPaths {
             };
         }
         if had_destination {
-            remove_exact_path(&self.backup)?;
+            let cleanup_result =
+                if test_failure_enabled(test_mode, "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_BACKUP_CLEANUP")
+                {
+                    Err(std::io::Error::other("injected backup cleanup failure"))
+                } else {
+                    remove_exact_path(&self.backup)
+                };
+            if let Err(cleanup_error) = cleanup_result {
+                let move_new_result = fs::rename(&self.destination, &self.stage);
+                let restore_old_result = if move_new_result.is_ok() {
+                    fs::rename(&self.backup, &self.destination)
+                } else {
+                    Err(std::io::Error::other(
+                        "new destination could not be moved aside",
+                    ))
+                };
+                let discard_new_result = if restore_old_result.is_ok() {
+                    remove_exact_path(&self.stage)
+                } else {
+                    Ok(())
+                };
+                return match (move_new_result, restore_old_result, discard_new_result) {
+                    (Ok(()), Ok(()), Ok(())) => Err(format!(
+                        "backup cleanup failed after promotion and the prior destination was restored: {cleanup_error}"
+                    )
+                    .into()),
+                    (move_new, restore_old, discard_new) => Err(format!(
+                        "backup cleanup failed after promotion: {cleanup_error}; move new destination aside: {move_new:?}; restore prior destination: {restore_old:?}; discard rejected new batch: {discard_new:?}"
+                    )
+                    .into()),
+                };
+            }
         }
         Ok(())
     }
@@ -178,25 +229,38 @@ fn render_lab(output: &Path, test_mode: bool) -> Result<(), Box<dyn std::error::
         .collect::<Result<Vec<_>, moj_sint::model_d::ModelDError>>()?;
     let aliases = ALIAS_NOTES_AND_BOUNDS
         .into_iter()
-        .map(|(note, bound_db)| {
-            Ok(AliasProbe {
-                note,
-                bound_db,
-                evidence: measure_alias_evidence(note)?,
-            })
+        .flat_map(|(note, bound_db)| {
+            [
+                measure_alias_evidence(note).map(|evidence| AliasProbe {
+                    note,
+                    bound_db,
+                    evidence,
+                }),
+                measure_full_alias_evidence(note).map(|evidence| AliasProbe {
+                    note,
+                    bound_db,
+                    evidence,
+                }),
+            ]
         })
         .collect::<Result<Vec<_>, moj_sint::model_d::ModelDError>>()?;
-    let filter = measure_filter_evidence()?;
+    let evidence = LabEvidence {
+        aliases,
+        oscillator_pitch: measure_vco_pitch_matrix()?,
+        oscillator_alias: measure_vco_waveform_alias_matrix()?,
+        filter: measure_filter_evidence()?,
+    };
 
-    // Nothing from a rejected candidate may become a listening WAV.
-    validate_all_evidence(&auditions, &aliases, &filter)?;
+    // Safety and controlled acceptance remain hard gates. The separately
+    // measured full-path failure is retained explicitly to narrow claims; it
+    // does not reclassify the already-authored listening set as alias-clean.
+    validate_all_evidence(&auditions, &evidence)?;
 
     fs::create_dir(&publish_paths.stage)?;
     let write_result = write_batch(
         &publish_paths.stage,
         &auditions,
-        &aliases,
-        &filter,
+        &evidence,
         started,
         test_mode,
     );
@@ -209,17 +273,21 @@ fn render_lab(output: &Path, test_mode: bool) -> Result<(), Box<dyn std::error::
 fn write_batch(
     stage: &Path,
     auditions: &[Audition],
-    aliases: &[AliasProbe],
-    filter: &ModelDFilterEvidence,
+    evidence: &LabEvidence,
     started: Instant,
     test_mode: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     write_manifest(stage, auditions)?;
     write_metrics(stage, auditions)?;
     write_ablations(stage, auditions)?;
-    write_oscillators(stage, auditions)?;
-    write_filter(stage, filter)?;
-    write_alias(stage, aliases)?;
+    write_oscillators(
+        stage,
+        auditions,
+        &evidence.oscillator_pitch,
+        &evidence.oscillator_alias,
+    )?;
+    write_filter(stage, &evidence.filter)?;
+    write_alias(stage, &evidence.aliases)?;
     write_hashes(stage, auditions)?;
     write_summary(stage, auditions)?;
     write_readme(stage)?;
@@ -241,8 +309,7 @@ fn write_batch(
 
 fn validate_all_evidence(
     auditions: &[Audition],
-    aliases: &[AliasProbe],
-    filter: &ModelDFilterEvidence,
+    evidence: &LabEvidence,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if auditions.len() != AuditionKind::ALL.len() {
         return Err("audition set is incomplete".into());
@@ -272,7 +339,7 @@ fn validate_all_evidence(
         }
     }
 
-    for probe in aliases {
+    for probe in &evidence.aliases {
         let evidence = &probe.evidence;
         let conservative_proxy = evidence
             .nonharmonic_foldback_proxy_db
@@ -290,21 +357,57 @@ fn validate_all_evidence(
                     .excess_nonharmonic_foldback_proxy_db
                     .is_some_and(|value| value <= probe.bound_db)
         };
+        let controlled =
+            evidence.configuration == ModelDAliasProbeConfiguration::ControlledDiagnostic;
+        let overtone_bounds = if controlled {
+            MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB
+                ..=MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB
+        } else {
+            MODEL_D_FULL_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB
+                ..=MODEL_D_FULL_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB
+        };
         if !conservative_proxy.is_finite()
-            || conservative_proxy > probe.bound_db
+            || (controlled && conservative_proxy > probe.bound_db)
             || !floor_classification_consistent
-            || evidence.harmonic_mask_coverage > 0.15
+            || (controlled && evidence.harmonic_mask_coverage > 0.15)
             || evidence.harmonic_mask_half_width_bins != 4
-            || !(MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB
-                ..=MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB)
-                .contains(&evidence.nonlinear_overtone_magnitude_difference_db)
+            || !overtone_bounds.contains(&evidence.nonlinear_overtone_magnitude_difference_db)
             || !evidence.transfer_conflated_residual_db.is_finite()
         {
             return Err(format!("note {} failed alias evidence: {evidence:?}", probe.note).into());
         }
     }
+    let full_aliases = evidence
+        .aliases
+        .iter()
+        .filter(|probe| {
+            probe.evidence.configuration == ModelDAliasProbeConfiguration::FullAuthoredBassStatic
+        })
+        .collect::<Vec<_>>();
+    if full_aliases.len() != ALIAS_NOTES_AND_BOUNDS.len()
+        || full_aliases.iter().all(|probe| probe.passes_bound())
+    {
+        return Err("full authored-path alias diagnostic must be complete and explicitly failing until its unchanged bounds are met".into());
+    }
+    if evidence.oscillator_pitch.len() != 9
+        || evidence.oscillator_pitch.iter().any(|row| {
+            row.mean_pitch_error_cents.abs() > 5.0
+                || row.minimum_drift_cents < -1.5
+                || row.maximum_drift_cents > 1.5
+        })
+    {
+        return Err("oscillator pitch/drift matrix failed".into());
+    }
+    if evidence.oscillator_alias.len() != 15
+        || evidence
+            .oscillator_alias
+            .iter()
+            .any(|row| row.nonharmonic_foldback_proxy_db > row.acceptance_bound_db)
+    {
+        return Err("oscillator waveform alias matrix failed".into());
+    }
 
-    if !filter.passes() {
+    if !evidence.filter.passes() {
         return Err("filter evidence failed".into());
     }
     Ok(())
@@ -390,23 +493,65 @@ fn write_ablations(output: &Path, auditions: &[Audition]) -> std::io::Result<()>
     finish_report(file)
 }
 
-fn write_oscillators(output: &Path, auditions: &[Audition]) -> std::io::Result<()> {
+fn write_oscillators(
+    output: &Path,
+    auditions: &[Audition],
+    pitch_matrix: &[ModelDVcoPitchEvidence],
+    alias_matrix: &[ModelDVcoAliasEvidence],
+) -> std::io::Result<()> {
     let mut file = writer(output, "oscillators.tsv")?;
     writeln!(
         file,
-        "file\tpitch_hz\tpitch_error_cents\tacceptance_bound_cents\tstatus"
+        "evidence\tfile\twaveform\tnote\tsample_rate\tconfigured_static_cents\tconfigured_drift_cents\tmean_pitch_hz\tmean_pitch_error_cents\tminimum_drift_cents\tmaximum_drift_cents\tasymmetry\tpulse_width\tnonharmonic_foldback_proxy_db\tacceptance_bound\tstatus"
     )?;
     for audition in &auditions[..3] {
         let metrics = audition.render.metrics;
         writeln!(
             file,
-            "{}\t{:.6}\t{:.6}\t10.000000\tpass",
+            "audition_pitch\t{}\tNA\tNA\t48000\tNA\tNA\t{:.6}\t{:.6}\tNA\tNA\tNA\tNA\tNA\tpitch_error_cents<=10.000000\tpass",
             audition.kind.filename(),
             metrics.pitch_hz,
             metrics.pitch_error_cents
         )?;
     }
+    for row in pitch_matrix {
+        writeln!(
+            file,
+            "vco_pitch_drift_matrix\tNA\ttriangle\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{:.6}\t{:.6}\t{:.6}\t0.370000\tNA\tNA\tpitch_error_cents<=5;drift_abs_cents<=1.5\tpass",
+            row.note,
+            row.sample_rate,
+            row.configured_static_cents,
+            row.configured_drift_cents,
+            row.mean_pitch_hz,
+            row.mean_pitch_error_cents,
+            row.minimum_drift_cents,
+            row.maximum_drift_cents
+        )?;
+    }
+    for row in alias_matrix {
+        writeln!(
+            file,
+            "vco_waveform_alias\tNA\t{}\t{}\t{}\t0.000000\t0.000000\tNA\tNA\tNA\tNA\t{:.6}\t{:.6}\t{:.6}\tproxy_db<={:.6}\tpass",
+            waveform_label(row.waveform),
+            row.note,
+            row.sample_rate,
+            row.asymmetry,
+            row.pulse_width,
+            row.nonharmonic_foldback_proxy_db,
+            row.acceptance_bound_db
+        )?;
+    }
     finish_report(file)
+}
+
+fn waveform_label(waveform: ModelDWaveform) -> &'static str {
+    match waveform {
+        ModelDWaveform::Triangle => "triangle",
+        ModelDWaveform::Saw => "saw",
+        ModelDWaveform::Rectangle => "rectangle",
+        ModelDWaveform::WidePulse => "wide_pulse",
+        ModelDWaveform::NarrowPulse => "narrow_pulse",
+    }
 }
 
 fn write_filter(output: &Path, evidence: &ModelDFilterEvidence) -> std::io::Result<()> {
@@ -441,7 +586,7 @@ fn write_alias(output: &Path, probes: &[AliasProbe]) -> std::io::Result<()> {
     let mut file = writer(output, "alias.tsv")?;
     writeln!(
         file,
-        "note\tnative_48k_nonharmonic_out_of_mask_foldback_proxy_db\tnative_192k_nonharmonic_out_of_mask_foldback_proxy_floor_db\treference_floor_6db_classification\texcess_nonharmonic_foldback_proxy_db\tharmonic_mask_half_width_bins\tharmonic_mask_coverage\tharmonic_mask_blind_spot\traw_transfer_residual_diagnostic_only_db\tnonlinear_overtone_magnitude_difference_db\tacceptance_bound_db\tstatus"
+        "configuration\tproxy_method\tnote\tsource_levels\tmixer_drive\tladder_drive\tstatic_oscillator_imperfections\tfeedback\tdrift_policy\tnative_48k_proxy_db\thigh_rate_reference_floor_db\treference_floor_6db_classification\texcess_proxy_db\tharmonic_mask_half_width_bins\tharmonic_mask_coverage\tharmonic_mask_blind_spot\traw_transfer_residual_diagnostic_only_db\tnonlinear_overtone_magnitude_difference_db\tacceptance_bound_db\tstatus"
     )?;
     for probe in probes {
         let evidence = &probe.evidence;
@@ -451,8 +596,22 @@ fn write_alias(output: &Path, probes: &[AliasProbe]) -> std::io::Result<()> {
             .unwrap_or_else(|| "floor_limited".to_owned());
         writeln!(
             file,
-            "{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{:.6}\tenergy_inside_masks_not_bounded\t{:.6}\t{:.6}\t{:.6}\tpass",
+            "{}\t{}\t{}\t{:.6},{:.6},{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{:.6}\tenergy_inside_masks_not_bounded\t{:.6}\t{:.6}\t{:.6}\t{}",
+            evidence.configuration.label(),
+            evidence.proxy_method,
             probe.note,
+            evidence.source_levels[0],
+            evidence.source_levels[1],
+            evidence.source_levels[2],
+            evidence.mixer_drive,
+            evidence.ladder_drive,
+            evidence.static_oscillator_imperfections_enabled,
+            evidence.feedback_enabled,
+            if evidence.drift_frozen_for_stationary_analysis {
+                "frozen_for_stationary_analysis"
+            } else {
+                "active"
+            },
             evidence.nonharmonic_foldback_proxy_db,
             evidence.reference_nonharmonic_floor_db,
             if evidence.nonharmonic_proxy_floor_limited {
@@ -465,7 +624,12 @@ fn write_alias(output: &Path, probes: &[AliasProbe]) -> std::io::Result<()> {
             evidence.harmonic_mask_coverage,
             evidence.transfer_conflated_residual_db,
             evidence.nonlinear_overtone_magnitude_difference_db,
-            probe.bound_db
+            probe.bound_db,
+            if probe.passes_bound() {
+                "pass"
+            } else {
+                "diagnostic_fail"
+            }
         )?;
     }
     finish_report(file)
@@ -507,6 +671,10 @@ fn write_summary(output: &Path, auditions: &[Audition]) -> std::io::Result<()> {
     writeln!(file, "copied_factory_preset\tfalse\tpass")?;
     writeln!(file, "hardware_equivalence_claim\tfalse\tpass")?;
     writeln!(file, "production_integration\tfalse\tpass")?;
+    writeln!(
+        file,
+        "full_authored_alias_acceptance\tfalse\tdiagnostic_fail"
+    )?;
     finish_report(file)
 }
 
@@ -523,7 +691,7 @@ fn write_readme(output: &Path) -> std::io::Result<()> {
     )?;
     writeln!(
         file,
-        "Aliasing evidence uses a native 192 kHz nonharmonic out-of-mask foldback proxy floor in the same physical 0–24 kHz band, with an explicit 6 dB floor classification. The report gives harmonic-mask coverage and blind spot: energy inside masked bins is not bounded. The raw transfer residual is diagnostic only because it conflates transfer and phase differences with alias energy.\n"
+        "Aliasing evidence is split rather than generalized. `controlled_diagnostic` uses the native 48/192 kHz nonharmonic out-of-mask proxy and is the only passing acceptance gate. `full_authored_bass_static_drift_frozen` retains source levels 0.88/0.72/0.14, mixer drive 2.4, ladder drive 2.2, static oscillator mismatch/asymmetry/level differences, and feedback; only drift is frozen for stationary analysis. Its 48-vs-192 kHz spectral-magnitude alias/error estimate with a 192-vs-768 kHz floor fails the unchanged bounds and is explicitly `diagnostic_fail`. The report gives harmonic-mask coverage and blind spot: energy inside masked bins is not bounded. The raw transfer residual remains diagnostic only because it conflates transfer and phase differences with alias energy.\n"
     )?;
     writeln!(
         file,

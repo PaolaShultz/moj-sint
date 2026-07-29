@@ -324,6 +324,7 @@ pub struct ModelDVco {
     drift_polarity: f32,
     drift_up_scale: f32,
     drift_down_scale: f32,
+    asymmetry: f32,
     triangle_peak: f32,
     pulse_width: f32,
     level: f32,
@@ -387,6 +388,7 @@ impl ModelDVco {
             drift_polarity,
             drift_up_scale,
             drift_down_scale,
+            asymmetry,
             triangle_peak: (0.50 + 0.20 * asymmetry).clamp(0.20, 0.80),
             pulse_width: (base_pulse_width + 0.25 * asymmetry)
                 .clamp(MIN_PULSE_WIDTH, MAX_PULSE_WIDTH),
@@ -410,14 +412,16 @@ impl ModelDVco {
             return 0.0;
         }
 
+        let phase_increment = self.phase_increment();
         let waveform = match self.waveform {
-            ModelDWaveform::Triangle => triangle(self.phase, self.triangle_peak),
+            ModelDWaveform::Triangle => {
+                bandlimited_triangle(self.phase, self.triangle_peak, phase_increment)
+            }
             ModelDWaveform::Saw => {
-                let phase = skew_phase(self.phase, self.triangle_peak);
-                2.0 * phase - 1.0 - poly_blep(self.phase, self.phase_increment())
+                let phase = smooth_skew_phase(self.phase, self.asymmetry);
+                2.0 * phase - 1.0 - poly_blep(self.phase, phase_increment)
             }
             ModelDWaveform::Rectangle | ModelDWaveform::WidePulse | ModelDWaveform::NarrowPulse => {
-                let phase_increment = self.phase_increment();
                 let falling_phase = wrap_phase_once(self.phase - self.pulse_width);
                 let raw = if self.phase < self.pulse_width {
                     1.0
@@ -453,6 +457,16 @@ impl ModelDVco {
             1.0 - bounded_drift_signal * self.drift_down_scale
         };
         self.base_increment * self.static_ratio * drift_ratio
+    }
+
+    #[inline]
+    pub(crate) fn prepared_phase_increment(&self) -> f32 {
+        self.phase_increment()
+    }
+
+    #[inline]
+    pub(crate) fn prepared_static_phase_increment(&self) -> f32 {
+        self.base_increment * self.static_ratio
     }
 
     #[inline]
@@ -526,12 +540,24 @@ fn wrap_phase_once(mut phase: f32) -> f32 {
 }
 
 #[inline]
-fn skew_phase(phase: f32, peak: f32) -> f32 {
-    if phase < peak {
-        0.5 * phase / peak
-    } else {
-        0.5 + 0.5 * (phase - peak) / (1.0 - peak)
+fn smooth_skew_phase(phase: f32, asymmetry: f32) -> f32 {
+    const MAX_WARP_DERIVATIVE: f32 = 0.75;
+    let cosine = periodic_sine_approximation(phase + 0.25);
+    phase - MAX_WARP_DERIVATIVE * asymmetry * (1.0 - cosine) / TAU
+}
+
+#[inline]
+fn periodic_sine_approximation(mut phase: f32) -> f32 {
+    if phase >= 1.0 {
+        phase -= 1.0;
     }
+    let (x, sign) = if phase <= 0.5 {
+        (phase * TAU, 1.0)
+    } else {
+        ((phase - 0.5) * TAU, -1.0)
+    };
+    let product = x * (core::f32::consts::PI - x);
+    sign * 16.0 * product / (5.0 * core::f32::consts::PI * core::f32::consts::PI - 4.0 * product)
 }
 
 #[inline]
@@ -540,6 +566,29 @@ fn triangle(phase: f32, peak: f32) -> f32 {
         2.0 * phase / peak - 1.0
     } else {
         1.0 - 2.0 * (phase - peak) / (1.0 - peak)
+    }
+}
+
+#[inline]
+fn bandlimited_triangle(phase: f32, peak: f32, phase_increment: f32) -> f32 {
+    let rising_slope = 2.0 / peak;
+    let falling_slope = -2.0 / (1.0 - peak);
+    let peak_phase = wrap_phase_once(phase - peak);
+    triangle(phase, peak)
+        + (rising_slope - falling_slope) * poly_blamp(phase, phase_increment)
+        + (falling_slope - rising_slope) * poly_blamp(peak_phase, phase_increment)
+}
+
+#[inline]
+fn poly_blamp(phase: f32, phase_increment: f32) -> f32 {
+    if phase < phase_increment {
+        let distance = 1.0 - phase / phase_increment;
+        phase_increment * distance * distance * distance / 6.0
+    } else if phase > 1.0 - phase_increment {
+        let distance = 1.0 + (phase - 1.0) / phase_increment;
+        phase_increment * distance * distance * distance / 6.0
+    } else {
+        0.0
     }
 }
 

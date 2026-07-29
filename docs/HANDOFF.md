@@ -647,7 +647,9 @@ Implemented on 2026-07-29 and awaiting human listening:
   macros, JACK, ALSA, or SHR-DAW;
 - built three independently phased VCOs with prepared octave/static-tuning
   offsets, bounded recurrence-based drift, waveform asymmetry, pulse-width and
-  level differences, and PolyBLEP-corrected saw/pulse edges;
+  level differences, PolyBLEP-corrected saw/pulse edges, PolyBLAMP-corrected
+  triangle slope corners, and a periodic value/derivative-matched rational
+  warp in place of the former piecewise-linear saw asymmetry;
 - summed the VCOs and delayed output feedback in a bounded odd cubic mixer,
   with an exact linear diagnostic substitution;
 - passed the mixer into four cascaded one-pole ladder stages with bounded odd
@@ -705,7 +707,7 @@ transfer and phase differences, even after accounting for the ladder FIR's
 7.75-host-sample delay, so it is diagnostic only. Its retained values are
 -29.880/-30.957/-22.678 dB for notes 36/60/84.
 
-The accepted engineering alias gate instead uses native-rate Blackman-Harris
+The controlled engineering alias gate uses native-rate Blackman-Harris
 spectra over `N = 131072` steady-state samples. It measures nonharmonic
 out-of-mask foldback at 48 kHz and an independent native-192 kHz proxy floor in
 the same physical 0–24 kHz band. A four-bin half-width masks expected
@@ -717,6 +719,41 @@ above the floor. The conservative values pass unchanged bounds of -45 dB for
 notes 36/60 and -35 dB for note 84. Mask coverage is
 10.0662/2.5131/0.6180%; energy folding inside those masks is an explicit blind
 spot and is not bounded by this proxy.
+
+Final review added evidence that prevents that controlled result from being
+generalized to the audition path:
+
+- `oscillators.tsv` now includes exactly nine configured pitch/drift rows for
+  MIDI 36/60/84 at 44.1/48/96 kHz, using -2.0 cents static offset and
+  +/-1.5 cents drift over a complete deterministic recurrence cycle; all mean
+  pitch errors are within 5 cents and every observed drift excursion remains
+  within +/-1.5 cents;
+- fifteen MIDI-96 waveform rows cover triangle, maximum-asymmetry saw,
+  rectangle, maximum-width wide pulse, and minimum-width narrow pulse at all
+  three rates. Their 44.1/48/96 kHz nonharmonic proxies are
+  -48.128/-49.678/-59.820 dB for triangle,
+  -28.269/-28.854/-31.446 dB for saw,
+  -28.644/-31.864/-32.335 dB for rectangle, and
+  -26.354/-24.572/-26.663 dB for both wide and narrow pulses. These are
+  waveform-specific proxy bounds with the same masked-bin limitation, not a
+  claim of alias-free output; and
+- a separate full-authored-bass probe retains source levels
+  `0.88/0.72/0.14`, mixer drive `2.4`, ladder drive `2.2`, static oscillator
+  mismatch/asymmetry/level differences, and feedback. Only drift is frozen for
+  stationary analysis. Its 48-vs-192 kHz spectral-magnitude alias/error values
+  are -34.100/-32.786/-26.817 dB for MIDI 36/60/84, while the corresponding
+  192-vs-768 kHz floors are -23.155/-24.411/-27.472 dB. Conservative values
+  -23.155/-24.411/-26.817 dB fail the unchanged -45/-45/-35 dB bounds and are
+  explicitly reported as `diagnostic_fail`. Nonlinear harmonic differences
+  of -4.790/-8.672/-13.051 dB confirm the full probe did not remove the
+  authored nonlinear character.
+
+The full authored path therefore has no passing alias claim. The controlled
+rows remain useful diagnostic acceptance evidence only for their exact
+idealized/lower-drive configuration. The full-path high-rate comparison also
+retains transfer and sample-rate-model differences, so its failure is an
+honest unresolved alias/error diagnostic rather than a quantified alias-only
+estimate.
 
 This is a circuit-informed causal model based on documented signal flow,
 Robert Moog's ladder patent, and Huovilainen's circuit-derived digital model.
@@ -738,6 +775,8 @@ Fresh feature-worktree verification:
   only the accepted `winnow` 0.7/1.0 duplicate warning through `toml`;
 - `cargo check --target aarch64-unknown-linux-gnu --all-targets
   --all-features`: exit 0, compile evidence only;
+- the verification snapshot below predates the final-review evidence
+  correction and must not be treated as current until the fresh final run;
 - two fresh release generations matched each other and the installed artifact
   byte-for-byte for all 16 deterministic files, excluding only
   `workstation-cost.txt`; their sorted deterministic SHA-256 manifest hash is

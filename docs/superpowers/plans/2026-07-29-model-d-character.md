@@ -14,7 +14,9 @@ retrospective claim that every intermediate command produced the originally
 predicted output. In particular, historical RED command output was not
 preserved, so those six RED-only boxes remain unchecked and explicitly noted.
 The alias acceptance method changed during implementation as recorded in Task
-5 and the design.
+5 and the design. Final review added waveform-specific VCO evidence, the exact
+pitch/drift matrix, and a separate full-authored-path diagnostic whose measured
+failure narrows the controlled alias claim.
 
 ---
 
@@ -78,7 +80,8 @@ Expected: compile failure because `model_d::vco` and its types do not exist.
 - [x] **Step 3: Implement the minimum prepared VCO**
 
 Implement an independent phase accumulator, PolyBLEP saw/pulse edges,
-continuous triangle, recurrence-based drift oscillator, prepared cents ratio,
+PolyBLAMP-corrected triangle slope corners, a periodic value/derivative-matched
+saw-asymmetry warp, recurrence-based drift oscillator, prepared cents ratio,
 bounded asymmetry, deterministic phase/reset state, and finite guards. Keep
 `powf` and `sin_cos` in construction or `set_note`; the sample path performs
 fixed arithmetic only.
@@ -327,6 +330,14 @@ reference as floor-limited, and report mask coverage plus the blind spot that
 energy inside masked bins is not bounded. Retain the aligned time-domain
 48/192 kHz residual only as a transfer-conflated diagnostic.
 
+Final-review extension: report every VCO waveform at MIDI 96 and
+44.1/48/96 kHz; report the configured -2.0-cent static and +/-1.5-cent drift
+matrix for MIDI 36/60/84 at the same rates; and measure the authored bass path
+separately at source levels `0.88/0.72/0.14`, mixer drive `2.4`, ladder drive
+`2.2`, with static imperfections and feedback retained and drift frozen. Keep
+its currently failing -45/-45/-35 dB result explicit instead of generalizing
+the controlled proxy.
+
 - [x] **Step 4: Run library and allocation tests**
 
 Run:
@@ -361,6 +372,10 @@ comparison. Verify stereo float 48 kHz WAVs, identical lengths for the matched
 bass files, fixed gains in the manifest, passing evidence rows, and README
 statements that there is no normalization, limiter, copied preset, hardware
 equivalence claim, or production integration.
+Require exact nine-row pitch/drift and fifteen-row waveform matrices, three
+controlled passing alias rows, three full-path `diagnostic_fail` rows, and a
+cleanup-failure injection proving rollback leaves one usable destination and
+does not block the next run.
 
 - [ ] **Step 2: Run the CLI test and verify RED** — historical command output
   was not preserved; no retrospective RED claim is made.

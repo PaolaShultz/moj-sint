@@ -2,7 +2,8 @@
 
 **Date:** 2026-07-29
 
-**Status:** Implemented and freshly engineering-verified; human listening pending
+**Status:** Implemented; controlled engineering gate passes, full authored-path
+alias/error diagnostic fails; human listening pending
 
 **Owner:** Moj Sint
 
@@ -259,6 +260,11 @@ Generated WAVs and reports remain disposable under
   deterministic, finite, resettable, and allocation-free.
 - VCO pitch and drift stay within the declared bounds across MIDI notes 36, 60,
   and 84 at 44.1, 48, and 96 kHz.
+- The pitch/drift report uses configured -2.0-cent static offset and
+  +/-1.5-cent deterministic drift over a complete recurrence cycle for every
+  note/rate row. Separate MIDI-96 rows report triangle, maximum-asymmetry saw,
+  rectangle, maximum-width wide pulse, and minimum-width narrow pulse at all
+  three rates.
 - The nonlinear mixer demonstrates compression and harmonic generation relative
   to its matched linear mode.
 - The ladder passes the declared slope, cutoff, resonance, finiteness, and
@@ -271,7 +277,7 @@ Generated WAVs and reports remain disposable under
 - The matched ablations differ from the full bass render while keeping the
   score, duration, and explicit presentation gain identical.
 
-### Aliasing gate
+### Aliasing gate and corrected evidence boundary
 
 The initially proposed raw time-domain residual between 48 and 192 kHz renders
 was rejected as an acceptance metric during implementation. Even after fixed
@@ -279,7 +285,7 @@ resampling and alignment for the ladder decimator's 7.75-host-sample group
 delay, that residual conflates ordinary transfer and phase differences with
 foldback. It remains reported as a diagnostic only.
 
-The implemented acceptance gate uses a native-rate Blackman-Harris spectral
+The controlled acceptance gate uses a native-rate Blackman-Harris spectral
 measurement over `N = 131072` steady-state samples. It measures nonharmonic
 out-of-mask energy in the physical 0–24 kHz band at 48 kHz, and independently
 measures the proxy floor from a native 192 kHz render over the same physical
@@ -300,6 +306,16 @@ The report states harmonic-mask coverage explicitly. Energy that folds onto or
 near an expected harmonic lies inside the masks and is not bounded by this
 proxy. These measurements are engineering rejection bounds, not proof that the
 model sounds analog or matches hardware.
+
+The final review also requires a separate whole-authored-path diagnostic. It
+uses the bass render's actual source levels `0.88/0.72/0.14`, mixer drive
+`2.4`, ladder drive `2.2`, static pitch/asymmetry/level differences, and
+feedback. Only drift is frozen to make stationary spectral comparison
+possible. A 48-vs-192 kHz spectral-magnitude alias/error estimate is compared
+with a 192-vs-768 kHz floor and the same -45/-45/-35 dB bounds. This full-path
+diagnostic currently fails and must be reported as `diagnostic_fail`; it is
+not silently treated as passing by applying the controlled probe's result.
+The controlled gate therefore supports only the controlled configuration.
 
 ### Reproducibility and repository gates
 

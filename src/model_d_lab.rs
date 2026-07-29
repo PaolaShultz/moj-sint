@@ -1,6 +1,7 @@
 use crate::model_d::{
     ModelDError,
     ladder::{LadderConfig, LadderMode, ModelDLadder},
+    vco::{ModelDVco, ModelDWaveform, VcoConfig},
     voice::{ModelDDiagnostics, ModelDPatch, ModelDVoice},
 };
 
@@ -21,6 +22,8 @@ pub const MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB: f64 = 6.0;
 pub const MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_POWER_RATIO: f64 = 3.981_071_705_534_972_2;
 pub const MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB: f64 = -24.0;
 pub const MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB: f64 = -6.0;
+pub const MODEL_D_FULL_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB: f64 = -24.0;
+pub const MODEL_D_FULL_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB: f64 = -2.0;
 pub const MODEL_D_FILTER_CUTOFF_ERROR_MAX: f32 = 0.08;
 pub const MODEL_D_FILTER_SLOPE_MIN_DB_PER_OCTAVE: f32 = 20.0;
 pub const MODEL_D_FILTER_SLOPE_MAX_DB_PER_OCTAVE: f32 = 28.0;
@@ -259,6 +262,14 @@ pub struct ModelDRender {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ModelDAliasEvidence {
+    pub configuration: ModelDAliasProbeConfiguration,
+    pub proxy_method: &'static str,
+    pub source_levels: [f32; 3],
+    pub mixer_drive: f32,
+    pub ladder_drive: f32,
+    pub static_oscillator_imperfections_enabled: bool,
+    pub feedback_enabled: bool,
+    pub drift_frozen_for_stationary_analysis: bool,
     /// Nonharmonic 48 kHz out-of-mask energy relative to target signal energy.
     /// This proxy deliberately excludes energy on or near legitimate harmonic
     /// bins, whose coverage and half-width are reported separately.
@@ -285,6 +296,151 @@ pub struct ModelDAliasEvidence {
     /// path's total harmonic energy. DC and the fundamental are excluded from
     /// the difference numerator.
     pub nonlinear_overtone_magnitude_difference_db: f64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModelDAliasProbeConfiguration {
+    ControlledDiagnostic,
+    FullAuthoredBassStatic,
+}
+
+impl ModelDAliasProbeConfiguration {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ControlledDiagnostic => "controlled_diagnostic",
+            Self::FullAuthoredBassStatic => "full_authored_bass_static_drift_frozen",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ModelDVcoPitchEvidence {
+    pub note: u8,
+    pub sample_rate: u32,
+    pub configured_static_cents: f32,
+    pub configured_drift_cents: f32,
+    pub mean_pitch_hz: f64,
+    pub mean_pitch_error_cents: f64,
+    pub minimum_drift_cents: f64,
+    pub maximum_drift_cents: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ModelDVcoAliasEvidence {
+    pub waveform: ModelDWaveform,
+    pub note: u8,
+    pub sample_rate: u32,
+    pub asymmetry: f32,
+    pub pulse_width: f32,
+    pub nonharmonic_foldback_proxy_db: f64,
+    pub acceptance_bound_db: f64,
+}
+
+pub fn measure_vco_pitch_matrix() -> Result<Vec<ModelDVcoPitchEvidence>, ModelDError> {
+    const STATIC_CENTS: f32 = -2.0;
+    const DRIFT_CENTS: f32 = 1.5;
+    const DRIFT_HZ: f32 = 0.5;
+    let mut rows = Vec::with_capacity(9);
+    for sample_rate in [44_100_u32, 48_000, 96_000] {
+        for note in [36_u8, 60, 84] {
+            let mut vco = ModelDVco::new(
+                sample_rate as f32,
+                VcoConfig {
+                    semitone_offset: 0,
+                    cents_offset: STATIC_CENTS,
+                    drift_cents: DRIFT_CENTS,
+                    drift_hz: DRIFT_HZ,
+                    asymmetry: 0.37,
+                    level_offset: 0.02,
+                    reset_phase: 0.25,
+                    waveform: ModelDWaveform::Triangle,
+                },
+            )?;
+            vco.set_note(note);
+            let expected_hz =
+                midi_frequency(note) * 2.0_f64.powf(f64::from(STATIC_CENTS) / 1_200.0);
+            let expected_increment = f64::from(vco.prepared_static_phase_increment());
+            let frames = (2 * sample_rate) as usize;
+            let mut increment_sum = 0.0_f64;
+            let mut minimum_drift_cents = f64::INFINITY;
+            let mut maximum_drift_cents = f64::NEG_INFINITY;
+            for _ in 0..frames {
+                let increment = f64::from(vco.prepared_phase_increment());
+                increment_sum += increment;
+                let drift_cents = 1_200.0 * (increment / expected_increment).log2();
+                minimum_drift_cents = minimum_drift_cents.min(drift_cents);
+                maximum_drift_cents = maximum_drift_cents.max(drift_cents);
+                vco.sample();
+            }
+            let mean_pitch_hz = increment_sum / frames as f64 * f64::from(sample_rate);
+            rows.push(ModelDVcoPitchEvidence {
+                note,
+                sample_rate,
+                configured_static_cents: STATIC_CENTS,
+                configured_drift_cents: DRIFT_CENTS,
+                mean_pitch_hz,
+                mean_pitch_error_cents: 1_200.0 * (mean_pitch_hz / expected_hz).log2(),
+                minimum_drift_cents,
+                maximum_drift_cents,
+            });
+        }
+    }
+    Ok(rows)
+}
+
+pub fn measure_vco_waveform_alias_matrix() -> Result<Vec<ModelDVcoAliasEvidence>, ModelDError> {
+    const NOTE: u8 = 96;
+    const FRAMES: usize = 131_072;
+    let configurations = [
+        (ModelDWaveform::Triangle, 1.0, 0.50, -40.0),
+        (ModelDWaveform::Saw, 1.0, 0.50, -28.0),
+        (ModelDWaveform::Rectangle, 0.0, 0.50, -28.0),
+        (ModelDWaveform::WidePulse, 1.0, 0.90, -24.0),
+        (ModelDWaveform::NarrowPulse, -1.0, 0.10, -24.0),
+    ];
+    let mut rows = Vec::with_capacity(15);
+    for sample_rate in [44_100_u32, 48_000, 96_000] {
+        for (waveform, asymmetry, pulse_width, acceptance_bound_db) in configurations {
+            let mut vco = ModelDVco::new(
+                sample_rate as f32,
+                VcoConfig {
+                    semitone_offset: 0,
+                    cents_offset: 0.0,
+                    drift_cents: 0.0,
+                    drift_hz: 0.25,
+                    asymmetry,
+                    level_offset: 0.0,
+                    reset_phase: 0.173,
+                    waveform,
+                },
+            )?;
+            vco.set_note(NOTE);
+            for _ in 0..sample_rate as usize {
+                vco.sample();
+            }
+            let samples = (0..FRAMES).map(|_| vco.sample()).collect::<Vec<_>>();
+            let fundamental_hz = prepared_fundamental_hz(NOTE, sample_rate);
+            let nonharmonic_foldback_proxy_db = ratio_db(
+                measure_nonharmonic_foldback_proxy(
+                    &samples,
+                    sample_rate,
+                    fundamental_hz,
+                    f64::from(sample_rate) * 0.5,
+                )
+                .ratio,
+            );
+            rows.push(ModelDVcoAliasEvidence {
+                waveform,
+                note: NOTE,
+                sample_rate,
+                asymmetry,
+                pulse_width,
+                nonharmonic_foldback_proxy_db,
+                acceptance_bound_db,
+            });
+        }
+    }
+    Ok(rows)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -446,18 +602,31 @@ pub fn measure_alias_residual(note: u8) -> Result<f64, ModelDError> {
 /// Measures nonharmonic out-of-mask foldback evidence and its explicit
 /// harmonic-mask blind spot; it does not bound energy inside masked bins.
 pub fn measure_alias_evidence(note: u8) -> Result<ModelDAliasEvidence, ModelDError> {
+    measure_alias_evidence_for(note, ModelDAliasProbeConfiguration::ControlledDiagnostic)
+}
+
+pub fn measure_full_alias_evidence(note: u8) -> Result<ModelDAliasEvidence, ModelDError> {
+    measure_alias_evidence_for(note, ModelDAliasProbeConfiguration::FullAuthoredBassStatic)
+}
+
+fn measure_alias_evidence_for(
+    note: u8,
+    configuration: ModelDAliasProbeConfiguration,
+) -> Result<ModelDAliasEvidence, ModelDError> {
     if !(24..=108).contains(&note) {
         return Err(ModelDError::InvalidConfig);
     }
     let low_end = ALIAS_WARMUP_FRAMES_48K + ALIAS_MEASUREMENT_FRAMES;
     let analysis_radius = MODEL_D_ALIAS_ANALYSIS_FILTER_TAPS / 2;
     let high_end = low_end * ANALYSIS_RATE_FACTOR + analysis_radius + ANALYSIS_RATE_FACTOR;
-    let low = render_alias_probe(note, CANONICAL_SAMPLE_RATE, low_end)?;
-    let linear_low = render_alias_probe_mode(note, CANONICAL_SAMPLE_RATE, low_end, false)?;
+    let low = render_alias_probe(note, CANONICAL_SAMPLE_RATE, low_end, configuration)?;
+    let linear_low =
+        render_alias_probe_mode(note, CANONICAL_SAMPLE_RATE, low_end, false, configuration)?;
     let high = render_alias_probe(
         note,
         CANONICAL_SAMPLE_RATE * ANALYSIS_RATE_FACTOR as u32,
         high_end,
+        configuration,
     )?;
     let target = &low[ALIAS_WARMUP_FRAMES_48K..low_end];
     let linear_target = &linear_low[ALIAS_WARMUP_FRAMES_48K..low_end];
@@ -467,27 +636,98 @@ pub fn measure_alias_evidence(note: u8) -> Result<ModelDAliasEvidence, ModelDErr
     let native_reference = &high[native_reference_start..native_reference_end];
     let reference =
         downsample_aligned_reference(&high, ALIAS_WARMUP_FRAMES_48K, ALIAS_MEASUREMENT_FRAMES);
-    let fundamental_note = note.saturating_sub(12);
-    let target_fundamental_hz = prepared_fundamental_hz(fundamental_note, CANONICAL_SAMPLE_RATE);
-    let reference_fundamental_hz = prepared_fundamental_hz(
-        fundamental_note,
+    let target_fundamentals =
+        alias_probe_fundamentals_hz(note, CANONICAL_SAMPLE_RATE, configuration);
+    let reference_fundamentals = alias_probe_fundamentals_hz(
+        note,
         CANONICAL_SAMPLE_RATE * ANALYSIS_RATE_FACTOR as u32,
+        configuration,
     );
-    let target_proxy = measure_nonharmonic_foldback_proxy(
-        target,
-        CANONICAL_SAMPLE_RATE,
-        target_fundamental_hz,
-        24_000.0,
+    let target_fundamental_hz = target_fundamentals[0];
+    let reference_fundamental_hz = reference_fundamentals[0];
+    let full_configuration = matches!(
+        configuration,
+        ModelDAliasProbeConfiguration::FullAuthoredBassStatic
     );
-    let reference_proxy = measure_nonharmonic_foldback_proxy(
-        native_reference,
-        CANONICAL_SAMPLE_RATE * ANALYSIS_RATE_FACTOR as u32,
-        reference_fundamental_hz,
-        24_000.0,
-    );
+    let (target_proxy, reference_proxy, proxy_method) = if full_configuration {
+        let ultra_factor = ANALYSIS_RATE_FACTOR * ANALYSIS_RATE_FACTOR;
+        let ultra_end = low_end * ultra_factor + analysis_radius + ultra_factor;
+        let ultra = render_alias_probe(
+            note,
+            CANONICAL_SAMPLE_RATE * ultra_factor as u32,
+            ultra_end,
+            configuration,
+        )?;
+        let ultra_reference = downsample_aligned_reference_factor(
+            &ultra,
+            ALIAS_WARMUP_FRAMES_48K,
+            ALIAS_MEASUREMENT_FRAMES,
+            ultra_factor,
+        );
+        let coverage = harmonic_mask_coverage(
+            ALIAS_MEASUREMENT_FRAMES,
+            CANONICAL_SAMPLE_RATE,
+            &target_fundamentals,
+            24_000.0,
+        );
+        (
+            NonharmonicFoldbackProxy {
+                ratio: spectral_magnitude_residual_ratio(
+                    target,
+                    &reference,
+                    CANONICAL_SAMPLE_RATE,
+                    24_000.0,
+                ),
+                coverage,
+                resolution_hz: f64::from(CANONICAL_SAMPLE_RATE) / ALIAS_MEASUREMENT_FRAMES as f64,
+            },
+            NonharmonicFoldbackProxy {
+                ratio: spectral_magnitude_residual_ratio(
+                    &reference,
+                    &ultra_reference,
+                    CANONICAL_SAMPLE_RATE,
+                    24_000.0,
+                ),
+                coverage,
+                resolution_hz: f64::from(CANONICAL_SAMPLE_RATE) / ALIAS_MEASUREMENT_FRAMES as f64,
+            },
+            "full_path_48_vs_192k_spectral_magnitude_alias_error_with_192_vs_768k_floor",
+        )
+    } else {
+        (
+            measure_nonharmonic_foldback_proxy_for_fundamentals(
+                target,
+                CANONICAL_SAMPLE_RATE,
+                &target_fundamentals,
+                24_000.0,
+            ),
+            measure_nonharmonic_foldback_proxy_for_fundamentals(
+                native_reference,
+                CANONICAL_SAMPLE_RATE * ANALYSIS_RATE_FACTOR as u32,
+                &reference_fundamentals,
+                24_000.0,
+            ),
+            "controlled_native_nonharmonic_out_of_mask_proxy",
+        )
+    };
     let (nonharmonic_proxy_floor_limited, excess_nonharmonic_foldback_proxy_db) =
         classify_nonharmonic_foldback_proxy(target_proxy.ratio, reference_proxy.ratio);
+    let (source_levels, mixer_drive, ladder_drive) = alias_probe_controls(configuration);
     Ok(ModelDAliasEvidence {
+        configuration,
+        proxy_method,
+        source_levels,
+        mixer_drive,
+        ladder_drive,
+        static_oscillator_imperfections_enabled: matches!(
+            configuration,
+            ModelDAliasProbeConfiguration::FullAuthoredBassStatic
+        ),
+        feedback_enabled: matches!(
+            configuration,
+            ModelDAliasProbeConfiguration::FullAuthoredBassStatic
+        ),
+        drift_frozen_for_stationary_analysis: true,
         nonharmonic_foldback_proxy_db: ratio_db(target_proxy.ratio),
         reference_nonharmonic_floor_db: ratio_db(reference_proxy.ratio),
         excess_nonharmonic_foldback_proxy_db,
@@ -553,8 +793,9 @@ fn render_alias_probe(
     note: u8,
     sample_rate: u32,
     frame_count: usize,
+    configuration: ModelDAliasProbeConfiguration,
 ) -> Result<Vec<f32>, ModelDError> {
-    render_alias_probe_mode(note, sample_rate, frame_count, true)
+    render_alias_probe_mode(note, sample_rate, frame_count, true, configuration)
 }
 
 fn render_alias_probe_mode(
@@ -562,21 +803,57 @@ fn render_alias_probe_mode(
     sample_rate: u32,
     frame_count: usize,
     nonlinear: bool,
+    configuration: ModelDAliasProbeConfiguration,
 ) -> Result<Vec<f32>, ModelDError> {
+    let mut patch = ModelDPatch::bass();
+    let (source_levels, mixer_drive, ladder_drive) = alias_probe_controls(configuration);
+    patch.source_levels = source_levels;
+    patch.mixer_drive = mixer_drive;
+    patch.ladder_drive = ladder_drive;
+    let full_configuration = matches!(
+        configuration,
+        ModelDAliasProbeConfiguration::FullAuthoredBassStatic
+    );
     let diagnostics = ModelDDiagnostics {
         linear_mixer: !nonlinear,
         linear_ladder: !nonlinear,
-        idealize_oscillators: true,
+        idealize_oscillators: !full_configuration,
         disable_drift: true,
-        disable_feedback: true,
+        disable_feedback: !full_configuration,
     };
-    let mut patch = ModelDPatch::bass();
-    patch.source_levels = [0.66, 0.54, 0.255];
-    patch.mixer_drive = 1.5;
-    patch.ladder_drive = 1.5;
     let mut voice = ModelDVoice::new(sample_rate as f32, patch, diagnostics)?;
-    voice.note_on(note, 0.82);
+    voice.note_on(note, if full_configuration { 0.88 } else { 0.82 });
     Ok((0..frame_count).map(|_| voice.sample()).collect())
+}
+
+fn alias_probe_controls(configuration: ModelDAliasProbeConfiguration) -> ([f32; 3], f32, f32) {
+    match configuration {
+        ModelDAliasProbeConfiguration::ControlledDiagnostic => ([0.66, 0.54, 0.255], 1.5, 1.5),
+        ModelDAliasProbeConfiguration::FullAuthoredBassStatic => {
+            ([0.88, 0.72, BASS_THIRD_OSCILLATOR_LEVEL], 2.4, 2.2)
+        }
+    }
+}
+
+fn alias_probe_fundamentals_hz(
+    note: u8,
+    sample_rate: u32,
+    configuration: ModelDAliasProbeConfiguration,
+) -> [f64; 3] {
+    let offsets_and_cents = match configuration {
+        ModelDAliasProbeConfiguration::ControlledDiagnostic => {
+            [(-12_i8, 0.0_f64), (0, 0.0), (12, 0.0)]
+        }
+        ModelDAliasProbeConfiguration::FullAuthoredBassStatic => {
+            [(-12_i8, -1.1_f64), (0, 0.8), (12, 1.7)]
+        }
+    };
+    offsets_and_cents.map(|(semitones, cents)| {
+        let oscillator_note = (i16::from(note) + i16::from(semitones)).clamp(0, 127) as u8;
+        let frequency_hz = midi_frequency(oscillator_note) * 2.0_f64.powf(cents / 1_200.0);
+        let increment = frequency_hz as f32 / sample_rate as f32;
+        f64::from(increment) * f64::from(sample_rate)
+    })
 }
 
 fn apply_event(voice: &mut ModelDVoice, action: ScoreAction) {
@@ -770,12 +1047,26 @@ fn measure_nonharmonic_foldback_proxy(
     fundamental_hz: f64,
     maximum_hz: f64,
 ) -> NonharmonicFoldbackProxy {
+    measure_nonharmonic_foldback_proxy_for_fundamentals(
+        samples,
+        sample_rate,
+        &[fundamental_hz],
+        maximum_hz,
+    )
+}
+
+fn measure_nonharmonic_foldback_proxy_for_fundamentals(
+    samples: &[f32],
+    sample_rate: u32,
+    fundamental_frequencies_hz: &[f64],
+    maximum_hz: f64,
+) -> NonharmonicFoldbackProxy {
     assert!(samples.len().is_power_of_two());
     let sample_count = samples.len();
     let resolution_hz = f64::from(sample_rate) / sample_count as f64;
     let spectrum = windowed_spectrum(samples);
     let maximum_bin = (maximum_hz / resolution_hz).floor() as usize;
-    let harmonic_mask = harmonic_mask(maximum_bin, resolution_hz, fundamental_hz);
+    let harmonic_mask = harmonic_mask(maximum_bin, resolution_hz, fundamental_frequencies_hz);
 
     let mut total_energy = 0.0_f64;
     let mut residual_energy = 0.0_f64;
@@ -792,6 +1083,62 @@ fn measure_nonharmonic_foldback_proxy(
         coverage: masked_bins as f64 / maximum_bin.max(1) as f64,
         resolution_hz,
     }
+}
+
+fn harmonic_mask_coverage(
+    sample_count: usize,
+    sample_rate: u32,
+    fundamental_frequencies_hz: &[f64],
+    maximum_hz: f64,
+) -> f64 {
+    let resolution_hz = f64::from(sample_rate) / sample_count as f64;
+    let maximum_bin = (maximum_hz / resolution_hz).floor() as usize;
+    let mask = harmonic_mask(maximum_bin, resolution_hz, fundamental_frequencies_hz);
+    mask[1..].iter().filter(|masked| **masked).count() as f64 / maximum_bin.max(1) as f64
+}
+
+fn spectral_magnitude_residual_ratio(
+    target: &[f32],
+    reference: &[f32],
+    sample_rate: u32,
+    maximum_hz: f64,
+) -> f64 {
+    assert_eq!(target.len(), reference.len());
+    let resolution_hz = f64::from(sample_rate) / target.len() as f64;
+    let maximum_bin = (maximum_hz / resolution_hz).floor() as usize;
+    let target_spectrum = windowed_spectrum(target);
+    let reference_spectrum = windowed_spectrum(reference);
+    let magnitudes = |spectrum: &[(f64, f64)]| {
+        spectrum[1..=maximum_bin]
+            .iter()
+            .map(|&(real, imaginary)| real.hypot(imaginary))
+            .collect::<Vec<_>>()
+    };
+    let target_magnitudes = magnitudes(&target_spectrum);
+    let reference_magnitudes = magnitudes(&reference_spectrum);
+    let dot = target_magnitudes
+        .iter()
+        .zip(&reference_magnitudes)
+        .map(|(target, reference)| target * reference)
+        .sum::<f64>();
+    let reference_energy = reference_magnitudes
+        .iter()
+        .map(|magnitude| magnitude * magnitude)
+        .sum::<f64>();
+    let gain = dot / reference_energy.max(1.0e-24);
+    let target_energy = target_magnitudes
+        .iter()
+        .map(|magnitude| magnitude * magnitude)
+        .sum::<f64>();
+    let residual_energy = target_magnitudes
+        .iter()
+        .zip(&reference_magnitudes)
+        .map(|(target, reference)| {
+            let residual = target - gain * reference;
+            residual * residual
+        })
+        .sum::<f64>();
+    (residual_energy / target_energy.max(1.0e-24)).max(1.0e-24)
 }
 
 fn windowed_spectrum(samples: &[f32]) -> Vec<(f64, f64)> {
@@ -812,16 +1159,23 @@ fn windowed_spectrum(samples: &[f32]) -> Vec<(f64, f64)> {
     spectrum
 }
 
-fn harmonic_mask(maximum_bin: usize, resolution_hz: f64, fundamental_hz: f64) -> Vec<bool> {
+fn harmonic_mask(
+    maximum_bin: usize,
+    resolution_hz: f64,
+    fundamental_frequencies_hz: &[f64],
+) -> Vec<bool> {
     let mut harmonic_mask = vec![false; maximum_bin + 1];
-    let harmonic_count = ((maximum_bin as f64 * resolution_hz) / fundamental_hz).floor() as usize;
-    for harmonic in 1..=harmonic_count {
-        let center = (fundamental_hz * harmonic as f64 / resolution_hz).round() as usize;
-        let first = center
-            .saturating_sub(MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS)
-            .max(1);
-        let last = (center + MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS).min(maximum_bin);
-        harmonic_mask[first..=last].fill(true);
+    for &fundamental_hz in fundamental_frequencies_hz {
+        let harmonic_count =
+            ((maximum_bin as f64 * resolution_hz) / fundamental_hz).floor() as usize;
+        for harmonic in 1..=harmonic_count {
+            let center = (fundamental_hz * harmonic as f64 / resolution_hz).round() as usize;
+            let first = center
+                .saturating_sub(MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS)
+                .max(1);
+            let last = (center + MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS).min(maximum_bin);
+            harmonic_mask[first..=last].fill(true);
+        }
     }
     harmonic_mask
 }
@@ -922,14 +1276,27 @@ fn downsample_aligned_reference(
     first_low_rate_frame: usize,
     output_frames: usize,
 ) -> Vec<f32> {
+    downsample_aligned_reference_factor(
+        high_rate,
+        first_low_rate_frame,
+        output_frames,
+        ANALYSIS_RATE_FACTOR,
+    )
+}
+
+fn downsample_aligned_reference_factor(
+    high_rate: &[f32],
+    first_low_rate_frame: usize,
+    output_frames: usize,
+    rate_factor: usize,
+) -> Vec<f32> {
     let analysis_radius = (MODEL_D_ALIAS_ANALYSIS_FILTER_TAPS / 2) as isize;
-    let ladder_alignment_high_rate = (ANALYSIS_RATE_FACTOR as f64 - 1.0)
-        - (ANALYSIS_RATE_FACTOR as f64 - 1.0) * MODEL_D_LADDER_GROUP_DELAY_HOST;
+    let ladder_alignment_high_rate =
+        (rate_factor as f64 - 1.0) - (rate_factor as f64 - 1.0) * MODEL_D_LADDER_GROUP_DELAY_HOST;
     (0..output_frames)
         .map(|output_frame| {
             let low_frame = first_low_rate_frame + output_frame;
-            let center =
-                low_frame as f64 * ANALYSIS_RATE_FACTOR as f64 + ladder_alignment_high_rate;
+            let center = low_frame as f64 * rate_factor as f64 + ladder_alignment_high_rate;
             let center_floor = center.floor() as isize;
             let mut output = 0.0_f64;
             let mut weight = 0.0_f64;
@@ -940,7 +1307,7 @@ fn downsample_aligned_reference(
                 }
                 let distance = index as f64 - center;
                 let analysis_cutoff = MODEL_D_ALIAS_ANALYSIS_FILTER_CUTOFF_HZ
-                    / f64::from(CANONICAL_SAMPLE_RATE * ANALYSIS_RATE_FACTOR as u32);
+                    / (f64::from(CANONICAL_SAMPLE_RATE) * rate_factor as f64);
                 let sinc_argument = 2.0 * std::f64::consts::PI * analysis_cutoff * distance;
                 let sinc = if sinc_argument.abs() < 1.0e-12 {
                     2.0 * analysis_cutoff
@@ -999,13 +1366,171 @@ fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use crate::model_d::vco::{ModelDVco, ModelDWaveform, VcoConfig};
+
     use super::{
-        AuditionKind, measure_alias_evidence, measure_alias_residual, measure_filter_evidence,
-        render_audition,
+        AuditionKind, ModelDAliasProbeConfiguration, measure_alias_evidence,
+        measure_alias_residual, measure_filter_evidence, measure_full_alias_evidence,
+        measure_vco_pitch_matrix, measure_vco_waveform_alias_matrix, render_audition,
     };
 
     const SAMPLE_RATE: u32 = 48_000;
     const MAX_PEAK_FOR_ONE_DB_HEADROOM: f64 = 0.891_250_938_133_745_6;
+
+    fn waveform_alias_probe(waveform: ModelDWaveform, sample_rate: u32, asymmetry: f32) -> f64 {
+        const FRAMES: usize = 131_072;
+        let note = 96;
+        let mut vco = ModelDVco::new(
+            sample_rate as f32,
+            VcoConfig {
+                semitone_offset: 0,
+                cents_offset: 0.0,
+                drift_cents: 0.0,
+                drift_hz: 0.25,
+                asymmetry,
+                level_offset: 0.0,
+                reset_phase: 0.173,
+                waveform,
+            },
+        )
+        .unwrap();
+        vco.set_note(note);
+        for _ in 0..sample_rate as usize {
+            vco.sample();
+        }
+        let samples = (0..FRAMES).map(|_| vco.sample()).collect::<Vec<_>>();
+        let fundamental_hz = super::prepared_fundamental_hz(note, sample_rate);
+        super::ratio_db(
+            super::measure_nonharmonic_foldback_proxy(
+                &samples,
+                sample_rate,
+                fundamental_hz,
+                f64::from(sample_rate) * 0.5,
+            )
+            .ratio,
+        )
+    }
+
+    #[test]
+    fn every_distinct_vco_waveform_has_bounded_high_note_nonharmonic_foldback() {
+        let mut failures = Vec::new();
+        for sample_rate in [44_100, 48_000, 96_000] {
+            for (waveform, asymmetry, maximum_db) in [
+                (ModelDWaveform::Triangle, 1.0, -40.0),
+                (ModelDWaveform::Saw, 1.0, -28.0),
+                (ModelDWaveform::Rectangle, 0.0, -28.0),
+                (ModelDWaveform::WidePulse, 1.0, -24.0),
+                (ModelDWaveform::NarrowPulse, -1.0, -24.0),
+            ] {
+                let residual_db = waveform_alias_probe(waveform, sample_rate, asymmetry);
+                eprintln!(
+                    "waveform={waveform:?}, sample_rate={sample_rate}, asymmetry={asymmetry}, residual_db={residual_db}, maximum_db={maximum_db}"
+                );
+                if residual_db > maximum_db {
+                    failures.push((waveform, sample_rate, asymmetry, residual_db, maximum_db));
+                }
+            }
+        }
+        assert!(failures.is_empty(), "failures={failures:?}");
+    }
+
+    #[test]
+    fn oscillator_pitch_and_drift_evidence_covers_the_exact_required_matrix() {
+        let rows = measure_vco_pitch_matrix().unwrap();
+        assert_eq!(rows.len(), 9, "{rows:?}");
+        assert_eq!(
+            rows.iter()
+                .map(|row| (row.note, row.sample_rate))
+                .collect::<Vec<_>>(),
+            [
+                (36, 44_100),
+                (60, 44_100),
+                (84, 44_100),
+                (36, 48_000),
+                (60, 48_000),
+                (84, 48_000),
+                (36, 96_000),
+                (60, 96_000),
+                (84, 96_000),
+            ]
+        );
+        for row in rows {
+            assert_eq!(row.configured_static_cents, -2.0, "{row:?}");
+            assert_eq!(row.configured_drift_cents, 1.5, "{row:?}");
+            assert!(row.mean_pitch_error_cents.abs() <= 5.0, "{row:?}");
+            assert!(row.minimum_drift_cents >= -1.5, "{row:?}");
+            assert!(row.maximum_drift_cents <= 1.5, "{row:?}");
+            assert!(
+                row.maximum_drift_cents - row.minimum_drift_cents >= 2.9,
+                "{row:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn public_waveform_alias_matrix_reports_every_waveform_rate_and_bound() {
+        let rows = measure_vco_waveform_alias_matrix().unwrap();
+        assert_eq!(rows.len(), 15, "{rows:?}");
+        for sample_rate in [44_100, 48_000, 96_000] {
+            let at_rate = rows
+                .iter()
+                .filter(|row| row.sample_rate == sample_rate)
+                .collect::<Vec<_>>();
+            assert_eq!(at_rate.len(), 5, "sample_rate={sample_rate}: {rows:?}");
+            assert_eq!(
+                at_rate.iter().map(|row| row.waveform).collect::<Vec<_>>(),
+                [
+                    ModelDWaveform::Triangle,
+                    ModelDWaveform::Saw,
+                    ModelDWaveform::Rectangle,
+                    ModelDWaveform::WidePulse,
+                    ModelDWaveform::NarrowPulse,
+                ]
+            );
+        }
+        assert!(rows.iter().all(|row| {
+            row.note == 96
+                && row.nonharmonic_foldback_proxy_db.is_finite()
+                && row.nonharmonic_foldback_proxy_db <= row.acceptance_bound_db
+        }));
+    }
+
+    #[test]
+    fn full_authored_bass_alias_evidence_keeps_static_character_drive_and_feedback() {
+        let mut failing_notes = Vec::new();
+        for (note, maximum_db) in [(36, -45.0), (60, -45.0), (84, -35.0)] {
+            let evidence = measure_full_alias_evidence(note).unwrap();
+            assert_eq!(
+                evidence.configuration,
+                ModelDAliasProbeConfiguration::FullAuthoredBassStatic
+            );
+            assert_eq!(evidence.source_levels, [0.88, 0.72, 0.14]);
+            assert_eq!(evidence.mixer_drive, 2.4);
+            assert_eq!(evidence.ladder_drive, 2.2);
+            assert!(evidence.static_oscillator_imperfections_enabled);
+            assert!(evidence.feedback_enabled);
+            assert!(evidence.drift_frozen_for_stationary_analysis);
+            let conservative = evidence
+                .nonharmonic_foldback_proxy_db
+                .max(evidence.reference_nonharmonic_floor_db);
+            eprintln!(
+                "note={note}, maximum_db={maximum_db}, conservative_db={conservative}, evidence={evidence:?}"
+            );
+            if conservative > maximum_db {
+                failing_notes.push((note, conservative, maximum_db));
+            }
+            assert!(
+                (super::MODEL_D_FULL_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB
+                    ..=super::MODEL_D_FULL_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB)
+                    .contains(&evidence.nonlinear_overtone_magnitude_difference_db),
+                "note={note}, evidence={evidence:?}"
+            );
+        }
+        assert!(
+            !failing_notes.is_empty(),
+            "full-path evidence must remain explicitly diagnostic until it meets its unchanged bounds"
+        );
+    }
 
     #[test]
     fn audition_contract_has_exactly_seven_stably_named_files() {

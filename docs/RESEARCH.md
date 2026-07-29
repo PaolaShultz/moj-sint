@@ -687,8 +687,10 @@ prepared note -> 3 independent VCOs -> bounded odd cubic mixer
 
 The three VCOs use independent phase accumulators, prepared musical/static
 tuning offsets, bounded deterministic recurrence drift, waveform
-asymmetry/pulse-width and level differences, and PolyBLEP-corrected saw/pulse
-edges. Triangle, saw, rectangle, wide-pulse, and narrow-pulse families support
+asymmetry/pulse-width and level differences, PolyBLEP-corrected saw/pulse
+edges, PolyBLAMP-corrected triangle slope corners, and a periodic
+value/derivative-matched rational saw warp. Triangle, saw, rectangle,
+wide-pulse, and narrow-pulse families support
 the authored bass, lead, and filter-articulation patches. Imperfections are
 deterministic and bounded rather than random analog-noise claims.
 
@@ -764,6 +766,31 @@ harmonics lies inside the masks and is not bounded. A matched linear/nonlinear
 overtone-magnitude diagnostic measures -8.868/-9.268/-15.504 dB and confirms
 that the nonlinear probe did not merely reproduce the linear harmonic
 spectrum.
+
+This acceptance table applies only to its controlled probe: oscillators are
+idealized, drift and feedback are disabled, source levels are
+`0.66/0.54/0.255`, and mixer/ladder drive are `1.5/1.5`. Final review added two
+missing evidence sets. First, `oscillators.tsv` now carries the exact
+MIDI-36/60/84 x 44.1/48/96 kHz configured pitch/drift matrix and fifteen
+MIDI-96 waveform-specific proxy rows. Triangle's former untreated slope
+corners measured -36.477/-37.889/-47.268 dB at 44.1/48/96 kHz; the PolyBLAMP
+correction measures -48.128/-49.678/-59.820 dB. The periodic saw warp measures
+-28.269/-28.854/-31.446 dB. Rectangle measures
+-28.644/-31.864/-32.335 dB, and wide/narrow pulses both measure
+-26.354/-24.572/-26.663 dB. These proxy rows retain the harmonic-mask blind
+spot and are not called alias-free.
+
+Second, the full-authored-bass diagnostic retains source levels
+`0.88/0.72/0.14`, mixer drive `2.4`, ladder drive `2.2`, static oscillator
+imperfections, and feedback; only drift is frozen. Its 48-vs-192 kHz spectral
+magnitude alias/error estimates are -34.100/-32.786/-26.817 dB for MIDI
+36/60/84. The 192-vs-768 kHz floors are -23.155/-24.411/-27.472 dB, producing
+conservative -23.155/-24.411/-26.817 dB values that fail the unchanged
+-45/-45/-35 dB bounds. Those rows are `diagnostic_fail`, not acceptance
+passes. Their matched nonlinear harmonic differences are
+-4.790/-8.672/-13.051 dB, so the diagnostic did not obtain a cleaner number by
+removing the authored nonlinearity. The full path therefore has no passing
+alias claim.
 
 The resulting model is circuit-informed and causally inspectable, not
 hardware-calibrated or hardware-equivalent. It has no individual-unit

@@ -112,13 +112,50 @@ fn lab_writes_exact_deterministic_passing_model_d_audition() {
 
     let alias = fs::read_to_string(first.path().join("alias.tsv")).unwrap();
     for phrase in [
-        "native_192k_nonharmonic_out_of_mask_foldback_proxy",
+        "configuration\tproxy_method",
+        "controlled_native_nonharmonic_out_of_mask_proxy",
+        "full_path_48_vs_192k_spectral_magnitude_alias_error_with_192_vs_768k_floor",
         "reference_floor_6db_classification",
         "harmonic_mask_coverage",
         "harmonic_mask_blind_spot",
         "raw_transfer_residual_diagnostic_only",
+        "full_authored_bass_static_drift_frozen",
+        "0.880000,0.720000,0.140000\t2.400000\t2.200000\ttrue\ttrue\tfrozen_for_stationary_analysis",
+        "diagnostic_fail",
     ] {
         assert!(alias.contains(phrase), "alias report missing {phrase}");
+    }
+    assert_eq!(alias.lines().count(), 7);
+    assert_eq!(alias.matches("controlled_diagnostic\t").count(), 3);
+    assert_eq!(
+        alias
+            .matches("full_authored_bass_static_drift_frozen\t")
+            .count(),
+        3
+    );
+    assert_eq!(alias.matches("\tdiagnostic_fail\n").count(), 3);
+
+    let oscillators = fs::read_to_string(first.path().join("oscillators.tsv")).unwrap();
+    assert_eq!(oscillators.lines().count(), 28);
+    assert_eq!(oscillators.matches("vco_pitch_drift_matrix\t").count(), 9);
+    assert_eq!(oscillators.matches("vco_waveform_alias\t").count(), 15);
+    for sample_rate in ["44100", "48000", "96000"] {
+        for note in ["36", "60", "84"] {
+            assert!(
+                oscillators.contains(&format!(
+                    "vco_pitch_drift_matrix\tNA\ttriangle\t{note}\t{sample_rate}\t-2.000000\t1.500000"
+                )),
+                "missing pitch/drift row note={note}, sample_rate={sample_rate}"
+            );
+        }
+        for waveform in ["triangle", "saw", "rectangle", "wide_pulse", "narrow_pulse"] {
+            assert!(
+                oscillators.contains(&format!(
+                    "vco_waveform_alias\tNA\t{waveform}\t96\t{sample_rate}\t"
+                )),
+                "missing waveform row waveform={waveform}, sample_rate={sample_rate}"
+            );
+        }
     }
 
     let readme = fs::read_to_string(first.path().join("README.md")).unwrap();
@@ -128,10 +165,12 @@ fn lab_writes_exact_deterministic_passing_model_d_audition() {
         "No copied factory preset",
         "No hardware-equivalence claim",
         "No production integration",
-        "native 192 kHz nonharmonic out-of-mask foldback proxy",
-        "6 dB floor classification",
+        "controlled_diagnostic",
+        "full_authored_bass_static_drift_frozen",
+        "only drift is frozen",
+        "diagnostic_fail",
         "harmonic-mask coverage and blind spot",
-        "raw transfer residual is diagnostic only",
+        "raw transfer residual remains diagnostic only",
     ] {
         assert!(readme.contains(statement), "README missing: {statement}");
     }
@@ -218,6 +257,43 @@ fn destination_backup_rename_failure_cleans_populated_stage() {
         fs::read_to_string(output.join("sentinel.txt")).unwrap(),
         "old destination"
     );
+    assert!(!root.path().join(".audition.model-d-lab-stage").exists());
+    assert!(!root.path().join(".audition.model-d-lab-backup").exists());
+}
+
+#[test]
+fn backup_cleanup_failure_rolls_back_to_one_usable_destination_and_does_not_block_retry() {
+    let root = tempfile::tempdir().unwrap();
+    let output = root.path().join("audition");
+    fs::create_dir(&output).unwrap();
+    fs::write(output.join("sentinel.txt"), "old destination").unwrap();
+
+    let status = run_lab_status(
+        &output,
+        &[(
+            "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_BACKUP_CLEANUP",
+            std::ffi::OsStr::new("1"),
+        )],
+    );
+    assert!(!status.success());
+    assert_eq!(
+        file_names(&output),
+        BTreeSet::from(["sentinel.txt".to_owned()])
+    );
+    assert_eq!(
+        fs::read_to_string(output.join("sentinel.txt")).unwrap(),
+        "old destination"
+    );
+    assert!(!root.path().join(".audition.model-d-lab-stage").exists());
+    assert!(!root.path().join(".audition.model-d-lab-backup").exists());
+
+    let retry = run_lab_status(&output, &[]);
+    assert!(retry.success());
+    assert_eq!(
+        file_names(&output).len(),
+        WAV_NAMES.len() + REPORT_NAMES.len()
+    );
+    assert!(!output.join("sentinel.txt").exists());
     assert!(!root.path().join(".audition.model-d-lab-stage").exists());
     assert!(!root.path().join(".audition.model-d-lab-backup").exists());
 }
