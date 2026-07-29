@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, ExitStatus};
 
 const WAV_NAMES: [&str; 7] = [
     "01_full_bass_phrase.wav",
@@ -30,6 +30,7 @@ const REPORT_NAMES: [&str; 10] = [
 fn lab_writes_exact_deterministic_passing_model_d_audition() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();
+    fs::write(first.path().join("stale.txt"), "remove me").unwrap();
     run_lab(first.path());
     run_lab(second.path());
 
@@ -46,6 +47,7 @@ fn lab_writes_exact_deterministic_passing_model_d_audition() {
     );
 
     let mut frame_counts = BTreeMap::new();
+    let mut decoded_hashes = BTreeMap::new();
     for name in WAV_NAMES {
         let mut wav = hound::WavReader::open(first.path().join(name)).unwrap();
         assert_eq!(wav.spec().channels, 2, "{name}");
@@ -56,7 +58,9 @@ fn lab_writes_exact_deterministic_passing_model_d_audition() {
             hound::SampleFormat::Float,
             "{name}"
         );
-        frame_counts.insert(name, wav.samples::<f32>().count() / 2);
+        let samples = wav.samples::<f32>().collect::<Result<Vec<_>, _>>().unwrap();
+        frame_counts.insert(name, samples.len() / 2);
+        decoded_hashes.insert(name, hash_sample_stream(&samples));
     }
     let bass_frames = frame_counts[WAV_NAMES[0]];
     for name in &WAV_NAMES[3..] {
@@ -118,15 +122,83 @@ fn lab_writes_exact_deterministic_passing_model_d_audition() {
     ] {
         assert!(readme.contains(statement), "README missing: {statement}");
     }
+
+    let hashes = fs::read_to_string(first.path().join("hashes.tsv")).unwrap();
+    assert_eq!(
+        hashes.lines().next(),
+        Some("file\tfnv1a_interleaved_stereo_sample_hash\tfnv1a_score_hash")
+    );
+    for (name, decoded_hash) in decoded_hashes {
+        assert!(
+            hashes.contains(&format!("{name}\t{decoded_hash:016x}\t")),
+            "{name} decoded stereo hash is absent from hashes.tsv"
+        );
+    }
+}
+
+#[test]
+fn preexisting_fixed_stage_is_refused_without_touching_destination() {
+    let root = tempfile::tempdir().unwrap();
+    let output = root.path().join("audition");
+    fs::create_dir(&output).unwrap();
+    fs::write(output.join("sentinel.txt"), "old destination").unwrap();
+    let stage = root.path().join(".audition.model-d-lab-stage");
+    fs::create_dir(&stage).unwrap();
+
+    let status = run_lab_status(&output, &[]);
+    assert!(!status.success());
+    assert_eq!(
+        fs::read_to_string(output.join("sentinel.txt")).unwrap(),
+        "old destination"
+    );
+    assert!(stage.is_dir());
+    assert!(!root.path().join(".audition.model-d-lab-backup").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn late_dev_full_report_failure_preserves_prior_destination() {
+    use std::os::unix::fs::symlink;
+
+    let root = tempfile::tempdir().unwrap();
+    let output = root.path().join("audition");
+    fs::create_dir(&output).unwrap();
+    fs::write(output.join("sentinel.txt"), "old destination").unwrap();
+    let full_link = root.path().join("dev-full");
+    symlink("/dev/full", &full_link).unwrap();
+
+    let status = run_lab_status(
+        &output,
+        &[(
+            "MOJ_SINT_MODEL_D_LAB_TEST_WORKSTATION_COST_PATH",
+            full_link.as_os_str(),
+        )],
+    );
+    assert!(!status.success());
+    assert_eq!(
+        file_names(&output),
+        BTreeSet::from(["sentinel.txt".to_owned()])
+    );
+    assert_eq!(
+        fs::read_to_string(output.join("sentinel.txt")).unwrap(),
+        "old destination"
+    );
+    assert!(!root.path().join(".audition.model-d-lab-stage").exists());
+    assert!(!root.path().join(".audition.model-d-lab-backup").exists());
 }
 
 fn run_lab(output: &Path) {
-    let status = Command::new(env!("CARGO_BIN_EXE_model-d-lab"))
-        .arg("render-test")
-        .arg(output)
-        .status()
-        .unwrap();
+    let status = run_lab_status(output, &[]);
     assert!(status.success());
+}
+
+fn run_lab_status(output: &Path, environment: &[(&str, &std::ffi::OsStr)]) -> ExitStatus {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_model-d-lab"));
+    command.arg("render-test").arg(output);
+    for (name, value) in environment {
+        command.env(name, value);
+    }
+    command.status().unwrap()
 }
 
 fn file_names(directory: &Path) -> BTreeSet<String> {
@@ -146,4 +218,10 @@ fn deterministic_files(directory: &Path) -> BTreeMap<String, Vec<u8>> {
             (name, fs::read(entry.path()).unwrap())
         })
         .collect()
+}
+
+fn hash_sample_stream(samples: &[f32]) -> u64 {
+    samples.iter().fold(0xcbf2_9ce4_8422_2325, |hash, sample| {
+        (hash ^ u64::from(sample.to_bits())).wrapping_mul(0x0000_0100_0000_01b3)
+    })
 }

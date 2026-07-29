@@ -1,5 +1,6 @@
 use crate::model_d::{
     ModelDError,
+    ladder::{LadderConfig, LadderMode, ModelDLadder},
     voice::{ModelDDiagnostics, ModelDPatch, ModelDVoice},
 };
 
@@ -20,6 +21,10 @@ pub const MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB: f64 = 6.0;
 pub const MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_POWER_RATIO: f64 = 3.981_071_705_534_972_2;
 pub const MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB: f64 = -24.0;
 pub const MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB: f64 = -6.0;
+pub const MODEL_D_FILTER_CUTOFF_ERROR_MAX: f32 = 0.08;
+pub const MODEL_D_FILTER_SLOPE_MIN_DB_PER_OCTAVE: f32 = 20.0;
+pub const MODEL_D_FILTER_SLOPE_MAX_DB_PER_OCTAVE: f32 = 28.0;
+pub const MODEL_D_FILTER_RESONANCE_RATIO_MIN: f32 = 1.05;
 
 /// The ladder's 63-tap decimator contributes 31 samples of delay at its
 /// four-times internal rate, or 7.75 samples at its host rate.
@@ -282,6 +287,135 @@ pub struct ModelDAliasEvidence {
     pub nonlinear_overtone_magnitude_difference_db: f64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ModelDCutoffProbe {
+    pub target_hz: f32,
+    pub measured_hz: f32,
+    pub error_fraction: f32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModelDFilterEvidence {
+    pub cutoffs: Vec<ModelDCutoffProbe>,
+    pub slope_db_per_octave: f32,
+    pub resonance_middle_over_low: f32,
+    pub resonance_high_over_middle: f32,
+}
+
+impl ModelDFilterEvidence {
+    pub fn passes(&self) -> bool {
+        self.cutoffs.len() == 4
+            && self.cutoffs.iter().all(|probe| {
+                probe.target_hz.is_finite()
+                    && probe.target_hz > 0.0
+                    && probe.measured_hz.is_finite()
+                    && probe.error_fraction.is_finite()
+                    && probe.error_fraction <= MODEL_D_FILTER_CUTOFF_ERROR_MAX
+            })
+            && self.cutoffs.windows(2).all(|pair| {
+                pair[0].measured_hz.is_finite()
+                    && pair[1].measured_hz.is_finite()
+                    && pair[0].measured_hz < pair[1].measured_hz
+            })
+            && self.slope_db_per_octave.is_finite()
+            && (MODEL_D_FILTER_SLOPE_MIN_DB_PER_OCTAVE..=MODEL_D_FILTER_SLOPE_MAX_DB_PER_OCTAVE)
+                .contains(&self.slope_db_per_octave)
+            && self.resonance_middle_over_low.is_finite()
+            && self.resonance_middle_over_low > MODEL_D_FILTER_RESONANCE_RATIO_MIN
+            && self.resonance_high_over_middle.is_finite()
+            && self.resonance_high_over_middle > MODEL_D_FILTER_RESONANCE_RATIO_MIN
+    }
+}
+
+/// Reuses the ladder's declared cutoff, slope, and resonance probes for the
+/// offline artifact report. This is engineering evidence, not a hardware match.
+pub fn measure_filter_evidence() -> Result<ModelDFilterEvidence, ModelDError> {
+    let targets = [125.0_f32, 500.0, 2_000.0, 8_000.0];
+    let cutoffs = targets
+        .into_iter()
+        .map(|target_hz| {
+            let measured_hz = measured_ladder_cutoff_hz(target_hz)?;
+            Ok(ModelDCutoffProbe {
+                target_hz,
+                measured_hz,
+                error_fraction: (measured_hz - target_hz).abs() / target_hz,
+            })
+        })
+        .collect::<Result<Vec<_>, ModelDError>>()?;
+    let lower = ladder_response(250.0, 2_000.0, 0.0)?;
+    let upper = ladder_response(250.0, 4_000.0, 0.0)?;
+    let resonance_peak = |resonance| -> Result<f32, ModelDError> {
+        let passband = ladder_response(1_000.0, 100.0, resonance)?;
+        let peak = [1_000.0_f32, 1_500.0, 2_000.0, 2_300.0, 2_500.0, 3_000.0]
+            .into_iter()
+            .map(|frequency| ladder_response(1_000.0, frequency, resonance))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .fold(0.0_f32, f32::max);
+        Ok(peak / passband)
+    };
+    let low = resonance_peak(0.0)?;
+    let middle = resonance_peak(0.45)?;
+    let high = resonance_peak(0.8)?;
+    Ok(ModelDFilterEvidence {
+        cutoffs,
+        slope_db_per_octave: 20.0 * (lower / upper).log10(),
+        resonance_middle_over_low: middle / low,
+        resonance_high_over_middle: high / middle,
+    })
+}
+
+fn measured_ladder_cutoff_hz(target_hz: f32) -> Result<f32, ModelDError> {
+    let threshold = core::f32::consts::FRAC_1_SQRT_2;
+    let mut lower = 0.72 * target_hz;
+    let mut upper = 1.28 * target_hz;
+    for _ in 0..12 {
+        let middle = 0.5 * (lower + upper);
+        if ladder_response(target_hz, middle, 0.0)? > threshold {
+            lower = middle;
+        } else {
+            upper = middle;
+        }
+    }
+    Ok(0.5 * (lower + upper))
+}
+
+fn ladder_response(cutoff_hz: f32, frequency_hz: f32, resonance: f32) -> Result<f32, ModelDError> {
+    const MIN_CUTOFF_HZ: f32 = 20.0;
+    const MAX_CUTOFF_HZ: f32 = 8_000.0;
+    let mut ladder = ModelDLadder::new(
+        CANONICAL_SAMPLE_RATE as f32,
+        LadderConfig {
+            resonance,
+            drive: 1.0,
+            mode: LadderMode::Linear,
+        },
+    )?;
+    let cutoff = (cutoff_hz / MIN_CUTOFF_HZ).ln() / (MAX_CUTOFF_HZ / MIN_CUTOFF_HZ).ln();
+    let phase_step = core::f32::consts::TAU * frequency_hz / CANONICAL_SAMPLE_RATE as f32;
+    let mut phase = 0.0_f32;
+    for _ in 0..8_192 {
+        ladder.sample(0.05 * phase.sin(), cutoff);
+        phase = (phase + phase_step).rem_euclid(core::f32::consts::TAU);
+    }
+    let mut input_sine = 0.0_f64;
+    let mut input_cosine = 0.0_f64;
+    let mut output_sine = 0.0_f64;
+    let mut output_cosine = 0.0_f64;
+    for _ in 0..16_384 {
+        let input = 0.05 * phase.sin();
+        let output = ladder.sample(input, cutoff);
+        let sine = f64::from(phase.sin());
+        let cosine = f64::from(phase.cos());
+        input_sine += f64::from(input) * sine;
+        input_cosine += f64::from(input) * cosine;
+        output_sine += f64::from(output) * sine;
+        output_cosine += f64::from(output) * cosine;
+        phase = (phase + phase_step).rem_euclid(core::f32::consts::TAU);
+    }
+    Ok(output_sine.hypot(output_cosine) as f32 / input_sine.hypot(input_cosine) as f32)
+}
+
 pub fn render_audition(kind: AuditionKind, sample_rate: u32) -> Result<ModelDRender, ModelDError> {
     validate_render_sample_rate(sample_rate)?;
     let mono = render_score(kind, sample_rate)?;
@@ -518,7 +652,7 @@ fn measure_render(
         presentation_gain: kind.presentation_gain(),
         zero_tail_frames,
         ablation_residual_rms,
-        sample_hash: hash_samples(samples),
+        sample_hash: hash_sample_stream(samples),
         score_hash: hash_score(kind.score_events(), kind.duration_frames_48k()),
         finite,
     }
@@ -590,7 +724,7 @@ fn difference_rms(left: &[f32], right: &[f32]) -> f64 {
         .sqrt()
 }
 
-fn hash_samples(samples: &[f32]) -> u64 {
+pub fn hash_sample_stream(samples: &[f32]) -> u64 {
     samples.iter().fold(0xcbf2_9ce4_8422_2325, |hash, sample| {
         (hash ^ u64::from(sample.to_bits())).wrapping_mul(0x0000_0100_0000_01b3)
     })
@@ -865,7 +999,10 @@ fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{AuditionKind, measure_alias_evidence, measure_alias_residual, render_audition};
+    use super::{
+        AuditionKind, measure_alias_evidence, measure_alias_residual, measure_filter_evidence,
+        render_audition,
+    };
 
     const SAMPLE_RATE: u32 = 48_000;
     const MAX_PEAK_FOR_ONE_DB_HEADROOM: f64 = 0.891_250_938_133_745_6;
@@ -884,6 +1021,42 @@ mod tests {
                 "07_matched_no_drift_or_feedback.wav",
             ]
         );
+    }
+
+    #[test]
+    fn public_filter_evidence_reuses_ladder_gates_and_rejects_nonfinite_values() {
+        let evidence = measure_filter_evidence().unwrap();
+        assert!(evidence.passes(), "{evidence:?}");
+        assert!(
+            evidence.cutoffs.iter().all(|probe| {
+                probe.target_hz.is_finite()
+                    && probe.measured_hz.is_finite()
+                    && probe.error_fraction.is_finite()
+            }),
+            "{evidence:?}"
+        );
+        assert!(evidence.slope_db_per_octave.is_finite());
+        assert!(evidence.resonance_middle_over_low.is_finite());
+        assert!(evidence.resonance_high_over_middle.is_finite());
+
+        for invalidate in [
+            |evidence: &mut super::ModelDFilterEvidence| {
+                evidence.cutoffs[0].measured_hz = f32::NAN;
+            },
+            |evidence: &mut super::ModelDFilterEvidence| {
+                evidence.slope_db_per_octave = f32::NAN;
+            },
+            |evidence: &mut super::ModelDFilterEvidence| {
+                evidence.resonance_middle_over_low = f32::NAN;
+            },
+            |evidence: &mut super::ModelDFilterEvidence| {
+                evidence.resonance_high_over_middle = f32::NAN;
+            },
+        ] {
+            let mut invalid = evidence.clone();
+            invalidate(&mut invalid);
+            assert!(!invalid.passes(), "{invalid:?}");
+        }
     }
 
     #[test]
