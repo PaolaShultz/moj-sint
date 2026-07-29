@@ -14,9 +14,11 @@ const ANALYSIS_RATE_FACTOR: usize = 4;
 pub const MODEL_D_ALIAS_ANALYSIS_FILTER_TAPS: usize = 257;
 pub const MODEL_D_ALIAS_ANALYSIS_FILTER_CUTOFF_HZ: f64 = 21_600.0;
 const ALIAS_WARMUP_FRAMES_48K: usize = 48_000;
-const ALIAS_MEASUREMENT_FRAMES: usize = 32_768;
+const ALIAS_MEASUREMENT_FRAMES: usize = 131_072;
 pub const MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS: usize = 4;
-pub const MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB: f64 = 3.0;
+pub const MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB: f64 = 6.0;
+pub const MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB: f64 = -24.0;
+pub const MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB: f64 = -6.0;
 
 /// The ladder's 63-tap decimator contributes 31 samples of delay at its
 /// four-times internal rate, or 7.75 samples at its host rate.
@@ -256,7 +258,10 @@ pub struct ModelDAliasEvidence {
     /// Non-harmonic native 192 kHz energy in the same physical 0–24 kHz band.
     pub reference_floor_db: f64,
     /// Positive target residual power above the independently measured floor.
-    pub excess_residual_db: f64,
+    /// `None` means that the estimate is floor-limited, so no excess can be
+    /// resolved without inventing a number below the reference floor.
+    pub excess_residual_db: Option<f64>,
+    pub floor_limited: bool,
     /// Raw time residual after fixed sinc resampling and the declared 7.75-host
     /// sample ladder-FIR alignment. It deliberately remains a non-acceptance
     /// diagnostic because it conflates transfer and phase with alias energy.
@@ -266,7 +271,11 @@ pub struct ModelDAliasEvidence {
     pub resolution_hz: f64,
     pub harmonic_mask_half_width_bins: usize,
     pub harmonic_mask_coverage: f64,
-    pub nonlinear_harmonic_difference_db: f64,
+    /// Gain- and phase-invariant overtone-magnitude difference between the
+    /// nonlinear probe and its matched linear path, relative to the nonlinear
+    /// path's total harmonic energy. DC and the fundamental are excluded from
+    /// the difference numerator.
+    pub nonlinear_overtone_magnitude_difference_db: f64,
 }
 
 pub fn render_audition(kind: AuditionKind, sample_rate: u32) -> Result<ModelDRender, ModelDError> {
@@ -330,18 +339,27 @@ pub fn measure_alias_evidence(note: u8) -> Result<ModelDAliasEvidence, ModelDErr
         reference_fundamental_hz,
         24_000.0,
     );
-    let excess_ratio = (target_spectral.ratio - reference_spectral.ratio).max(1.0e-24);
+    let floor_limited = target_spectral.ratio <= reference_spectral.ratio;
+    let excess_residual_db =
+        (!floor_limited).then(|| ratio_db(target_spectral.ratio - reference_spectral.ratio));
     Ok(ModelDAliasEvidence {
         target_residual_db: ratio_db(target_spectral.ratio),
         reference_floor_db: ratio_db(reference_spectral.ratio),
-        excess_residual_db: ratio_db(excess_ratio),
+        excess_residual_db,
+        floor_limited,
         transfer_conflated_residual_db: fitted_residual_db(target, &reference),
         target_fundamental_hz,
         reference_fundamental_hz,
         resolution_hz: target_spectral.resolution_hz,
         harmonic_mask_half_width_bins: MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS,
         harmonic_mask_coverage: target_spectral.coverage,
-        nonlinear_harmonic_difference_db: fitted_residual_db(target, linear_target),
+        nonlinear_overtone_magnitude_difference_db: overtone_magnitude_difference_db(
+            target,
+            linear_target,
+            CANONICAL_SAMPLE_RATE,
+            target_fundamental_hz,
+            24_000.0,
+        ),
     })
 }
 
@@ -600,30 +618,9 @@ fn measure_spectral_foldback(
     assert!(samples.len().is_power_of_two());
     let sample_count = samples.len();
     let resolution_hz = f64::from(sample_rate) / sample_count as f64;
-    let mean = samples.iter().map(|sample| f64::from(*sample)).sum::<f64>() / sample_count as f64;
-    let mut spectrum: Vec<_> = samples
-        .iter()
-        .enumerate()
-        .map(|(index, sample)| {
-            let phase = std::f64::consts::TAU * index as f64 / (sample_count - 1) as f64;
-            let window = 0.358_75 - 0.488_29 * phase.cos() + 0.141_28 * (2.0 * phase).cos()
-                - 0.011_68 * (3.0 * phase).cos();
-            ((f64::from(*sample) - mean) * window, 0.0_f64)
-        })
-        .collect();
-    fft_in_place(&mut spectrum);
-
+    let spectrum = windowed_spectrum(samples);
     let maximum_bin = (maximum_hz / resolution_hz).floor() as usize;
-    let mut harmonic_mask = vec![false; maximum_bin + 1];
-    let harmonic_count = (maximum_hz / fundamental_hz).floor() as usize;
-    for harmonic in 1..=harmonic_count {
-        let center = (fundamental_hz * harmonic as f64 / resolution_hz).round() as usize;
-        let first = center
-            .saturating_sub(MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS)
-            .max(1);
-        let last = (center + MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS).min(maximum_bin);
-        harmonic_mask[first..=last].fill(true);
-    }
+    let harmonic_mask = harmonic_mask(maximum_bin, resolution_hz, fundamental_hz);
 
     let mut total_energy = 0.0_f64;
     let mut residual_energy = 0.0_f64;
@@ -640,6 +637,86 @@ fn measure_spectral_foldback(
         coverage: masked_bins as f64 / maximum_bin.max(1) as f64,
         resolution_hz,
     }
+}
+
+fn windowed_spectrum(samples: &[f32]) -> Vec<(f64, f64)> {
+    assert!(samples.len().is_power_of_two());
+    let sample_count = samples.len();
+    let mean = samples.iter().map(|sample| f64::from(*sample)).sum::<f64>() / sample_count as f64;
+    let mut spectrum: Vec<_> = samples
+        .iter()
+        .enumerate()
+        .map(|(index, sample)| {
+            let phase = std::f64::consts::TAU * index as f64 / (sample_count - 1) as f64;
+            let window = 0.358_75 - 0.488_29 * phase.cos() + 0.141_28 * (2.0 * phase).cos()
+                - 0.011_68 * (3.0 * phase).cos();
+            ((f64::from(*sample) - mean) * window, 0.0_f64)
+        })
+        .collect();
+    fft_in_place(&mut spectrum);
+    spectrum
+}
+
+fn harmonic_mask(maximum_bin: usize, resolution_hz: f64, fundamental_hz: f64) -> Vec<bool> {
+    let mut harmonic_mask = vec![false; maximum_bin + 1];
+    let harmonic_count = ((maximum_bin as f64 * resolution_hz) / fundamental_hz).floor() as usize;
+    for harmonic in 1..=harmonic_count {
+        let center = (fundamental_hz * harmonic as f64 / resolution_hz).round() as usize;
+        let first = center
+            .saturating_sub(MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS)
+            .max(1);
+        let last = (center + MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS).min(maximum_bin);
+        harmonic_mask[first..=last].fill(true);
+    }
+    harmonic_mask
+}
+
+fn overtone_magnitude_difference_db(
+    target: &[f32],
+    reference: &[f32],
+    sample_rate: u32,
+    fundamental_hz: f64,
+    maximum_hz: f64,
+) -> f64 {
+    assert_eq!(target.len(), reference.len());
+    let resolution_hz = f64::from(sample_rate) / target.len() as f64;
+    let target_spectrum = windowed_spectrum(target);
+    let reference_spectrum = windowed_spectrum(reference);
+    let maximum_bin = (maximum_hz / resolution_hz).floor() as usize;
+    let harmonic_count = (maximum_hz / fundamental_hz).floor() as usize;
+    let band_magnitudes = |spectrum: &[(f64, f64)]| {
+        (1..=harmonic_count)
+            .map(|harmonic| {
+                let center = (fundamental_hz * harmonic as f64 / resolution_hz).round() as usize;
+                let first = center
+                    .saturating_sub(MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS)
+                    .max(1);
+                let last = (center + MODEL_D_ALIAS_HARMONIC_MASK_HALF_WIDTH_BINS).min(maximum_bin);
+                spectrum[first..=last]
+                    .iter()
+                    .map(|&(real, imaginary)| real * real + imaginary * imaginary)
+                    .sum::<f64>()
+                    .sqrt()
+            })
+            .collect::<Vec<_>>()
+    };
+    let target_magnitudes = band_magnitudes(&target_spectrum);
+    let reference_magnitudes = band_magnitudes(&reference_spectrum);
+    let gain = target_magnitudes[0] / reference_magnitudes[0].max(1.0e-24);
+    let difference_energy = target_magnitudes
+        .iter()
+        .zip(&reference_magnitudes)
+        .skip(1)
+        .map(|(&target, &reference)| {
+            let difference = target - gain * reference;
+            difference * difference
+        })
+        .sum::<f64>();
+    let target_harmonic_energy = target_magnitudes
+        .iter()
+        .map(|magnitude| magnitude * magnitude)
+        .sum::<f64>();
+    ratio_db((difference_energy / target_harmonic_energy.max(1.0e-24)).max(1.0e-24))
 }
 
 fn fft_in_place(values: &mut [(f64, f64)]) {
@@ -950,15 +1027,29 @@ mod tests {
                 "note={note}, residual_db={first}, maximum_db={maximum_db}, evidence={evidence:?}"
             );
             assert!(
-                evidence.reference_floor_db
-                    <= evidence.target_residual_db
-                        - super::MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB,
+                evidence.reference_floor_db <= maximum_db,
                 "note={note}, evidence={evidence:?}"
             );
-            assert!(
-                evidence.excess_residual_db <= maximum_db,
-                "note={note}, evidence={evidence:?}"
-            );
+            if evidence.floor_limited {
+                assert_eq!(evidence.excess_residual_db, None, "{evidence:?}");
+                assert!(
+                    evidence.target_residual_db <= evidence.reference_floor_db,
+                    "{evidence:?}"
+                );
+            } else {
+                assert!(
+                    evidence.reference_floor_db
+                        <= evidence.target_residual_db
+                            - super::MODEL_D_ALIAS_MIN_REFERENCE_FLOOR_MARGIN_DB,
+                    "note={note}, evidence={evidence:?}"
+                );
+                assert!(
+                    evidence
+                        .excess_residual_db
+                        .is_some_and(|db| db <= maximum_db),
+                    "note={note}, evidence={evidence:?}"
+                );
+            }
             assert!(
                 evidence.transfer_conflated_residual_db.is_finite(),
                 "note={note}, evidence={evidence:?}"
@@ -977,46 +1068,107 @@ mod tests {
                 "note={note}, evidence={evidence:?}"
             );
             assert_eq!(evidence.harmonic_mask_half_width_bins, 4);
-            assert!(evidence.resolution_hz <= 1.5, "{evidence:?}");
-            assert!(evidence.harmonic_mask_coverage < 0.50, "{evidence:?}");
+            assert!(evidence.resolution_hz <= 0.37, "{evidence:?}");
+            assert!(evidence.harmonic_mask_coverage <= 0.15, "{evidence:?}");
             assert!(
-                (-40.0..=-6.0).contains(&evidence.nonlinear_harmonic_difference_db),
+                (super::MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MIN_DB
+                    ..=super::MODEL_D_NONLINEAR_OVERTONE_DIFFERENCE_MAX_DB)
+                    .contains(&evidence.nonlinear_overtone_magnitude_difference_db),
                 "note={note}, evidence={evidence:?}"
             );
+            assert_eq!(evidence.floor_limited, note == 36, "{evidence:?}");
         }
         assert!(measure_alias_residual(127).is_err());
     }
 
     #[test]
-    fn spectral_mask_retains_a_synthetic_non_harmonic_folded_tone() {
-        const FRAMES: usize = 32_768;
-        const FUNDAMENTAL_HZ: f64 = 997.3;
-        const FOLDED_HZ: f64 = 7_311.7;
+    fn note_36_spectral_mask_retains_low_mid_and_high_folded_components() {
+        const FRAMES: usize = 131_072;
+        const FOLDED_LEVEL: f64 = 0.01;
+        let fundamental_hz = super::prepared_fundamental_hz(24, SAMPLE_RATE);
+        let folded_frequencies = [1_000.0, 8_000.0, 18_000.0]
+            .map(|near_hz| ((near_hz / fundamental_hz).floor() + 0.5) * fundamental_hz);
         let clean: Vec<_> = (0..FRAMES)
             .map(|frame| {
-                (std::f64::consts::TAU * FUNDAMENTAL_HZ * frame as f64 / f64::from(SAMPLE_RATE))
-                    .sin() as f32
+                let phase =
+                    std::f64::consts::TAU * fundamental_hz * frame as f64 / f64::from(SAMPLE_RATE);
+                (phase.sin() + 0.3 * (2.0 * phase).sin() + 0.2 * (3.0 * phase).sin()) as f32
             })
             .collect();
         let folded: Vec<_> = clean
             .iter()
             .enumerate()
             .map(|(frame, clean)| {
-                *clean
-                    + 0.01
-                        * (std::f64::consts::TAU * FOLDED_HZ * frame as f64
-                            / f64::from(SAMPLE_RATE))
-                        .sin() as f32
+                folded_frequencies.iter().fold(*clean, |sample, frequency| {
+                    sample
+                        + (FOLDED_LEVEL
+                            * (std::f64::consts::TAU * frequency * frame as f64
+                                / f64::from(SAMPLE_RATE))
+                            .sin()) as f32
+                })
             })
             .collect();
-        let clean = super::measure_spectral_foldback(&clean, SAMPLE_RATE, FUNDAMENTAL_HZ, 24_000.0);
+        let clean = super::measure_spectral_foldback(&clean, SAMPLE_RATE, fundamental_hz, 24_000.0);
         let folded =
-            super::measure_spectral_foldback(&folded, SAMPLE_RATE, FUNDAMENTAL_HZ, 24_000.0);
-        assert!(super::ratio_db(clean.ratio) <= -75.0, "{clean:?}");
+            super::measure_spectral_foldback(&folded, SAMPLE_RATE, fundamental_hz, 24_000.0);
+        let expected_ratio = 3.0 * FOLDED_LEVEL.powi(2) / (1.0 + 0.3_f64.powi(2) + 0.2_f64.powi(2));
+        let expected_db = super::ratio_db(expected_ratio);
+        assert!(super::ratio_db(clean.ratio) <= -45.0, "{clean:?}");
         assert!(
-            (-43.0..=-37.0).contains(&super::ratio_db(folded.ratio)),
-            "{folded:?}"
+            (super::ratio_db(folded.ratio) - expected_db).abs() <= 0.5,
+            "expected_db={expected_db}, folded={folded:?}"
         );
-        assert!(folded.coverage < 0.50, "{folded:?}");
+        assert!(folded.coverage <= 0.15, "{folded:?}");
+    }
+
+    #[test]
+    fn overtone_magnitude_difference_rejects_gain_and_phase_but_detects_harmonics() {
+        const FRAMES: usize = 131_072;
+        const FUNDAMENTAL_HZ: f64 = 997.3;
+        let reference: Vec<_> = (0..FRAMES)
+            .map(|frame| {
+                (std::f64::consts::TAU * FUNDAMENTAL_HZ * frame as f64 / f64::from(SAMPLE_RATE))
+                    .sin() as f32
+            })
+            .collect();
+        let gain_and_phase: Vec<_> = (0..FRAMES)
+            .map(|frame| {
+                (0.5 * (std::f64::consts::TAU * FUNDAMENTAL_HZ * frame as f64
+                    / f64::from(SAMPLE_RATE)
+                    + 0.8)
+                    .sin()) as f32
+            })
+            .collect();
+        let added_harmonic: Vec<_> = reference
+            .iter()
+            .enumerate()
+            .map(|(frame, fundamental)| {
+                *fundamental
+                    + (0.1
+                        * (std::f64::consts::TAU * 3.0 * FUNDAMENTAL_HZ * frame as f64
+                            / f64::from(SAMPLE_RATE))
+                        .sin()) as f32
+            })
+            .collect();
+
+        let gain_phase_db = super::overtone_magnitude_difference_db(
+            &gain_and_phase,
+            &reference,
+            SAMPLE_RATE,
+            FUNDAMENTAL_HZ,
+            24_000.0,
+        );
+        let added_harmonic_db = super::overtone_magnitude_difference_db(
+            &added_harmonic,
+            &reference,
+            SAMPLE_RATE,
+            FUNDAMENTAL_HZ,
+            24_000.0,
+        );
+        assert!(gain_phase_db <= -75.0, "{gain_phase_db}");
+        assert!(
+            (-21.0..=-19.0).contains(&added_harmonic_db),
+            "{added_harmonic_db}"
+        );
     }
 }
