@@ -295,8 +295,11 @@ pub fn render_audition(kind: AuditionKind, sample_rate: u32) -> Result<ModelDRen
     Ok(ModelDRender { samples, metrics })
 }
 
+/// Returns the conservative alias upper bound, using the native reference floor
+/// whenever the target estimate is floor-limited.
 pub fn measure_alias_residual(note: u8) -> Result<f64, ModelDError> {
-    Ok(measure_alias_evidence(note)?.target_residual_db)
+    let evidence = measure_alias_evidence(note)?;
+    Ok(evidence.target_residual_db.max(evidence.reference_floor_db))
 }
 
 pub fn measure_alias_evidence(note: u8) -> Result<ModelDAliasEvidence, ModelDError> {
@@ -1020,7 +1023,11 @@ mod tests {
             let first = measure_alias_residual(note).unwrap();
             let second = measure_alias_residual(note).unwrap();
             assert_eq!(first, second, "note={note}");
-            assert_eq!(first, evidence.target_residual_db, "note={note}");
+            assert_eq!(
+                first,
+                evidence.target_residual_db.max(evidence.reference_floor_db),
+                "note={note}"
+            );
             assert!(first.is_finite(), "note={note}, residual_db={first}");
             assert!(
                 first <= maximum_db,
