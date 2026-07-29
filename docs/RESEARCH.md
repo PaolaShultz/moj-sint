@@ -711,6 +711,15 @@ filter articulation 1.6. Internal voice output gains are 0.42/0.40/0.42.
 There is no per-file or post-render normalization, full-band limiter,
 compressor, reverb, or delay.
 
+The first human comparison on 2026-07-29 preferred
+`04_matched_idealized_path.wav` over the other six renders. The listener
+explicitly described the assessment as non-expert. This is directionally
+useful evidence that the cleaner idealized path is the strongest current
+baseline; it does not show that the modeled oscillator imperfections, mixer
+loading, ladder nonlinearity, drift, or feedback improve the sound. Those
+mechanisms must be reintroduced one at a time in any future refinement rather
+than assumed to be desirable because they are circuit-informed.
+
 The three full-path files measure:
 
 | file | peak | RMS | DC | maximum jump | headroom dBFS |

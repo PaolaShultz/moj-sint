@@ -640,7 +640,8 @@ The settled high-level choices are:
 
 ## Model D character checkpoint
 
-Implemented on 2026-07-29 and awaiting human listening:
+Implemented on 2026-07-29. The first human listening comparison is now
+recorded:
 
 - added an isolated monophonic `model_d` research path and offline
   `model-d-lab` without modifying production `Engine`, preset schema, stable
@@ -683,6 +684,14 @@ matched causal ablations. Listen in filename order:
 5. `05_matched_linear_mixer.wav`
 6. `06_matched_linear_ladder.wav`
 7. `07_matched_no_drift_or_feedback.wav`
+
+On 2026-07-29 the user preferred `04_matched_idealized_path.wav` over the
+other six renders, while explicitly qualifying the verdict as a non-expert
+assessment. This is a directionally positive selection of the idealized path
+as the best current listening baseline. It is not acceptance of the full
+character path, proof that the added imperfections/nonlinearities help, a
+hardware-equivalence claim, or authorization to integrate the experiment into
+the production `Engine`.
 
 The presentation gains are fixed at 1.0 for the bass and every matched
 ablation, 0.75 for the lead, and 1.6 for the filter-articulation phrase.
@@ -820,14 +829,13 @@ Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
 `docs/superpowers/specs/2026-07-29-model-d-character-design.md` before changing
 files.
 
-Listen in order to the seven-file isolated Model D character audition under
-`artifacts/model-d-character/`: three full-path coverage phrases, then the
-matched idealized, linear-mixer, linear-ladder, and no-drift/no-feedback bass
-ablations. Judge coherent instrument identity, useful oscillator movement,
-mixer/filter character, retained filter body, and whether the ablations expose
-proportionate causal contributions. Do not claim hardware equivalence or route
-the model into `Engine`, presets, or stable macros without explicit human
-acceptance.
+Continue from the first listening verdict: `04_matched_idealized_path.wav` was
+preferred over the other six renders, with the user's explicit non-expert
+qualification. Treat it as the best current baseline, not as hardware
+equivalence or production acceptance. Before integrating anything, use a
+separately approved refinement task to identify whether any oscillator
+imperfection, mixer nonlinearity, ladder nonlinearity, drift, or feedback can
+be reintroduced individually without making that baseline worse.
 
 Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
 expand production polyphony without explicit scope and native evidence.
@@ -835,11 +843,11 @@ expand production polyphony without explicit scope and native evidence.
 
 ## Next action
 
-Obtain the human listening verdict for the seven-file Model D character gate.
-If rejected, trash the disposable batch and record the reason. If
-directionally positive, identify which causal mechanisms survived the
-ablations before deciding whether to preserve a specific result, refine the
-isolated model, or propose a separately scoped production integration.
+Use `04_matched_idealized_path.wav` as the current listening baseline in a
+future, separately scoped refinement. Reintroduce character mechanisms
+individually and compare them causally before deciding whether to preserve a
+specific result or propose production integration. The current ignored batch
+remains disposable and no experiment output has been added to Git.
 
 ## Executed foundation checkpoint
 
