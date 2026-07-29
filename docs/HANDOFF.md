@@ -335,38 +335,37 @@ requested.
 ## Performance controller contract
 
 Controller design is a first-class synth requirement. The target physical
-surface has one relative master rotary, eight sound-shaping rotary controls,
-and four ADSR pots. The goal is thirteen musically useful controls, not a list
-of convenient implementation parameters.
+surface exposes exactly twelve continuous synth controls: eight sound-shaping
+rotaries and four ADSR pots. SHR's relative master rotary remains a host
+navigation/context control and is not a thirteenth Moj Sint control.
 
-Proposed stable roles:
+The current Rust `MacroId` and version-1 preset schema contain nine timbral
+candidates plus ADSR: `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`,
+`DEPTH`, `WIDTH`, `SPACE`, `ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. That
+thirteen-ID implementation is provisional foundation scaffolding, not the
+settled hardware or product contract.
+
+Before production controller integration, evaluate the nine timbral candidates
+and remove the least musically useful one. Do not invent a button, hidden page,
+mode, or master-encoder takeover to retain it. The final eight names remain
+open until automated control-travel evidence and human listening support the
+choice.
+
+Settled physical roles:
 
 | Physical control | Musical role | Intent |
 | --- | --- | --- |
-| Master rotary | `EVOLVE` | Coherent preset-authored transformation between related sound states |
-| Rotary 1 | `SHAPE` | Oscillator topology or spectral structure |
-| Rotary 2 | `COLOR` | Harmonic balance and brightness |
-| Rotary 3 | `EDGE` | Fold, drive, feedback, or nonlinear intensity |
-| Rotary 4 | `COUPLE` | Sync, FM/PM, cross-modulation, or oscillator interaction |
-| Rotary 5 | `MOTION` | Movement character or rate |
-| Rotary 6 | `DEPTH` | Modulation intensity |
-| Rotary 7 | `WIDTH` | Detune, phase distribution, or stereo structure |
-| Rotary 8 | `SPACE` | Internal diffusion, resonant tail, or dimensional character |
+| Rotary 1-8 | Exactly eight evidence-selected timbral/performance macros | Useful sound variation across the physical travel |
 | Pot 1 | `ATTACK` | Perceptually scaled onset; may coordinate amplitude and timbre |
 | Pot 2 | `DECAY` | Perceptually scaled decay; may coordinate amplitude and timbre |
 | Pot 3 | `SUSTAIN` | Sustained level and, where authored, sustained spectral state |
 | Pot 4 | `RELEASE` | Perceptually scaled tail; may coordinate amplitude and timbre |
 
-These are semantic anchors, not fixed one-to-one DSP parameters. A versioned
-preset may map one macro to multiple internal parameters with explicit minimum,
-maximum, curve, polarity, smoothing, and safe gain/energy compensation. For
-example, `EDGE` may increase fold depth, adjust feedback damping, and reduce
-output gain together.
-
-`EVOLVE` must produce a broad, coherent, preset-specific transformation. It
-must not be a disguised volume control. The master encoder is relative, so SHR
-must accumulate and retain a normalized macro value rather than treating its
-messages like absolute knobs.
+The selected controls are semantic anchors, not fixed one-to-one DSP
+parameters. A versioned preset may map one macro to multiple internal
+parameters with explicit minimum, maximum, curve, polarity, smoothing, and safe
+gain/energy compensation. For example, `EDGE` may increase fold depth, adjust
+feedback damping, and reduce output gain together.
 
 The four ADSR controls remain predictable even when they coordinate amplitude
 and timbre envelopes. Time controls need perceptual/exponential mappings rather
@@ -376,25 +375,27 @@ than linear milliseconds.
 
 Current SHR-DAW behavior discovered during inspection:
 
-- The 12 continuous mappings in `src/control.rs` are explicitly synthv1-only.
+- The physical synth surface provides 12 continuous mappings.
 - They use pickup after preset load/reset and currently refer to verified
   synthv1 parameter indices.
 - The master rotary is translated into internal `EncoderAction` UI events and
   is not forwarded to managed synths.
 - On Playback, N00B mode temporarily uses the master rotary to choose a scale.
-- With N00B off, Playback rotary turns currently have no competing sound
-  action, making contextual Moj Sint support feasible.
 
-Proposed Moj Sint behavior in a later SHR-DAW change:
+Required Moj Sint behavior in a later SHR-DAW change:
 
-- On Moj Sint Playback, the master rotary controls `EVOLVE`.
-- Encoder press restores the preset's saved `EVOLVE` value.
-- While N00B is active, the master rotary temporarily keeps its existing scale
-  role.
-- Disabling N00B restores `EVOLVE` control without losing its stored value.
-- The other 12 controls use pickup after preset load, reset, or Idea restore.
-- Moj Sint receives its own stable macro CC/schema; it never inherits synthv1
+- Map the 12 continuous synth controls to the final eight timbral roles plus
+  ADSR, with pickup after preset load, reset, or Idea restore.
+- Keep the master rotary's SHR navigation/context responsibilities; do not add
+  a Moj Sint-only encoder mode merely to preserve a ninth timbral candidate.
+- Give Moj Sint its own stable macro CC/schema; it never inherits synthv1
   parameter indices or semantics.
+- Follow SHR-DAW's actual continuous-control path. Safe, musically continuous
+  parameters should affect held notes with smoothing.
+- Treat “the next launched tone may receive the new value” only as permission
+  for a simpler implementation where a particular structural or expensive
+  change genuinely requires note-boundary application. It is not a global
+  product constraint and must not be imposed merely for convenience.
 
 ### Control-usefulness gate
 
@@ -437,12 +438,16 @@ The musical architecture is **mono-first, poly-later**, not mono-only:
 - Before expanding, run native Raspberry Pi callback timing under representative
   notes, macro motion, and worst-case topology. Establish a conservative budget
   with headroom for JACK, MIDI/event transfer, and the rest of SHR-DAW.
-- Add voices incrementally and repeat allocation, deadline, determinism,
-  finiteness, level, and listening checks. Polyphony may also need per-voice
-  phase/seed policy, voice stealing, mix compensation, and reduced internal
-  topology; none is selected yet.
-- Do not promise a voice count until native evidence exists. Monophonic design
-  is a sequencing decision that protects sound research, not a product lock.
+- Measure explicit 1-, 2-, 4-, and 8-voice cases, then repeat allocation,
+  deadline, determinism, finiteness, level, and listening checks. Four voices
+  may be sufficient and is an acceptable result; eight is neither required nor
+  preferred without evidence.
+- Polyphony may also need per-voice phase/seed policy, voice stealing, mix
+  compensation, and reduced internal topology; none is selected yet.
+- Do not promise a voice count until native evidence exists. The 1/2/4/8 test
+  set is an evaluation ladder, not a commitment to its maximum. Monophonic
+  design is a sequencing decision that protects sound research, not a product
+  lock.
 
 ## Initial software direction
 
@@ -465,7 +470,7 @@ Suggested focused modules, subject to the approved implementation plan:
 ```text
 src/lib.rs              public engine boundary
 src/engine.rs           voices, events, block rendering
-src/control.rs          13 macros, prepared routing, smoothing
+src/control.rs          provisional 13 IDs pending final 12-control migration
 src/envelope.rs         perceptual ADSR behavior
 src/dsp/mod.rs          finite guards and DSP primitives
 src/dsp/oscillator.rs   first reference oscillator
@@ -604,12 +609,12 @@ replay, and the audible consequences of register-width and state-cycle
 changes. Different bit widths and oscillator counts are engineering sweeps
 inside this one family, not separate listening mechanisms.
 
-The hoped-for payoff is enough cheap parallel machines to support an eventual
-four-note polyphonic instrument with rich internal oscillator populations.
+The hoped-for payoff is enough cheap parallel machines to make a four-note
+instrument a serious candidate with rich internal oscillator populations.
 “Zillions of oscillators” is a productive hypothesis, not a performance claim.
 Research remains monophonic first; only native Raspberry Pi callback/headroom
-measurements may establish how many machines per voice and whether four
-simultaneous notes are actually safe.
+measurements may establish how many machines per voice and whether four or any
+higher count is actually safe and worthwhile.
 
 ## Design and workflow state
 
@@ -618,7 +623,7 @@ request to include the controller target. The revised high-level architecture
 is accepted. There is no unresolved high-level design-approval blocker. Later
 sessions should proceed without reopening settled questions such as installation
 authorization, ALSA-versus-JACK output, external-process integration, or the
-13-control target.
+exact 12-continuous-control budget.
 
 The initial plan and design are recorded under `docs/superpowers/`. The
 foundation fixed module and preset boundaries. The JACK crate-versus-dynamic-FFI
@@ -632,9 +637,13 @@ The settled high-level choices are:
 - ALSA Sequencer MIDI;
 - pure/testable DSP core;
 - fourth distinct SHR-DAW engine;
-- 13 musically meaningful performance controls;
+- exactly 12 continuous performance controls: eight evidence-selected timbral
+  roles plus ADSR, with no invented extra button/mode or master-encoder macro;
+- live control timing aligned with SHR-DAW, with note-boundary deferral only
+  where a particular parameter's implementation requires it;
 - mono-first oscillator-system design with polyphony deferred until native Pi
-  cost/headroom evidence, without permanently locking the engine to mono;
+  cost/headroom evidence across 1/2/4/8 voices, without requiring eight or
+  permanently locking the engine to mono;
 - Raspberry Pi 5 / 2 GB / 64-bit OS primary target; and
 - x86_64 Linux development compatibility.
 
@@ -838,7 +847,9 @@ imperfection, mixer nonlinearity, ladder nonlinearity, drift, or feedback can
 be reintroduced individually without making that baseline worse.
 
 Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
-expand production polyphony without explicit scope and native evidence.
+expand production polyphony without explicit scope and native evidence. Keep
+the settled 12-control budget, follow SHR-DAW's live control path, and do not
+turn next-note application into a global constraint.
 ```
 
 ## Next action
@@ -856,9 +867,9 @@ Completed later on 2026-07-22 and merged into local `main`:
 - initialized Git and recorded the accepted design and implementation plan;
 - installed user-local stable Rust, rustfmt, Clippy, cargo-audit, and cargo-deny;
 - created a pure Rust library, strict version-1 `.mojsint` preset, thirteen
-  stable control identities, reference sine/ADSR, fixed voice engine, and
-  deterministic two-channel float WAV renderer/validator CLI; the production
-  engine currently writes the same mono mix to both channels;
+  then-provisional control identities, reference sine/ADSR, fixed voice engine,
+  and deterministic two-channel float WAV renderer/validator CLI; the
+  production engine currently writes the same mono mix to both channels;
 - enforced no allocation inside `Engine::render_block` in tests;
 - rechecked SHR-DAW main at
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40`;
@@ -938,7 +949,7 @@ Completed later on 2026-07-22:
   harmonic, without per-sample trigonometric setup;
 - routed smoothed `EDGE` from the selector fundamental to its third harmonic and
   smoothed `COUPLE` from the existing oscillator to the selector, preserving the
-  thirteen stable roles and the unchanged `COUPLE=0` baseline;
+  then-current thirteen-ID schema and the unchanged `COUPLE=0` baseline;
 - added exact tap/cancellation, deterministic reset, finite/bounded output,
   high-note third-harmonic guard, macro-travel, rapid-movement, and
   oscillator/engine allocation tests;

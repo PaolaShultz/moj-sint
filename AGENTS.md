@@ -18,8 +18,17 @@
   allocation checks; oscillator/nonlinear changes need aliasing measurements.
 - The live callback may not allocate/deallocate, lock, perform I/O, log, format,
   panic, spawn, or perform avoidable per-sample transcendental setup.
-- Preserve the thirteen stable musical roles in `docs/HANDOFF.md`. Do not claim
-  a macro is useful until automated sweeps and human listening both pass.
+- Preserve the settled physical budget of exactly twelve continuous controls:
+  eight evidence-selected timbral roles plus ADSR. The current thirteen-ID
+  code/schema is provisional; do not invent another button, mode, or
+  master-encoder takeover to retain all nine timbral candidates. Drop the least
+  useful candidate only after automated sweeps and human listening.
+- Follow SHR-DAW's actual live-control path. Permission to apply a value on the
+  next note is an implementation option, not a product constraint; defer a
+  parameter only when its safe implementation genuinely requires it.
+- Do not assume eight-voice polyphony. Measure 1/2/4/8 voices on the native Pi;
+  four is an acceptable outcome if callback/headroom and listening evidence
+  support it.
 - Treat scalar Rust as the baseline. Add x86_64/AArch64 specialization only
   behind measured compile-time gates.
 - Run `cargo fmt --check`, all-target tests, Clippy with warnings denied, release

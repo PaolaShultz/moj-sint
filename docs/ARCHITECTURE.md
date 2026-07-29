@@ -41,10 +41,32 @@ sample path allocates or performs per-sample trigonometric setup.
 The rejected 0/120/240-degree selector remains a tested DSP primitive and a
 direct disposable lab generator, but it is no longer in the voice render path.
 
+## Production control and polyphony contract
+
+SHR-DAW exposes exactly twelve continuous synth controls. Moj Sint's production
+mapping must use eight timbral/performance roles plus `ATTACK`, `DECAY`,
+`SUSTAIN`, and `RELEASE`. The current `MacroId` and version-1 preset schema
+still contain nine timbral candidates plus ADSR. Those thirteen IDs are
+provisional implementation history, not a product requirement. A later
+test-first migration must remove the least useful timbral candidate after
+automated travel evidence and human listening; it must not consume SHR's master
+encoder or invent a hidden page, button, or mode.
+
+Parameter timing follows SHR-DAW's actual live-control path. Safe continuous
+changes should reach held voices through prepared, smoothed events. A
+particular structural or coefficient-heavy parameter may be applied only to
+the next note when evidence shows that is necessary, but next-note-only
+behavior is not a global engine constraint.
+
+Production voice count is also unresolved. Native Raspberry Pi tests must
+measure 1/2/4/8 voices in the real SHR/JACK workload. Four voices is a valid
+possible product result; eight has no special status and is not required.
+
 ## Modules
 
-- `control`: the thirteen stable performance identities, normalized values,
-  perceptual ADSR time mapping, and smoothing primitive.
+- `control`: the currently implemented thirteen provisional identities,
+  normalized values, perceptual ADSR time mapping, and smoothing primitive;
+  production must migrate to the settled twelve-control budget.
 - `dsp`: finite guards, the retained reference sine, independently implemented
   PolyBLEP and integrated-wavetable candidates, the negative-result shared-
   phase selector, and the parallel character layer. Frequency changes prepare
@@ -129,11 +151,12 @@ limitations are in `COMPOSITE_MACHINE_RESEARCH.md`.
 
 ## Deliberate deferrals
 
-The stable macro names exist. `SHAPE`/`COLOR` have measured routes whose human
-listening gate remains open. The selector's `EDGE`/`COUPLE` mapping was rejected
-and retired from the engine. The replacement parallel-character mapping also
-failed human listening because it presented the same weak source under small
-treatments; it is not an accepted factory sound or mapping. The completed
+The provisional macro candidates exist, but the final eight timbral names
+remain open. `SHAPE`/`COLOR` have measured routes whose human listening gate
+remains open. The selector's `EDGE`/`COUPLE` mapping was rejected and retired
+from the engine. The replacement parallel-character mapping also failed human
+listening because it presented the same weak source under small treatments; it
+is not an accepted factory sound or mapping. The completed
 five-family research gate remains isolated from `Engine` and selected no
 successor. The complete hybrid stereo/chord gate is now implemented and also
 remains isolated pending human headphone, speaker, and mono listening. Its
@@ -145,8 +168,8 @@ determinism checks pass, but none establishes perceived power, distinction, or
 musical value. Digital level is not acoustic SPL.
 The future typed micro-machine graph is specified in
 `MICRO_MACHINE_ROUTING.md`, but extraction starts only after listening reveals
-which nodes and connections deserve reuse. The other five timbral macro routes,
-modulation, full
-control-usefulness thresholds, live JACK/ALSA adapters, factory presets, and Pi
-profiling each need their own measured, test-first milestone. No SIMD or
-architecture-specific path should precede profiling on the Pi.
+which nodes and connections deserve reuse. Selection and mapping of the final
+eight timbral roles, modulation, full control-usefulness thresholds, live
+JACK/ALSA adapters, factory presets, and Pi profiling each need their own
+measured, test-first milestone. No SIMD or architecture-specific path should
+precede profiling on the Pi.
