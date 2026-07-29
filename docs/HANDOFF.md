@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-07-24, Europe/Zagreb.
+Last updated: 2026-07-29, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -98,8 +98,8 @@ must not be presented as the musical-variation listening gate.
 
 At this checkpoint:
 
-- Git is initialized on clean `main`; the foundation feature branch was merged
-  locally and its temporary worktree was removed.
+- Git state, branch, and artifact existence must be inspected live rather than
+  inferred from this handoff.
 - The Rust crate contains the portable DSP/control/preset/engine library,
   offline renderer/validator binary, tests, reference preset, and documentation.
 - The first bandlimited-oscillator milestone is implemented: fair scalar
@@ -165,11 +165,16 @@ At this checkpoint:
   exposed excessive bass/sub distortion. Inspection found that its complete
   signal was hard-clamped at -0.3 dBFS from about 8-80 ms while its 45-90 Hz
   onset band remained very strong.
-- The approved next experiment keeps the original 73 Hz fundamental and sub
-  path clean and centered, reduces only their strike crest, and moves bounded
-  hard-crest character into a 105-500 Hz branch for a short onset window. It
-  will produce one successor WAV with modest headroom, not another parameter
-  batch. Nothing is integrated.
+- The controlled-thump successor kept the original 73 Hz fundamental and sub
+  path clean and centered, reduced only their strike crest, and moved bounded
+  hard-crest character into a 105-500 Hz branch for a short onset window.
+  Its historical engineering checkpoint is recorded below; nothing from that
+  experiment was integrated.
+- A separate isolated Model D character model now exercises a documented
+  three-VCO, nonlinear mixer, four-stage nonlinear ladder, dual-contour, VCA,
+  and output-feedback path. Automated engineering gates pass in the generated
+  report, but human listening is pending. It is not integrated into production
+  `Engine`, presets, stable macros, JACK, ALSA, or SHR-DAW.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -633,27 +638,143 @@ The settled high-level choices are:
 - Raspberry Pi 5 / 2 GB / 64-bit OS primary target; and
 - x86_64 Linux development compatibility.
 
+## Model D character checkpoint
+
+Implemented on 2026-07-29 and awaiting human listening:
+
+- added an isolated monophonic `model_d` research path and offline
+  `model-d-lab` without modifying production `Engine`, preset schema, stable
+  macros, JACK, ALSA, or SHR-DAW;
+- built three independently phased VCOs with prepared octave/static-tuning
+  offsets, bounded recurrence-based drift, waveform asymmetry, pulse-width and
+  level differences, and PolyBLEP-corrected saw/pulse edges;
+- summed the VCOs and delayed output feedback in a bounded odd cubic mixer,
+  with an exact linear diagnostic substitution;
+- passed the mixer into four cascaded one-pole ladder stages with bounded odd
+  input/stage transfers, resonance feedback, a 2,049-entry prepared cutoff
+  table, and fixed four-times internal sampling;
+- decimated the ladder with a 63-tap Blackman-windowed linear-phase FIR whose
+  group delay is 31 internal samples, or 7.75 host-rate samples;
+- used independent attack/decay/sustain filter and loudness contours, reusing
+  each contour's decay duration for release, followed by velocity and one
+  authored fixed voice output gain;
+- retained exact idle zero, deterministic reset, finite/bounded output, and
+  allocation-free prepared VCO, contour, mixer, ladder, and full-voice sample
+  paths in tests; and
+- provided matched idealized-path, linear-mixer, linear-ladder, and
+  no-drift/no-feedback ablations using the same bass score, duration, and
+  presentation gain as the full bass render.
+
+The disposable listening set is generated with:
+
+```bash
+cargo run --release --bin model-d-lab -- render artifacts/model-d-character
+```
+
+It contains three authored 48 kHz dual-mono coverage phrases followed by four
+matched causal ablations. Listen in filename order:
+
+1. `01_full_bass_phrase.wav`
+2. `02_full_lead_phrase.wav`
+3. `03_full_filter_articulation.wav`
+4. `04_matched_idealized_path.wav`
+5. `05_matched_linear_mixer.wav`
+6. `06_matched_linear_ladder.wav`
+7. `07_matched_no_drift_or_feedback.wav`
+
+The presentation gains are fixed at 1.0 for the bass and every matched
+ablation, 0.75 for the lead, and 1.6 for the filter-articulation phrase.
+Authored internal voice output gains are 0.42/0.40/0.42 for bass/lead/filter
+respectively. There is no per-file or post-render normalization, full-band
+limiter, compressor, reverb, or delay. The full bass, lead, and filter files
+measure peaks of 0.062773/0.043793/0.107463, RMS
+0.023693/0.020241/0.026807, absolute DC below 0.004667, maximum jumps below
+0.027032, and at least 19.375 dBFS sample headroom. Every render is finite and
+has an exact zero tail. Matched-ablation RMS residuals against the full bass
+are 0.067203/0.018528/0.004531/0.003852.
+
+The linear low-drive ladder probes measure cutoff at
+125.555/498.804/2000.137/7999.453 Hz for 125/500/2000/8000 Hz targets, a
+23.113 dB/octave stop-band slope, and increasing resonance-peak ratios of
+2.008 then 2.188. These establish the declared digital model behavior; they
+are not hardware calibration.
+
+The original plan proposed accepting a time-aligned 48/192 kHz waveform
+residual. Implementation showed that this residual also measures ordinary
+transfer and phase differences, even after accounting for the ladder FIR's
+7.75-host-sample delay, so it is diagnostic only. Its retained values are
+-29.880/-30.957/-22.678 dB for notes 36/60/84.
+
+The accepted engineering alias gate instead uses native-rate Blackman-Harris
+spectra over `N = 131072` steady-state samples. It measures nonharmonic
+out-of-mask foldback at 48 kHz and an independent native-192 kHz proxy floor in
+the same physical 0–24 kHz band. A four-bin half-width masks expected
+harmonics; estimates less than 6 dB above the floor are classified as
+floor-limited. Notes 36/60/84 measure 48 kHz proxies of
+-64.393/-55.921/-36.928 dB and 192 kHz floors of
+-62.360/-62.289/-52.209 dB. Note 36 is floor-limited; notes 60 and 84 resolve
+above the floor. The conservative values pass unchanged bounds of -45 dB for
+notes 36/60 and -35 dB for note 84. Mask coverage is
+10.0662/2.5131/0.6180%; energy folding inside those masks is an explicit blind
+spot and is not bounded by this proxy.
+
+This is a circuit-informed causal model based on documented signal flow,
+Robert Moog's ladder patent, and Huovilainen's circuit-derived digital model.
+It is not calibrated to an individual instrument, does not use copied factory
+presets, third-party code, or reference recordings, and is not claimed to be
+hardware-equivalent. AArch64 compilation and x86_64 offline generation do not
+establish Raspberry Pi callback cost, latency, safe polyphony, or sound
+quality.
+
+Fresh feature-worktree verification:
+
+- `cargo fmt --check` and `git diff --check`: exit 0;
+- `cargo test --all-targets --all-features`: 174 library tests and 27
+  integration tests passed with zero failures;
+- `cargo clippy --all-targets --all-features -- -D warnings`: exit 0;
+- `cargo build --release`: exit 0;
+- `cargo audit`: 35 locked dependencies scanned with no vulnerabilities;
+- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning through `toml`;
+- `cargo check --target aarch64-unknown-linux-gnu --all-targets
+  --all-features`: exit 0, compile evidence only;
+- two fresh release generations matched each other and the installed artifact
+  byte-for-byte for all 16 deterministic files, excluding only
+  `workstation-cost.txt`; their sorted deterministic SHA-256 manifest hash is
+  `73999091ed21794109dffe3b2bb28871db7b227660006d011cc5b6eb9e1cdd0f`;
+- each batch contains exactly 17 files, including exactly seven WAVs; and
+- artifact hygiene found zero tracked artifact files and no staging/backup
+  residue.
+
+Human listening must decide whether the full path sounds like one coherent
+instrument, whether three-oscillator movement stays useful rather than
+chorused, whether mixer and ladder nonlinearities add proportionate character,
+whether the filter retains body under articulation/resonance, and whether the
+matched ablations expose audible causal contributions. Until that verdict,
+nothing is selected, preserved outside the disposable artifact policy, mapped,
+or integrated.
+
 ## Current continuation prompt
 
 Use this short prompt after resetting; this handoff contains the detailed
 context and should not be copied back into the new prompt:
 
 ```text
-Continue Moj Sint in `/home/shome/p/moj-sint` from the current clean `main`.
-Record `git rev-parse --short HEAD` before changing files.
+Continue Moj Sint in `/home/shome/p/moj-sint`. Confirm the owning repository
+and inspect live Git state before changing files.
 
-Read `docs/HANDOFF.md`, `docs/RESEARCH.md`,
-`docs/COMPOSITE_MACHINE_RESEARCH.md`, and
-`docs/superpowers/specs/2026-07-24-coupled-wire-controlled-thump-design.md`
-before changing files. The Coupled Wire envelope/motion batch is rejected;
-only its first reference was somewhat usable, and cranked line output exposed
-uncontrolled bass/sub distortion.
+Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
+`docs/superpowers/specs/2026-07-29-model-d-character-design.md` before changing
+files.
 
-Listen to the single controlled-thump successor in
-`artifacts/coupled-wire-controlled-thump/`. Judge whether it keeps the useful
-Coupled Wire identity and nasty strike while controlling the bass/sub
-distortion heard at high line-output gain. Do not route it into `Engine`,
-presets, or stable macros without explicit human acceptance.
+Listen in order to the seven-file isolated Model D character audition under
+`artifacts/model-d-character/`: three full-path coverage phrases, then the
+matched idealized, linear-mixer, linear-ladder, and no-drift/no-feedback bass
+ablations. Judge coherent instrument identity, useful oscillator movement,
+mixer/filter character, retained filter body, and whether the ablations expose
+proportionate causal contributions. Do not claim hardware equivalence or route
+the model into `Engine`, presets, or stable macros without explicit human
+acceptance.
 
 Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
 expand production polyphony without explicit scope and native evidence.
@@ -661,10 +782,11 @@ expand production polyphony without explicit scope and native evidence.
 
 ## Next action
 
-Obtain the human listening verdict for
-`01_coupled_wire_controlled_thump.wav`. If rejected, trash this disposable
-batch and record the reason. If accepted, define the next product decision
-before mapping controls or integrating `Engine`.
+Obtain the human listening verdict for the seven-file Model D character gate.
+If rejected, trash the disposable batch and record the reason. If
+directionally positive, identify which causal mechanisms survived the
+ablations before deciding whether to preserve a specific result, refine the
+isolated model, or propose a separately scoped production integration.
 
 ## Executed foundation checkpoint
 

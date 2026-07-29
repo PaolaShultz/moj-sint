@@ -650,6 +650,130 @@ isolated ideal oscillator.
   practical, but nonlinear stages, tuning correction, feedback, and
   oversampling are materially more expensive than one table lookup.
 
+### 2026-07-29 Model D character implementation
+
+This isolated experiment tests causal signal-path modeling rather than
+forensic matching to an individual instrument. Its source boundary is:
+
+- Moog Music, *Minimoog Model D Manual*, official reissue manual,
+  [PDF](https://back.moogmusic.com/sites/default/files/2022-11/Minimoog_Model_D_Manual.pdf).
+  The documented facts used are the three-oscillator mixer path, mixer
+  overload, four-pole ladder filter, separate filter/loudness contours, and
+  output-to-external-input feedback. The manual is copyrighted; no prose,
+  figure, factory preset, sample, or recording was copied.
+- Robert A. Moog, US Patent 3,475,623, “Electronic high-pass and low-pass
+  filters employing the base to emitter diode resistance of bipolar
+  transistors,” filed 1966 and published 1969,
+  [patent record](https://patents.google.com/patent/US3475623A/en). It supports
+  the four-stage transistor-ladder topology and voltage-dependent stage
+  resistance. Patent facts and equations informed an independent digital
+  implementation; no drawing or prose was reused.
+- Antti Huovilainen, “Non-Linear Digital Implementation of the Moog Ladder
+  Filter,” DAFx-04, 2004,
+  [paper](https://dafx.de/paper-archive/2004/P_061.PDF). It supports a
+  circuit-derived nonlinear cascade, tuning correction, resonance feedback,
+  and oversampling as relevant digital-model concerns. Moj Sint does not copy
+  the author's source and does not claim a literal component solver.
+
+The implemented mono path is:
+
+```text
+prepared note -> 3 independent VCOs -> bounded odd cubic mixer
+             -> 4x four-stage nonlinear ladder -> 63-tap FIR decimator
+             -> loudness contour/VCA -> fixed authored output gain
+                        ^                         |
+                        +---- bounded feedback --+
+```
+
+The three VCOs use independent phase accumulators, prepared musical/static
+tuning offsets, bounded deterministic recurrence drift, waveform
+asymmetry/pulse-width and level differences, and PolyBLEP-corrected saw/pulse
+edges. Triangle, saw, rectangle, wide-pulse, and narrow-pulse families support
+the authored bass, lead, and filter-articulation patches. Imperfections are
+deterministic and bounded rather than random analog-noise claims.
+
+The mixer exposes exact linear and bounded nonlinear modes. The ladder uses a
+prepared 2,049-entry cutoff table, four cascaded stateful one-pole stages,
+bounded odd input/stage transfers, resonance feedback, fixed four-times
+internal sampling, and a 63-tap Blackman-windowed FIR decimator. The
+linear-phase decimator contributes 31 internal samples, or 7.75 host samples,
+of group delay. Separate attack/decay/sustain filter and loudness contours
+reuse decay time for release. The VCA multiplies the filtered path by loudness,
+velocity, and a fixed authored output gain; there is no sample-path limiter.
+
+The 48 kHz listening gate contains seven dual-mono files: full bass, lead, and
+filter-articulation phrases, then matched idealized-path, linear-mixer,
+linear-ladder, and no-drift/no-feedback versions of the bass phrase. The bass
+and all matched ablations share presentation gain 1.0; lead uses 0.75 and
+filter articulation 1.6. Internal voice output gains are 0.42/0.40/0.42.
+There is no per-file or post-render normalization, full-band limiter,
+compressor, reverb, or delay.
+
+The three full-path files measure:
+
+| file | peak | RMS | DC | maximum jump | headroom dBFS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| bass | 0.062773 | 0.023693 | -0.003285 | 0.003856 | 24.044542 |
+| lead | 0.043793 | 0.020241 | 0.004667 | 0.010711 | 27.171910 |
+| filter articulation | 0.107463 | 0.026807 | -0.003219 | 0.027032 | 19.374855 |
+
+Every file is finite and has an exact zero tail. Matched residual RMS against
+the full bass is 0.067203 for the idealized path, 0.018528 for the linear
+mixer, 0.004531 for the linear ladder, and 0.003852 without drift/feedback.
+These residuals prove that each substitution changes the render; they do not
+prove that every change is perceptually useful.
+
+The linear low-drive ladder probes measure:
+
+- 125.555/498.804/2000.137/7999.453 Hz for
+  125/500/2000/8000 Hz cutoff targets;
+- 23.113 dB/octave in the declared stop-band region; and
+- resonance peak ratios of 2.008 from low to middle resonance and 2.188 from
+  middle to high resonance.
+
+These are digital-model calibration checks, not measurements of Model D
+hardware.
+
+#### Corrected nonlinear alias/foldback evidence
+
+The design initially proposed accepting a raw time-domain 48/192 kHz
+residual. That method was rejected during implementation because it conflates
+ordinary transfer and phase differences with foldback. Even after fixed sinc
+resampling and alignment for the ladder FIR's 7.75-host-sample delay, the
+retained diagnostic residuals are -29.880/-30.957/-22.678 dB for MIDI
+36/60/84 and are not acceptance values.
+
+The implemented engineering gate uses native-rate Blackman-Harris spectra over
+`N = 131072` steady-state samples. It measures nonharmonic out-of-mask energy
+at 48 kHz and an independently rendered native-192 kHz proxy floor over the
+same physical 0–24 kHz band. A four-bin half-width masks every expected
+harmonic. A target estimate less than 6 dB above its reference floor is
+reported as floor-limited; otherwise the proxy power above the floor is
+reported as resolved.
+
+| MIDI | 48 kHz proxy dB | 192 kHz floor dB | classification | resolved excess dB | mask coverage | bound dB |
+| ---: | ---: | ---: | --- | ---: | ---: | ---: |
+| 36 | -64.393 | -62.360 | floor-limited | n/a | 0.100662 | -45 |
+| 60 | -55.921 | -62.289 | resolved | -57.061 | 0.025131 | -45 |
+| 84 | -36.928 | -52.209 | resolved | -37.058 | 0.006180 | -35 |
+
+Acceptance uses the conservative maximum of the 48 kHz proxy and the 192 kHz
+floor, so the unchanged bounds pass without inventing a below-floor estimate.
+The metric has a declared blind spot: energy that folds onto or near expected
+harmonics lies inside the masks and is not bounded. A matched linear/nonlinear
+overtone-magnitude diagnostic measures -8.868/-9.268/-15.504 dB and confirms
+that the nonlinear probe did not merely reproduce the linear harmonic
+spectrum.
+
+The resulting model is circuit-informed and causally inspectable, not
+hardware-calibrated or hardware-equivalent. It has no individual-unit
+component measurements, external-input calibration, copied presets, or
+reference recordings. Workstation offline generation and AArch64 compilation
+also do not establish Raspberry Pi callback cost, latency, safe polyphony, or
+sound quality. Human listening remains the musical acceptance gate, and the
+model stays outside production `Engine`, presets, stable macros, JACK, ALSA,
+and SHR-DAW until a separately scoped decision.
+
 ### What “good” and “bad” sound mean here
 
 No scalar metric establishes good sound. For Moj Sint, automated evidence must

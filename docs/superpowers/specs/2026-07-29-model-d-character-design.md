@@ -1,7 +1,9 @@
 # Model D Character Model Design
 
-**Date:** 2026-07-29  
-**Status:** Approved design, awaiting implementation plan  
+**Date:** 2026-07-29
+
+**Status:** Implemented and freshly engineering-verified; human listening pending
+
 **Owner:** Moj Sint
 
 ## Purpose
@@ -184,9 +186,11 @@ from the final output to the input differential stage. Every nonlinear stage
 uses the same bounded transfer family, with state and coefficients prepared
 outside the sample path.
 
-The first implementation uses a fixed four-times internal sample rate and a
-fixed-size decimation filter. It remains scalar Rust. Oversampling is part of
-the sound path, not an offline-only cleanup step.
+The implemented ladder uses a fixed four-times internal sample rate and a
+63-tap Blackman-windowed FIR decimator. The linear-phase FIR contributes 31
+samples of delay at the internal rate, or 7.75 host-rate samples. It remains
+scalar Rust. Oversampling is part of the sound path, not an offline-only
+cleanup step.
 
 At low drive and low resonance, automated probes must establish:
 
@@ -269,20 +273,33 @@ Generated WAVs and reports remain disposable under
 
 ### Aliasing gate
 
-Oscillator and nonlinear changes require high-rate evidence. The lab compares
-the 48 kHz full path with a time-aligned 192 kHz reference decimated by the
-same declared analysis filter. Across representative low, middle, and high
-notes:
+The initially proposed raw time-domain residual between 48 and 192 kHz renders
+was rejected as an acceptance metric during implementation. Even after fixed
+resampling and alignment for the ladder decimator's 7.75-host-sample group
+delay, that residual conflates ordinary transfer and phase differences with
+foldback. It remains reported as a diagnostic only.
 
-- low- and middle-note residual must be at or below -45 dB relative to the
-  reference signal;
-- the high-note residual must be at or below -35 dB;
+The implemented acceptance gate uses a native-rate Blackman-Harris spectral
+measurement over `N = 131072` steady-state samples. It measures nonharmonic
+out-of-mask energy in the physical 0–24 kHz band at 48 kHz, and independently
+measures the proxy floor from a native 192 kHz render over the same physical
+band. A four-bin half-width masks each expected harmonic. The 48 kHz proxy is
+classified as floor-limited when it is less than 6 dB above the 192 kHz floor;
+otherwise the report also gives the resolved excess above that floor.
+
+Across representative low, middle, and high notes:
+
+- the conservative maximum of the 48 kHz proxy and 192 kHz floor must be at or
+  below -45 dB for the low and middle notes;
+- the same conservative value must be at or below -35 dB for the high note;
 - all reported values must be finite and deterministic; and
 - a failure remains visible in the report instead of being omitted or
   reclassified.
 
-These residuals are engineering rejection bounds, not proof that the model
-sounds analog or matches hardware.
+The report states harmonic-mask coverage explicitly. Energy that folds onto or
+near an expected harmonic lies inside the masks and is not bounded by this
+proxy. These measurements are engineering rejection bounds, not proof that the
+model sounds analog or matches hardware.
 
 ### Reproducibility and repository gates
 

@@ -8,6 +8,14 @@
 
 **Tech Stack:** Scalar Rust 2024, existing `hound`, `thiserror`, and `assert_no_alloc`; standard Cargo format/test/Clippy/build/audit/deny/AArch64 checks.
 
+**Execution record:** Tasks 1–6 are implemented in repository history. Checked
+boxes record delivered code, tests, or current verification, not a
+retrospective claim that every intermediate command produced the originally
+predicted output. In particular, historical RED command output was not
+preserved, so those six RED-only boxes remain unchecked and explicitly noted.
+The alias acceptance method changed during implementation as recorded in Task
+5 and the design.
+
 ---
 
 ## File map
@@ -33,7 +41,7 @@
 - Create: `src/model_d.rs`
 - Modify: `src/lib.rs`
 
-- [ ] **Step 1: Write failing VCO contract tests**
+- [x] **Step 1: Add VCO contract tests**
 
 Add tests that construct three `ModelDVco` values with `VcoConfig`, reject invalid sample rates/configuration, verify deterministic reset, bound static offset and drift to the specification, verify MIDI 36/60/84 pitch at 44.1/48/96 kHz, and wrap `sample()` in `assert_no_alloc`.
 
@@ -60,13 +68,14 @@ impl ModelDVco {
 }
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [ ] **Step 2: Run the focused test and verify RED** — historical command
+  output was not preserved; no retrospective RED claim is made.
 
 Run: `cargo test model_d::vco -- --nocapture`
 
 Expected: compile failure because `model_d::vco` and its types do not exist.
 
-- [ ] **Step 3: Implement the minimum prepared VCO**
+- [x] **Step 3: Implement the minimum prepared VCO**
 
 Implement an independent phase accumulator, PolyBLEP saw/pulse edges,
 continuous triangle, recurrence-based drift oscillator, prepared cents ratio,
@@ -74,7 +83,7 @@ bounded asymmetry, deterministic phase/reset state, and finite guards. Keep
 `powf` and `sin_cos` in construction or `set_note`; the sample path performs
 fixed arithmetic only.
 
-- [ ] **Step 4: Run VCO tests and the existing oscillator tests**
+- [x] **Step 4: Run VCO tests and the existing oscillator tests**
 
 Run:
 
@@ -85,7 +94,7 @@ cargo test dsp::oscillator -- --nocapture
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib.rs src/model_d.rs src/model_d/vco.rs
@@ -99,7 +108,7 @@ git commit -m "feat: add prepared Model D oscillators"
 - Create: `src/model_d/mixer.rs`
 - Modify: `src/model_d.rs`
 
-- [ ] **Step 1: Write failing contour and mixer tests**
+- [x] **Step 1: Add contour and mixer contract tests**
 
 Contour tests require attack, decay, sustain, release using the same decay
 duration, exact idle zero, deterministic restart, invalid-config rejection,
@@ -127,7 +136,8 @@ pub struct MixerConfig {
 pub struct ModelDMixer { /* fixed config */ }
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [ ] **Step 2: Run focused tests and verify RED** — historical command output
+  was not preserved; no retrospective RED claim is made.
 
 Run:
 
@@ -138,14 +148,14 @@ cargo test model_d::mixer -- --nocapture
 
 Expected: compile failure because the modules do not exist.
 
-- [ ] **Step 3: Implement contour and mixer**
+- [x] **Step 3: Implement contour and mixer**
 
 Implement the contour as a fixed state machine. Implement the mixer with an
 odd cubic soft clip inside `[-1, 1]`, saturated shoulders outside that interval,
 explicit drive compensation, and a separate exact linear mode. Reject
 non-finite or out-of-range preparation values.
 
-- [ ] **Step 4: Run focused and envelope regression tests**
+- [x] **Step 4: Run focused and envelope regression tests**
 
 Run:
 
@@ -157,7 +167,7 @@ cargo test envelope::tests -- --nocapture
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/model_d.rs src/model_d/contour.rs src/model_d/mixer.rs
@@ -170,7 +180,7 @@ git commit -m "feat: add Model D contours and mixer"
 - Create: `src/model_d/ladder.rs`
 - Modify: `src/model_d.rs`
 
-- [ ] **Step 1: Write failing ladder tests**
+- [x] **Step 1: Add ladder contract tests**
 
 Tests require:
 
@@ -195,22 +205,24 @@ octave stop-band slope, increasing resonance peak, nonlinear harmonic
 generation relative to linear mode, and stability throughout the declared
 cutoff/resonance/drive range.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [ ] **Step 2: Run focused tests and verify RED** — historical command output
+  was not preserved; no retrospective RED claim is made.
 
 Run: `cargo test model_d::ladder -- --nocapture`
 
 Expected: compile failure because `ModelDLadder` does not exist.
 
-- [ ] **Step 3: Implement the ladder**
+- [x] **Step 3: Implement the ladder**
 
 Build a fixed 2,049-entry cutoff/coefficient table during construction. For
 each host sample, linearly interpolate the table coefficient and run four
 internal Euler/TPT-style substeps through four cascaded one-pole states.
 Apply the bounded odd transfer at the input differential stage and at each
-nonlinear stage. Return the fixed four-substep moving-average decimator output.
-Clamp controls during preparation and silence non-finite defensive output.
+nonlinear stage. Return the 63-tap Blackman-windowed FIR decimator output; its
+group delay is 31 internal samples, or 7.75 host samples. Clamp controls during
+preparation and silence non-finite defensive output.
 
-- [ ] **Step 4: Run ladder and character nonlinear regressions**
+- [x] **Step 4: Run ladder and character nonlinear regressions**
 
 Run:
 
@@ -221,7 +233,7 @@ cargo test dsp::character::tests -- --nocapture
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/model_d.rs src/model_d/ladder.rs
@@ -234,7 +246,7 @@ git commit -m "feat: model nonlinear transistor ladder"
 - Create: `src/model_d/voice.rs`
 - Modify: `src/model_d.rs`
 
-- [ ] **Step 1: Write failing complete-voice tests**
+- [x] **Step 1: Add complete-voice contract tests**
 
 Define `ModelDPatch`, `ModelDDiagnostics`, and `ModelDVoice`. Tests construct
 the authored bass patch, call `note_on`, render sustain, call `note_off`, and
@@ -244,26 +256,27 @@ must prove that linear mixer, linear ladder, and no-drift/no-feedback modes each
 produce a nonzero residual against the full voice while preserving duration
 and pitch.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [ ] **Step 2: Run focused tests and verify RED** — historical command output
+  was not preserved; no retrospective RED claim is made.
 
 Run: `cargo test model_d::voice -- --nocapture`
 
 Expected: compile failure because the voice types do not exist.
 
-- [ ] **Step 3: Implement patch preparation and voice data flow**
+- [x] **Step 3: Implement patch preparation and voice data flow**
 
 Implement three authored patch constructors (`bass`, `lead`, and
 `filter_articulation`), note lifecycle, velocity, VCO summation, feedback into
 the mixer, filter-contour cutoff mapping, ladder processing, loudness contour,
 fixed output gain, exact idle zero, reset, and diagnostic substitutions.
 
-- [ ] **Step 4: Run all model unit tests**
+- [x] **Step 4: Run all model unit tests**
 
 Run: `cargo test model_d -- --nocapture`
 
 Expected: all Model D tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/model_d.rs src/model_d/voice.rs
@@ -276,14 +289,13 @@ git commit -m "feat: assemble Model D character voice"
 - Create: `src/model_d_lab.rs`
 - Modify: `src/lib.rs`
 
-- [ ] **Step 1: Write failing lab-library tests**
+- [x] **Step 1: Add lab-library contract tests**
 
 Tests require exactly seven `AuditionKind` values and filenames, fixed 48 kHz
 stereo rendering, shared bass score/gain for the four matched ablations,
 finite/peak/DC/jump/headroom/return-to-zero gates, deterministic hashes, and
-nonzero ablation residuals. Add a high-rate test that compares 48 kHz renders
-against time-aligned 192 kHz renders and enforces residuals no greater than
--45 dB for notes 36/60 and -35 dB for note 84.
+nonzero ablation residuals. Add nonlinear alias/foldback evidence with bounds
+no greater than -45 dB for notes 36/60 and -35 dB for note 84.
 
 Use:
 
@@ -294,23 +306,28 @@ pub fn render_audition(kind: AuditionKind, sample_rate: u32)
 pub fn measure_alias_residual(note: u8) -> Result<f64, ModelDError>;
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [ ] **Step 2: Run the focused test and verify RED** — historical command
+  output was not preserved; no retrospective RED claim is made.
 
 Run: `cargo test model_d_lab -- --nocapture`
 
 Expected: compile failure because `model_d_lab` does not exist.
 
-- [ ] **Step 3: Implement scores, renderer, metrics, and alias comparison**
+- [x] **Step 3: Implement scores, renderer, metrics, and alias comparison**
 
 Implement three authored monophonic scores with explicit note-on/note-off
 frames and a long enough zero tail. Render files 4–7 from the bass score and
 patch with only the named diagnostic mechanism disabled. Measure peak, RMS,
 DC, maximum jump, finite state, final zero, hash, pitch, and pairwise residual.
-For alias evidence, render the same sustained note at 48 and 192 kHz, average
-each four-frame reference group, align by declared filter latency, and report
-the error-to-reference RMS ratio in dB.
+For alias evidence, use native-rate Blackman-Harris spectra over `N = 131072`
+steady-state samples. Measure the 48 kHz nonharmonic out-of-mask foldback proxy
+and a native 192 kHz floor in the same physical 0–24 kHz band. Mask expected
+harmonics by four bins on either side, classify estimates within 6 dB of the
+reference as floor-limited, and report mask coverage plus the blind spot that
+energy inside masked bins is not bounded. Retain the aligned time-domain
+48/192 kHz residual only as a transfer-conflated diagnostic.
 
-- [ ] **Step 4: Run library and allocation tests**
+- [x] **Step 4: Run library and allocation tests**
 
 Run:
 
@@ -321,7 +338,7 @@ cargo test model_d -- --nocapture
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib.rs src/model_d_lab.rs
@@ -334,7 +351,7 @@ git commit -m "feat: add Model D render evidence"
 - Create: `src/bin/model-d-lab.rs`
 - Create: `tests/model_d_cli.rs`
 
-- [ ] **Step 1: Write the failing CLI integration test**
+- [x] **Step 1: Add the CLI integration test**
 
 Run `model-d-lab render-test` into two temporary directories. Require the exact
 seven WAV names, `README.md`, `manifest.tsv`, `metrics.tsv`, `ablations.tsv`,
@@ -345,20 +362,21 @@ bass files, fixed gains in the manifest, passing evidence rows, and README
 statements that there is no normalization, limiter, copied preset, hardware
 equivalence claim, or production integration.
 
-- [ ] **Step 2: Run the CLI test and verify RED**
+- [ ] **Step 2: Run the CLI test and verify RED** — historical command output
+  was not preserved; no retrospective RED claim is made.
 
 Run: `cargo test --test model_d_cli -- --nocapture`
 
 Expected: failure because `CARGO_BIN_EXE_model-d-lab` is unavailable.
 
-- [ ] **Step 3: Implement the artifact writer**
+- [x] **Step 3: Implement the artifact writer**
 
 Accept only `render` or `render-test` plus an output directory. Render the
 seven files, evaluate every gate before writing WAVs, write deterministic TSV
 and Markdown reports with stable ordering and six-decimal floating formatting,
 then write timing separately to `workstation-cost.txt`.
 
-- [ ] **Step 4: Run CLI test and generate the actual disposable batch**
+- [x] **Step 4: Run CLI test and generate the actual disposable batch**
 
 Run:
 
@@ -370,7 +388,7 @@ cargo run --release --bin model-d-lab -- render artifacts/model-d-character
 Expected: CLI test passes and the ignored artifact directory contains exactly
 seven passing WAVs plus the declared reports.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/bin/model-d-lab.rs tests/model_d_cli.rs
@@ -384,14 +402,14 @@ git commit -m "feat: render Model D character audition"
 - Modify: `docs/HANDOFF.md`
 - Modify: `/home/shome/Documents/knowledge/Moj Sint/01 Current State.md`
 
-- [ ] **Step 1: Update canonical repository documentation**
+- [x] **Step 1: Update canonical repository documentation**
 
 Record the implemented signal path, source provenance, exact engineering
 evidence, limitations, artifact location, and listening questions. State that
 the result is circuit-informed, not hardware-calibrated, and remains isolated
 from `Engine`.
 
-- [ ] **Step 2: Update and validate project knowledge**
+- [x] **Step 2: Update and validate project knowledge**
 
 Update the concise current-state note only after `docs/HANDOFF.md`; do not add
 HEAD, ahead/behind state, or disposable file inventory. Run:
@@ -402,7 +420,7 @@ HEAD, ahead/behind state, or disposable file inventory. Run:
 
 Expected: validation exits 0.
 
-- [ ] **Step 3: Run fresh complete verification**
+- [x] **Step 3: Run fresh complete verification**
 
 Run:
 
@@ -420,14 +438,14 @@ git diff --check
 Expected: every command exits 0; `cargo deny` may retain only the repository's
 already accepted duplicate-`winnow` warning.
 
-- [ ] **Step 4: Verify deterministic release regeneration and artifact hygiene**
+- [x] **Step 4: Verify deterministic release regeneration and artifact hygiene**
 
 Generate into two fresh temporary directories with the release binary, compare
 all files except `workstation-cost.txt`, compare them with
 `artifacts/model-d-character`, and enumerate the artifact root. Expected:
 byte-identical deterministic files and no generated material tracked by Git.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/HANDOFF.md docs/RESEARCH.md
