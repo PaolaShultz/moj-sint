@@ -132,6 +132,51 @@ mod tests {
     }
 
     #[test]
+    fn negative_maximum_drift_never_exceeds_its_declared_positive_bound() {
+        let sample_rate = 48_000.0;
+        let mut vco = ModelDVco::new(
+            sample_rate,
+            VcoConfig {
+                drift_cents: -1.5,
+                drift_hz: 0.25,
+                reset_phase: 0.75,
+                ..config(ModelDWaveform::Triangle)
+            },
+        )
+        .unwrap();
+        vco.set_note(60);
+        let nominal_increment = vco.base_increment * vco.static_ratio;
+        for _ in 0..(sample_rate as usize * 60 * 10) {
+            let observed_cents = 1_200.0 * (vco.phase_increment() / nominal_increment).log2();
+            assert!(
+                observed_cents.abs() <= 1.5,
+                "observed_cents={observed_cents}"
+            );
+            vco.sample();
+        }
+    }
+
+    #[test]
+    fn zero_drift_preserves_the_exact_prepared_pitch() {
+        let mut vco = ModelDVco::new(
+            48_000.0,
+            VcoConfig {
+                drift_cents: 0.0,
+                drift_hz: 0.25,
+                reset_phase: 0.75,
+                ..config(ModelDWaveform::Triangle)
+            },
+        )
+        .unwrap();
+        vco.set_note(60);
+        let nominal_increment = vco.base_increment * vco.static_ratio;
+        for _ in 0..4_096 {
+            assert_eq!(vco.phase_increment(), nominal_increment);
+            vco.sample();
+        }
+    }
+
+    #[test]
     fn triangle_mean_pitch_tracks_midi_notes_across_supported_sample_rates() {
         for sample_rate in SAMPLE_RATES {
             for note in NOTES {
@@ -265,6 +310,7 @@ pub struct ModelDVco {
     drift_rotation_sine: f32,
     drift_rotation_cosine: f32,
     drift_samples_since_normalize: u16,
+    drift_polarity: f32,
     drift_up_scale: f32,
     drift_down_scale: f32,
     triangle_peak: f32,
@@ -290,8 +336,16 @@ impl ModelDVco {
         }
         let (drift_rotation_sine, drift_rotation_cosine) = rotation_angle.sin_cos();
         let static_ratio = cents_ratio(config.cents_offset);
-        let drift_up_scale = cents_ratio(config.drift_cents) - 1.0;
-        let drift_down_scale = next_positive_f32(cents_ratio(-config.drift_cents)) - 1.0;
+        let drift_magnitude = config.drift_cents.abs();
+        let (drift_up_scale, drift_down_scale) = if drift_magnitude == 0.0 {
+            (0.0, 0.0)
+        } else {
+            (
+                previous_positive_f32(cents_ratio(drift_magnitude)) - 1.0,
+                next_positive_f32(cents_ratio(-drift_magnitude)) - 1.0,
+            )
+        };
+        let drift_polarity = if config.drift_cents < 0.0 { -1.0 } else { 1.0 };
         let asymmetry = config.asymmetry.clamp(-1.0, 1.0);
         let base_pulse_width = match config.waveform {
             ModelDWaveform::Rectangle => 0.50,
@@ -319,6 +373,7 @@ impl ModelDVco {
             drift_rotation_sine,
             drift_rotation_cosine,
             drift_samples_since_normalize: 0,
+            drift_polarity,
             drift_up_scale,
             drift_down_scale,
             triangle_peak: (0.50 + 0.20 * asymmetry).clamp(0.20, 0.80),
@@ -380,11 +435,11 @@ impl ModelDVco {
 
     #[inline]
     fn phase_increment(&self) -> f32 {
-        let bounded_drift_sine = self.drift_sine.clamp(-1.0, 1.0);
-        let drift_ratio = if bounded_drift_sine >= 0.0 {
-            1.0 + bounded_drift_sine * self.drift_up_scale
+        let bounded_drift_signal = self.drift_sine.clamp(-1.0, 1.0) * self.drift_polarity;
+        let drift_ratio = if bounded_drift_signal >= 0.0 {
+            1.0 + bounded_drift_signal * self.drift_up_scale
         } else {
-            1.0 - bounded_drift_sine * self.drift_down_scale
+            1.0 - bounded_drift_signal * self.drift_down_scale
         };
         self.base_increment * self.static_ratio * drift_ratio
     }
@@ -436,6 +491,12 @@ fn cents_ratio(cents: f32) -> f32 {
 fn next_positive_f32(value: f32) -> f32 {
     debug_assert!(value.is_finite() && value > 0.0);
     f32::from_bits(value.to_bits() + 1)
+}
+
+#[inline]
+fn previous_positive_f32(value: f32) -> f32 {
+    debug_assert!(value.is_finite() && value > 0.0);
+    f32::from_bits(value.to_bits() - 1)
 }
 
 #[inline]
