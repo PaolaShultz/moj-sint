@@ -1,5 +1,7 @@
 //! Isolated circuit-informed Model D character research modules.
 
+pub mod contour;
+pub mod mixer;
 pub mod vco;
 
 use thiserror::Error;
