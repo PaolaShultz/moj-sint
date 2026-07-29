@@ -15,6 +15,7 @@ pub mod envelope_audition;
 pub mod hybrid;
 pub mod hybrid_subset;
 pub mod model_d;
+pub mod model_d_lab;
 pub mod offline;
 pub mod preset;
 pub mod research;
