@@ -74,10 +74,22 @@ impl PublishPaths {
         Ok(paths)
     }
 
-    fn promote(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn promote(&self, test_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
         let had_destination = path_exists(&self.destination);
         if had_destination {
-            fs::rename(&self.destination, &self.backup)?;
+            let backup_result = if test_failure_enabled(
+                test_mode,
+                "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_BACKUP_RENAME",
+            ) {
+                Err(std::io::Error::other(
+                    "injected destination-to-backup rename failure",
+                ))
+            } else {
+                fs::rename(&self.destination, &self.backup)
+            };
+            if let Err(backup_error) = backup_result {
+                return cleanup_stage_after_error(&self.stage, backup_error.to_string());
+            }
         }
         if let Err(promotion_error) = fs::rename(&self.stage, &self.destination) {
             let rollback_result = if had_destination {
@@ -112,6 +124,24 @@ fn remove_exact_path(path: &Path) -> std::io::Result<()> {
     } else {
         fs::remove_file(path)
     }
+}
+
+fn cleanup_stage_after_error(
+    stage: &Path,
+    error: String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match remove_exact_path(stage) {
+        Ok(()) => Err(error.into()),
+        Err(cleanup_error) => Err(format!(
+            "{error}; failed to remove staging directory {}: {cleanup_error}",
+            stage.display()
+        )
+        .into()),
+    }
+}
+
+fn test_failure_enabled(test_mode: bool, name: &str) -> bool {
+    test_mode && std::env::var_os(name).is_some_and(|value| value == "1")
 }
 
 fn main() -> ExitCode {
@@ -171,16 +201,9 @@ fn render_lab(output: &Path, test_mode: bool) -> Result<(), Box<dyn std::error::
         test_mode,
     );
     if let Err(write_error) = write_result {
-        return match remove_exact_path(&publish_paths.stage) {
-            Ok(()) => Err(write_error),
-            Err(cleanup_error) => Err(format!(
-                "{write_error}; failed to remove staging directory {}: {cleanup_error}",
-                publish_paths.stage.display()
-            )
-            .into()),
-        };
+        return cleanup_stage_after_error(&publish_paths.stage, write_error.to_string());
     }
-    publish_paths.promote()
+    publish_paths.promote(test_mode)
 }
 
 fn write_batch(
@@ -206,7 +229,13 @@ fn write_batch(
             &audition.render.samples,
         )?;
     }
-    write_cost(stage, started.elapsed().as_secs_f64(), auditions, test_mode)?;
+    write_cost(stage, started.elapsed().as_secs_f64(), auditions)?;
+    if test_failure_enabled(
+        test_mode,
+        "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_AFTER_COST_REPORT",
+    ) {
+        return Err("injected failure after staged cost report".into());
+    }
     Ok(())
 }
 
@@ -503,25 +532,13 @@ fn write_readme(output: &Path) -> std::io::Result<()> {
     finish_report(file)
 }
 
-fn write_cost(
-    output: &Path,
-    elapsed_seconds: f64,
-    auditions: &[Audition],
-    test_mode: bool,
-) -> std::io::Result<()> {
+fn write_cost(output: &Path, elapsed_seconds: f64, auditions: &[Audition]) -> std::io::Result<()> {
     let audio_seconds = auditions
         .iter()
         .map(|audition| audition.render.samples.len() as f64 / 2.0 / f64::from(SAMPLE_RATE))
         .sum::<f64>();
     let realtime_multiple = audio_seconds / elapsed_seconds.max(f64::MIN_POSITIVE);
-    let injected_path = test_mode
-        .then(|| std::env::var_os("MOJ_SINT_MODEL_D_LAB_TEST_WORKSTATION_COST_PATH"))
-        .flatten()
-        .map(PathBuf::from);
-    let mut file = match injected_path {
-        Some(path) => BufWriter::new(File::create(path)?),
-        None => writer(output, "workstation-cost.txt")?,
-    };
+    let mut file = writer(output, "workstation-cost.txt")?;
     writeln!(file, "scope=offline_model_d_lab_complete_generation")?;
     writeln!(file, "total_audio_seconds={audio_seconds:.3}")?;
     writeln!(file, "wall_seconds={elapsed_seconds:.3}")?;

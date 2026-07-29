@@ -30,9 +30,22 @@ const REPORT_NAMES: [&str; 10] = [
 fn lab_writes_exact_deterministic_passing_model_d_audition() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();
+    let external = tempfile::tempdir().unwrap();
+    let external_cost = external.path().join("misdirected-cost.txt");
     fs::write(first.path().join("stale.txt"), "remove me").unwrap();
-    run_lab(first.path());
+    let first_status = run_lab_status(
+        first.path(),
+        &[(
+            "MOJ_SINT_MODEL_D_LAB_TEST_WORKSTATION_COST_PATH",
+            external_cost.as_os_str(),
+        )],
+    );
+    assert!(first_status.success());
     run_lab(second.path());
+    assert!(
+        !external_cost.exists(),
+        "legacy path injection escaped the staged batch"
+    );
 
     let actual = file_names(first.path());
     let expected = WAV_NAMES
@@ -155,23 +168,45 @@ fn preexisting_fixed_stage_is_refused_without_touching_destination() {
     assert!(!root.path().join(".audition.model-d-lab-backup").exists());
 }
 
-#[cfg(unix)]
 #[test]
-fn late_dev_full_report_failure_preserves_prior_destination() {
-    use std::os::unix::fs::symlink;
-
+fn controlled_late_failure_preserves_prior_destination() {
     let root = tempfile::tempdir().unwrap();
     let output = root.path().join("audition");
     fs::create_dir(&output).unwrap();
     fs::write(output.join("sentinel.txt"), "old destination").unwrap();
-    let full_link = root.path().join("dev-full");
-    symlink("/dev/full", &full_link).unwrap();
 
     let status = run_lab_status(
         &output,
         &[(
-            "MOJ_SINT_MODEL_D_LAB_TEST_WORKSTATION_COST_PATH",
-            full_link.as_os_str(),
+            "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_AFTER_COST_REPORT",
+            std::ffi::OsStr::new("1"),
+        )],
+    );
+    assert!(!status.success());
+    assert_eq!(
+        file_names(&output),
+        BTreeSet::from(["sentinel.txt".to_owned()])
+    );
+    assert_eq!(
+        fs::read_to_string(output.join("sentinel.txt")).unwrap(),
+        "old destination"
+    );
+    assert!(!root.path().join(".audition.model-d-lab-stage").exists());
+    assert!(!root.path().join(".audition.model-d-lab-backup").exists());
+}
+
+#[test]
+fn destination_backup_rename_failure_cleans_populated_stage() {
+    let root = tempfile::tempdir().unwrap();
+    let output = root.path().join("audition");
+    fs::create_dir(&output).unwrap();
+    fs::write(output.join("sentinel.txt"), "old destination").unwrap();
+
+    let status = run_lab_status(
+        &output,
+        &[(
+            "MOJ_SINT_MODEL_D_LAB_TEST_FAIL_BACKUP_RENAME",
+            std::ffi::OsStr::new("1"),
         )],
     );
     assert!(!status.success());
