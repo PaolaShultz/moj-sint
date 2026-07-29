@@ -253,6 +253,20 @@ impl ModelDDiagnostics {
         }
     }
 
+    pub const fn without_drift() -> Self {
+        Self {
+            disable_drift: true,
+            ..Self::full()
+        }
+    }
+
+    pub const fn without_feedback() -> Self {
+        Self {
+            disable_feedback: true,
+            ..Self::full()
+        }
+    }
+
     pub const fn no_drift_or_feedback() -> Self {
         Self {
             disable_drift: true,
@@ -540,14 +554,38 @@ mod tests {
 
     #[test]
     fn bass_note_lifecycle_is_finite_bounded_and_returns_to_exact_idle_zero() {
-        let samples = render_bass(ModelDDiagnostics::full());
-        let peak = samples.iter().copied().map(f32::abs).fold(0.0, f32::max);
-
-        assert!(samples.iter().all(|sample| sample.is_finite()));
+        let patch = ModelDPatch::bass();
+        let release_samples = (f64::from(patch.loudness_contour.decay_seconds)
+            * f64::from(SAMPLE_RATE))
+        .round() as usize;
+        let mut voice = ModelDVoice::new(SAMPLE_RATE, patch, ModelDDiagnostics::full()).unwrap();
+        voice.note_on(48, 0.82);
+        let mut peak = 0.0_f32;
+        for sample_index in 0..SUSTAIN_SAMPLES {
+            let sample = voice.sample();
+            assert!(sample.is_finite(), "sustain sample {sample_index}");
+            assert!(
+                !voice.is_idle(),
+                "voice became idle during sustain at sample {sample_index}"
+            );
+            peak = peak.max(sample.abs());
+        }
         assert!(peak > 0.001, "peak={peak}");
         assert!(peak < MODEL_D_OUTPUT_BOUND, "peak={peak}");
-        assert_eq!(samples.last(), Some(&0.0));
-        assert!(active_duration(&samples) < samples.len());
+
+        voice.note_off();
+        assert!(!voice.is_idle());
+        for release_index in 0..release_samples - 1 {
+            let sample = voice.sample();
+            assert!(sample.is_finite(), "release sample {release_index}");
+            assert!(
+                !voice.is_idle(),
+                "voice became idle before the configured release bound at {release_index}"
+            );
+        }
+        assert_eq!(voice.sample(), 0.0);
+        assert!(voice.is_idle());
+        assert_eq!(voice.sample(), 0.0);
     }
 
     #[test]
@@ -588,6 +626,8 @@ mod tests {
         let ablations = [
             render_bass(ModelDDiagnostics::linear_mixer()),
             render_bass(ModelDDiagnostics::linear_ladder()),
+            render_bass(ModelDDiagnostics::without_drift()),
+            render_bass(ModelDDiagnostics::without_feedback()),
             render_bass(ModelDDiagnostics::no_drift_or_feedback()),
         ];
         let full_duration = active_duration(&full);
@@ -614,6 +654,31 @@ mod tests {
                 "full_period={full_period}, ablation_period={period}"
             );
         }
+    }
+
+    #[test]
+    fn output_feedback_state_is_the_exact_one_sample_delayed_voice_output() {
+        let mut patch = ModelDPatch::bass();
+        patch.feedback_level = 0.8;
+        let mut voice = ModelDVoice::new(SAMPLE_RATE, patch, ModelDDiagnostics::full()).unwrap();
+        voice.note_on(48, 0.82);
+        let mut previous_output = 0.0;
+        let mut observed_nonzero_feedback = false;
+
+        for sample_index in 0..4_096 {
+            assert_eq!(
+                voice.feedback_sample, previous_output,
+                "wrong feedback tap before sample {sample_index}"
+            );
+            let output = voice.sample();
+            assert_eq!(
+                voice.feedback_sample, output,
+                "feedback state was not updated from voice output at sample {sample_index}"
+            );
+            observed_nonzero_feedback |= voice.feedback_sample != 0.0;
+            previous_output = output;
+        }
+        assert!(observed_nonzero_feedback);
     }
 
     #[test]
