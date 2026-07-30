@@ -113,6 +113,37 @@ mod tests {
     }
 
     #[test]
+    fn evolve_midpoint_keeps_authored_static_character_without_drift() {
+        let mut vco = ModelDVco::new(
+            48_000.0,
+            VcoConfig {
+                cents_offset: -2.0,
+                drift_cents: 1.25,
+                asymmetry: -0.2,
+                level_offset: 0.04,
+                ..config(ModelDWaveform::Saw)
+            },
+        )
+        .unwrap();
+        vco.set_character(0.0);
+        assert_eq!(vco.static_ratio, 1.0);
+        assert_eq!(vco.drift_up_scale, 0.0);
+        assert_eq!(vco.asymmetry, 0.0);
+        assert_eq!(vco.level, 1.0);
+
+        vco.set_character(0.5);
+        assert_eq!(vco.static_ratio, vco.authored_static_ratio);
+        assert_eq!(vco.drift_up_scale, 0.0);
+        assert_eq!(vco.drift_down_scale, 0.0);
+        assert_eq!(vco.asymmetry, vco.authored_asymmetry);
+        assert_eq!(vco.level, vco.authored_level);
+
+        vco.set_character(1.0);
+        assert_eq!(vco.drift_up_scale, vco.authored_drift_up_scale);
+        assert_eq!(vco.drift_down_scale, vco.authored_drift_down_scale);
+    }
+
+    #[test]
     fn drift_excursion_stays_within_its_declared_bound_over_long_low_rate_runs() {
         for (sample_rate, drift_hz) in [(44_100.0, 0.01), (48_000.0, 0.25)] {
             let mut vco = ModelDVco::new(
@@ -408,23 +439,26 @@ impl ModelDVco {
         })
     }
 
-    /// Continuously opens the authored oscillator offsets, drift, waveform
-    /// asymmetry, and level mismatch. This uses only bounded scalar arithmetic
-    /// so it is safe to call from the prepared render path.
+    /// Continuously opens the authored oscillator character. The first half
+    /// introduces static offset, waveform asymmetry, and level mismatch; the
+    /// second half introduces drift. This makes the documented no-drift
+    /// comparison a truthful midpoint rather than hidden preset state.
     pub fn set_character(&mut self, amount: f32) {
         let amount = if amount.is_finite() {
             amount.clamp(0.0, 1.0)
         } else {
             0.0
         };
-        self.static_ratio = 1.0 + amount * (self.authored_static_ratio - 1.0);
-        self.drift_up_scale = amount * self.authored_drift_up_scale;
-        self.drift_down_scale = amount * self.authored_drift_down_scale;
-        self.asymmetry = amount * self.authored_asymmetry;
+        let static_amount = (2.0 * amount).min(1.0);
+        let drift_amount = (2.0 * amount - 1.0).max(0.0);
+        self.static_ratio = 1.0 + static_amount * (self.authored_static_ratio - 1.0);
+        self.drift_up_scale = drift_amount * self.authored_drift_up_scale;
+        self.drift_down_scale = drift_amount * self.authored_drift_down_scale;
+        self.asymmetry = static_amount * self.authored_asymmetry;
         self.triangle_peak = (0.50 + 0.20 * self.asymmetry).clamp(0.20, 0.80);
         self.pulse_width =
             (self.base_pulse_width + 0.25 * self.asymmetry).clamp(MIN_PULSE_WIDTH, MAX_PULSE_WIDTH);
-        self.level = 1.0 + amount * (self.authored_level - 1.0);
+        self.level = 1.0 + static_amount * (self.authored_level - 1.0);
     }
 
     pub fn set_note(&mut self, note: u8) {

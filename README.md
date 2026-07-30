@@ -7,10 +7,10 @@ rendering, and the live JACK/ALSA host.
 
 The production control surface has twelve stable absolute controls:
 `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`, `SPACE`,
-`ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. The idealized Model D path is the
-reference preset's default baseline. Moving the first eight controls opens all
-modeled Model D experiment mechanisms for evaluation; none of those mechanisms
-has been rejected.
+`ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. Seven factory starting points
+preserve the exact authored bass, lead, filter-articulation, and matched
+diagnostic configurations. Moving the first eight controls opens the modeled
+mechanisms from any starting point; none has been rejected.
 
 ## Usage
 
@@ -23,6 +23,11 @@ cargo run -- render presets/reference.mojsint output.wav --note 60 --seconds 1
 cargo run -- --client-name shs-moj-sint --preset presets/reference.mojsint
 ```
 
+The factory catalog is ordered as Full Bass, Full Lead, Full Filter
+Articulation, Matched Idealized, Matched Linear Mixer, Matched Linear Ladder,
+and Matched No Drift or Feedback. These are editable live starting points, not
+seven claims of separate synthesis families.
+
 The live process publishes one ALSA Sequencer input named `input` and exactly
 two JACK outputs named `out_l` and `out_r`. It does not connect them to physical
 or other JACK ports.
@@ -31,8 +36,8 @@ or other JACK ports.
 
 ```sh
 cargo install --path . --locked
-install -Dm644 presets/reference.mojsint \
-  "$HOME/.local/share/moj-sint/presets/reference.mojsint"
+install -d "$HOME/.local/share/moj-sint/presets"
+install -m644 presets/*.mojsint "$HOME/.local/share/moj-sint/presets/"
 ```
 
 SHR-DAW's default configuration includes that user preset root. Presets added

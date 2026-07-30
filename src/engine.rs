@@ -6,7 +6,7 @@ use crate::dsp::{
 };
 use crate::envelope::{Adsr, AdsrConfig};
 use crate::model_d::voice::{ModelDDiagnostics, ModelDPatch, ModelDVoice};
-use crate::preset::{MacroValues, Preset};
+use crate::preset::{MacroValues, ModelDPatchId, Preset};
 use thiserror::Error;
 
 const SMOOTH_SECONDS: f32 = 0.010;
@@ -64,8 +64,16 @@ struct Voice {
 }
 
 impl Voice {
-    fn new(sample_rate: f32, values: MacroValues) -> Result<Self, EngineError> {
-        let mut patch = ModelDPatch::bass();
+    fn new(
+        sample_rate: f32,
+        values: MacroValues,
+        patch_id: ModelDPatchId,
+    ) -> Result<Self, EngineError> {
+        let mut patch = match patch_id {
+            ModelDPatchId::Bass => ModelDPatch::bass(),
+            ModelDPatchId::Lead => ModelDPatch::lead(),
+            ModelDPatchId::FilterArticulation => ModelDPatch::filter_articulation(),
+        };
         // The public ADSR owns loudness and release. Keep the Model D loudness
         // contour transparent so it cannot truncate the public envelope.
         patch.loudness_contour.attack_seconds = 0.001;
@@ -165,7 +173,11 @@ impl Engine {
         }
         let mut voices = Vec::with_capacity(preset.voices);
         for _ in 0..preset.voices {
-            voices.push(Voice::new(sample_rate, preset.macros)?);
+            voices.push(Voice::new(
+                sample_rate,
+                preset.macros,
+                preset.model_d_patch,
+            )?);
         }
         Ok(Self {
             voices,
@@ -313,6 +325,18 @@ mod tests {
         left
     }
 
+    fn factory_sources() -> [&'static str; 7] {
+        [
+            include_str!("../presets/01-full-bass.mojsint"),
+            include_str!("../presets/02-full-lead.mojsint"),
+            include_str!("../presets/03-full-filter-articulation.mojsint"),
+            include_str!("../presets/reference.mojsint"),
+            include_str!("../presets/05-matched-linear-mixer.mojsint"),
+            include_str!("../presets/06-matched-linear-ladder.mojsint"),
+            include_str!("../presets/07-matched-no-drift-or-feedback.mojsint"),
+        ]
+    }
+
     #[test]
     fn renders_timed_stereo_and_panics_to_silence() {
         let mut engine = Engine::new(48_000.0, &preset(2)).unwrap();
@@ -358,6 +382,49 @@ mod tests {
                 / (low.len() - 1024) as f64)
                 .sqrt();
             assert!(rms > 1.0e-5, "{id:?} rms difference={rms}");
+        }
+    }
+
+    #[test]
+    fn seven_factory_starting_points_are_finite_and_pairwise_distinct() {
+        let renders = factory_sources().map(|source| {
+            let mut preset = Preset::parse(source).unwrap();
+            preset.voices = 1;
+            let mut engine = Engine::new(48_000.0, &preset).unwrap();
+            let mut left = vec![0.0; 16_384];
+            let mut right = vec![0.0; left.len()];
+            engine
+                .render_block(
+                    &[TimedEvent::new(
+                        0,
+                        Event::NoteOn {
+                            note: 48,
+                            velocity: 0.8,
+                        },
+                    )],
+                    &mut left,
+                    &mut right,
+                )
+                .unwrap();
+            assert_eq!(left, right);
+            assert!(left.iter().all(|sample| sample.is_finite()));
+            left
+        });
+
+        for left in 0..renders.len() {
+            for right in left + 1..renders.len() {
+                let residual = renders[left]
+                    .iter()
+                    .zip(&renders[right])
+                    .skip(1_024)
+                    .map(|(a, b)| f64::from(a - b).powi(2))
+                    .sum::<f64>()
+                    / (renders[left].len() - 1_024) as f64;
+                assert!(
+                    residual.sqrt() > 1.0e-6,
+                    "factory presets {left} and {right} collapsed"
+                );
+            }
         }
     }
 

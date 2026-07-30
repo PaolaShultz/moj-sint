@@ -56,7 +56,7 @@ JACK headers are not required because the host loads `libjack.so.0` dynamically.
 JACK/PipeWire services and hardware remain outside installation scope; the host
 will fail rather than start or reconfigure a server.
 
-Install the validated binary and public reference preset for SHR-DAW with the
-commands in the repository README. The binary belongs in the user's Cargo
-`bin` directory; `.mojsint` files belong under the configured data root, never
-under ignored repository `artifacts/`.
+Install the validated binary and all seven public factory presets for SHR-DAW
+with the commands in the repository README. The binary belongs in the user's
+Cargo `bin` directory; `.mojsint` files belong under the configured data root,
+never under ignored repository `artifacts/`.

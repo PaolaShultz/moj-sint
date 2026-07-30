@@ -39,11 +39,15 @@ eight Model D roles—`EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`,
 `WIDTH` was removed because this Model D engine has no supported width
 experiment. There is no hidden page or master-encoder takeover.
 
-The preferred idealized path is the reference preset's default baseline, not a
-rejection of the other Model D mechanisms. The eight timbral controls expose
-oscillator character/drift, source balance, cutoff, mixer nonlinearity,
-feedback, filter motion, ladder nonlinearity, and resonance so the user can
-audition them before making any rejection decision.
+The catalog preserves all seven authored Model D audition starting points:
+three full bass/lead/filter-articulation patches and four matched bass
+diagnostics. They are selectable states of one modeled instrument, not separate
+synthesis families. The eight timbral controls expose oscillator
+character/drift, source balance, cutoff, mixer nonlinearity, feedback, filter
+motion, ladder nonlinearity, and resonance from every start. EVOLVE uses 0 for
+idealized oscillators, 0.5 for authored static character without drift, and 1
+for full authored character, so the no-drift diagnostic is visible rather than
+hidden preset state.
 
 Parameter timing follows SHR-DAW's actual live-control path. Safe continuous
 changes should reach held voices through prepared, smoothed events. A

@@ -98,21 +98,25 @@ must not be presented as the musical-variation listening gate.
 
 At this checkpoint:
 
-- Version 0.2.0 is the first public live-host/control boundary. The production
-  `Engine` now uses the Model D voice and SHR-DAW 0.4.4 integrates it as a
-  distinct fourth backend.
+- Version 0.2.1 adds seven honest live starting presets to the 0.2.0
+  live-host/control boundary. The production `Engine` uses the authored Model D
+  bass, lead, or filter-articulation patch selected by strict schema 3, and
+  SHR-DAW 0.4.5 discovers all seven as its fourth backend.
 - `moj-sint --client-name NAME --preset FILE` implements the owned live
   process: dynamic JACK with `JACK_NO_START_SERVER`, exactly `out_l`/`out_r`,
   one ALSA Sequencer `input`, fixed SPSC timing handoff, overflow counters,
   panic, and SIGINT/SIGTERM/JACK-shutdown cleanup. Connected JACK and physical
   acceptance remain intentionally untested.
-- The stable schema is version 2 with exactly twelve CC 20–31 controls:
+- The stable schema is version 3 with one explicit `bass`, `lead`, or
+  `filter_articulation` patch and exactly twelve CC 20–31 controls:
   `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`, `SPACE`,
-  and ADSR. Strict version-1 migration discards only its provisional `WIDTH`
-  value and redundant envelope table.
-- `04_matched_idealized_path.wav` supplies the reference preset defaults, but
-  it is not a rejection verdict. The user explicitly requires every modeled
-  Model D mechanism to remain controllable before judging it.
+  and ADSR. Strict version-2 migration selects bass; version-1 migration also
+  discards only its provisional `WIDTH` and redundant envelope table.
+- The factory catalog contains Full Bass, Full Lead, Full Filter Articulation,
+  Matched Idealized, Matched Linear Mixer, Matched Linear Ladder, and Matched
+  No Drift or Feedback. Each preserves the corresponding audition coordinates
+  while retaining all twelve live controls. They are one instrument's starting
+  points, not seven invented sound families or rejection verdicts.
 - `WIDTH` was removed solely because this Model D production path is dual-mono
   and contains no width experiment. There is no hidden thirteenth control.
 - The original external development-PC zk notebook is not available on this
@@ -857,10 +861,11 @@ Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
 `docs/superpowers/specs/2026-07-29-model-d-character-design.md` before changing
 files.
 
-Continue from the implemented 0.2.0 live Model D host and SHR-DAW 0.4.4
-integration. `04_matched_idealized_path.wav` supplies the default baseline, but
-the user has not rejected any modeled Model D mechanism and wants to audition
-all of them through the full control surface before deciding.
+Continue from the implemented Moj Sint 0.2.1 live Model D host and SHR-DAW
+0.4.5 integration. Seven live factory starting points preserve the exact
+authored Model D audition patch/diagnostic coordinates. The user has not
+rejected any modeled mechanism and wants to audition every start through the
+full control surface before deciding.
 
 Do not touch connected JACK/hardware, add SIMD, claim whole-system Pi
 performance, or expand production polyphony without explicit scope and native
@@ -870,10 +875,11 @@ path.
 
 ## Next action
 
-Use SHR-DAW Playback to audition the eight timbral controls from the idealized
-baseline, then record the user's actual judgments about individual Model D
-mechanisms. Connected JACK, physical routing, and listening are the remaining
-acceptance boundary; no experiment output belongs in Git.
+Use SHR-DAW Presets to select each of the seven Model D starts, then use
+Playback to audition all eight timbral controls and ADSR from each. Record the
+user's actual judgments only afterward. Connected JACK, physical routing, and
+listening are the remaining acceptance boundary; no experiment output belongs
+in Git.
 
 ## Executed foundation checkpoint
 

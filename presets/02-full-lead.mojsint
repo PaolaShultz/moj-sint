@@ -1,0 +1,19 @@
+schema_version = 3
+name = "02 Full Lead"
+voices = 8
+output_gain = 0.2
+model_d_patch = "lead"
+
+[macros]
+evolve = 1.0
+shape = 0.5
+color = 0.575
+edge = 1.0
+couple = 1.0
+motion = 0.41666667
+depth = 1.0
+space = 0.56
+attack = 0.25091228
+decay = 0.60991188
+sustain = 0.76
+release = 0.60991188

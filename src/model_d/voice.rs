@@ -286,6 +286,10 @@ pub struct ModelDVoice {
     vcos: [ModelDVco; 3],
     mixer: ModelDMixer,
     ladder: ModelDLadder,
+    authored_source_levels: [f32; 3],
+    authored_feedback_level: f32,
+    authored_mixer_drive: f32,
+    authored_ladder_drive: f32,
     filter_contour: ModelDContour,
     loudness_contour: ModelDContour,
     cutoff_normalized: f32,
@@ -360,6 +364,10 @@ impl ModelDVoice {
             vcos,
             mixer,
             ladder,
+            authored_source_levels: patch.source_levels,
+            authored_feedback_level: patch.feedback_level,
+            authored_mixer_drive: patch.mixer_drive,
+            authored_ladder_drive: patch.ladder_drive,
             filter_contour: ModelDContour::new(sample_rate, patch.filter_contour)?,
             loudness_contour: ModelDContour::new(sample_rate, patch.loudness_contour)?,
             cutoff_normalized: patch.cutoff_normalized,
@@ -395,18 +403,22 @@ impl ModelDVoice {
         let shape = shape.clamp(0.0, 1.0);
         let lower = (1.0 - 2.0 * shape).max(0.0);
         let upper = (2.0 * shape - 1.0).max(0.0);
+        let [one, two, three] = self.authored_source_levels;
         self.mixer.set_source_levels([
-            0.88 - 0.38 * upper + 0.12 * lower,
-            0.72 * (1.0 - lower) + 0.28 * upper,
-            0.34 * (1.0 - lower) + 0.46 * upper,
+            one + lower * (1.0 - one) - upper * 0.45 * one,
+            two * (1.0 - lower) + upper * 0.45 * (1.0 - two),
+            three * (1.0 - lower) + upper * 0.65 * (1.0 - three),
         ]);
         self.cutoff_normalized = 0.10 + 0.80 * color.clamp(0.0, 1.0);
+        let edge = edge.clamp(0.0, 1.0);
         self.mixer
-            .set_character(edge, 1.0 + 3.0 * edge.clamp(0.0, 1.0));
-        self.mixer.set_feedback(0.60 * couple.clamp(0.0, 1.0));
+            .set_character(edge, 1.0 + edge * (self.authored_mixer_drive - 1.0));
+        self.mixer
+            .set_feedback(self.authored_feedback_level * couple.clamp(0.0, 1.0));
         self.filter_contour_amount = 0.60 * motion.clamp(0.0, 1.0);
+        let depth = depth.clamp(0.0, 1.0);
         self.ladder
-            .set_character(depth, 1.0 + 3.0 * depth.clamp(0.0, 1.0));
+            .set_character(depth, 1.0 + depth * (self.authored_ladder_drive - 1.0));
         self.ladder.set_resonance(0.75 * space.clamp(0.0, 1.0));
     }
 
@@ -690,6 +702,59 @@ mod tests {
             assert!(
                 period.abs_diff(full_period) <= 2,
                 "full_period={full_period}, ablation_period={period}"
+            );
+        }
+    }
+
+    #[test]
+    fn live_macro_starting_points_reproduce_the_five_bass_diagnostics() {
+        let cases = [
+            (
+                ModelDDiagnostics::full(),
+                [1.0, 0.5, 0.4125, 1.0, 1.0, 0.43333334, 1.0, 0.45333335],
+            ),
+            (
+                ModelDDiagnostics::idealized_path(),
+                [0.0, 0.5, 0.4125, 0.0, 0.0, 0.43333334, 0.0, 0.45333335],
+            ),
+            (
+                ModelDDiagnostics::linear_mixer(),
+                [1.0, 0.5, 0.4125, 0.0, 1.0, 0.43333334, 1.0, 0.45333335],
+            ),
+            (
+                ModelDDiagnostics::linear_ladder(),
+                [1.0, 0.5, 0.4125, 1.0, 1.0, 0.43333334, 0.0, 0.45333335],
+            ),
+            (
+                ModelDDiagnostics::no_drift_or_feedback(),
+                [0.5, 0.5, 0.4125, 1.0, 0.0, 0.43333334, 1.0, 0.45333335],
+            ),
+        ];
+
+        for (diagnostics, controls) in cases {
+            let mut expected =
+                ModelDVoice::new(SAMPLE_RATE, ModelDPatch::bass(), diagnostics).unwrap();
+            let mut actual =
+                ModelDVoice::new(SAMPLE_RATE, ModelDPatch::bass(), ModelDDiagnostics::full())
+                    .unwrap();
+            actual.set_live_controls(
+                controls[0],
+                controls[1],
+                controls[2],
+                controls[3],
+                controls[4],
+                controls[5],
+                controls[6],
+                controls[7],
+            );
+            expected.note_on(48, 0.8);
+            actual.note_on(48, 0.8);
+            let maximum_error = (0..8_192)
+                .map(|_| (expected.sample() - actual.sample()).abs())
+                .fold(0.0_f32, f32::max);
+            assert!(
+                maximum_error < 1.0e-5,
+                "{diagnostics:?} maximum_error={maximum_error}"
             );
         }
     }
