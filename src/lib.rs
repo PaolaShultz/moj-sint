@@ -12,6 +12,7 @@ pub mod dsp;
 pub mod engine;
 pub mod envelope;
 pub mod envelope_audition;
+pub mod host;
 pub mod hybrid;
 pub mod hybrid_subset;
 pub mod model_d;

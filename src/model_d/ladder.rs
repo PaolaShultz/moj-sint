@@ -42,7 +42,7 @@ pub struct ModelDLadder {
     resonance_tuning: f32,
     resonance_feedback: f32,
     drive: f32,
-    mode: LadderMode,
+    character: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -93,7 +93,10 @@ impl ModelDLadder {
             resonance_tuning,
             resonance_feedback: resonance * MAX_RESONANCE_FEEDBACK,
             drive: config.drive.clamp(MIN_DRIVE, MAX_DRIVE),
-            mode: config.mode,
+            character: match config.mode {
+                LadderMode::Linear => 0.0,
+                LadderMode::Nonlinear => 1.0,
+            },
         })
     }
 
@@ -115,22 +118,17 @@ impl ModelDLadder {
         let input = input.clamp(-MAX_INPUT, MAX_INPUT);
 
         for _ in 0..OVERSAMPLE_FACTOR {
-            let feedback_output = match self.mode {
-                LadderMode::Linear => self.states[3],
-                LadderMode::Nonlinear => bounded_odd(self.states[3]),
-            };
+            let nonlinear_feedback = bounded_odd(self.states[3]);
+            let feedback_output =
+                self.states[3] + self.character * (nonlinear_feedback - self.states[3]);
             let differential = input - self.resonance_feedback * feedback_output;
-            let mut stage_input = match self.mode {
-                LadderMode::Linear => differential,
-                LadderMode::Nonlinear => bounded_odd(self.drive * differential) / self.drive,
-            };
+            let nonlinear_input = bounded_odd(self.drive * differential) / self.drive;
+            let mut stage_input = differential + self.character * (nonlinear_input - differential);
 
             for state in &mut self.states {
                 *state += coefficient * (stage_input - *state);
-                stage_input = match self.mode {
-                    LadderMode::Linear => *state,
-                    LadderMode::Nonlinear => bounded_odd(*state),
-                };
+                let nonlinear_stage = bounded_odd(*state);
+                stage_input = *state + self.character * (nonlinear_stage - *state);
             }
             self.decimator_history[self.decimator_index] = stage_input;
             self.decimator_index += 1;
@@ -152,6 +150,21 @@ impl ModelDLadder {
         self.states = [0.0; 4];
         self.decimator_history = [0.0; DECIMATOR_TAPS];
         self.decimator_index = 0;
+    }
+
+    pub fn set_resonance(&mut self, resonance: f32) {
+        let resonance = resonance.clamp(0.0, 1.0);
+        self.resonance_tuning = if resonance > 0.0 {
+            resonance / (0.1 + 0.9 * resonance)
+        } else {
+            0.0
+        };
+        self.resonance_feedback = resonance * MAX_RESONANCE_FEEDBACK;
+    }
+
+    pub fn set_character(&mut self, amount: f32, drive: f32) {
+        self.character = amount.clamp(0.0, 1.0);
+        self.drive = drive.clamp(MIN_DRIVE, MAX_DRIVE);
     }
 
     #[inline]

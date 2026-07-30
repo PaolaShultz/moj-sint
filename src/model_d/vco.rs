@@ -310,6 +310,7 @@ pub struct ModelDVco {
     reset_phase: f32,
     base_increment: f32,
     static_ratio: f32,
+    authored_static_ratio: f32,
     #[cfg(test)]
     static_cents: f32,
     #[cfg(test)]
@@ -324,10 +325,15 @@ pub struct ModelDVco {
     drift_polarity: f32,
     drift_up_scale: f32,
     drift_down_scale: f32,
+    authored_drift_up_scale: f32,
+    authored_drift_down_scale: f32,
     asymmetry: f32,
+    authored_asymmetry: f32,
+    base_pulse_width: f32,
     triangle_peak: f32,
     pulse_width: f32,
     level: f32,
+    authored_level: f32,
 }
 
 impl ModelDVco {
@@ -374,6 +380,7 @@ impl ModelDVco {
             reset_phase,
             base_increment: 0.0,
             static_ratio,
+            authored_static_ratio: static_ratio,
             #[cfg(test)]
             static_cents: config.cents_offset,
             #[cfg(test)]
@@ -388,12 +395,36 @@ impl ModelDVco {
             drift_polarity,
             drift_up_scale,
             drift_down_scale,
+            authored_drift_up_scale: drift_up_scale,
+            authored_drift_down_scale: drift_down_scale,
             asymmetry,
+            authored_asymmetry: asymmetry,
+            base_pulse_width,
             triangle_peak: (0.50 + 0.20 * asymmetry).clamp(0.20, 0.80),
             pulse_width: (base_pulse_width + 0.25 * asymmetry)
                 .clamp(MIN_PULSE_WIDTH, MAX_PULSE_WIDTH),
             level: 1.0 + config.level_offset,
+            authored_level: 1.0 + config.level_offset,
         })
+    }
+
+    /// Continuously opens the authored oscillator offsets, drift, waveform
+    /// asymmetry, and level mismatch. This uses only bounded scalar arithmetic
+    /// so it is safe to call from the prepared render path.
+    pub fn set_character(&mut self, amount: f32) {
+        let amount = if amount.is_finite() {
+            amount.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        self.static_ratio = 1.0 + amount * (self.authored_static_ratio - 1.0);
+        self.drift_up_scale = amount * self.authored_drift_up_scale;
+        self.drift_down_scale = amount * self.authored_drift_down_scale;
+        self.asymmetry = amount * self.authored_asymmetry;
+        self.triangle_peak = (0.50 + 0.20 * self.asymmetry).clamp(0.20, 0.80);
+        self.pulse_width =
+            (self.base_pulse_width + 0.25 * self.asymmetry).clamp(MIN_PULSE_WIDTH, MAX_PULSE_WIDTH);
+        self.level = 1.0 + amount * (self.authored_level - 1.0);
     }
 
     pub fn set_note(&mut self, note: u8) {
@@ -483,9 +514,12 @@ impl ModelDVco {
         self.drift_cosine = drift_cosine;
         self.drift_samples_since_normalize += 1;
         if self.drift_samples_since_normalize == DRIFT_NORMALIZE_PERIOD {
-            let scale = (self.drift_sine * self.drift_sine + self.drift_cosine * self.drift_cosine)
-                .sqrt()
-                .recip();
+            let magnitude_squared =
+                self.drift_sine * self.drift_sine + self.drift_cosine * self.drift_cosine;
+            // One Newton step around unit magnitude. Recurrence drift over 256
+            // samples is tiny, so this keeps the rotation bounded without a
+            // square root in the real-time sample path.
+            let scale = 1.5 - 0.5 * magnitude_squared;
             self.drift_sine *= scale;
             self.drift_cosine *= scale;
             self.drift_samples_since_normalize = 0;

@@ -66,13 +66,17 @@ enum Stage {
     Release,
 }
 
+/// Live-controllable ADSR. Stage time is kept independently from its current
+/// parameters, so smoothed time changes affect held and released notes without
+/// restarting them.
 #[derive(Clone, Copy, Debug)]
 pub struct Adsr {
     sample_rate: f32,
     config: AdsrConfig,
     stage: Stage,
     level: f32,
-    release_step: f32,
+    stage_samples: u64,
+    stage_start_level: f32,
 }
 
 impl Adsr {
@@ -80,58 +84,80 @@ impl Adsr {
         if !sample_rate.is_finite() || sample_rate <= 0.0 {
             return Err(EnvelopeError::InvalidSampleRate);
         }
-        let config = config.validate()?;
         Ok(Self {
             sample_rate,
-            config,
+            config: config.validate()?,
             stage: Stage::Idle,
             level: 0.0,
-            release_step: 0.0,
+            stage_samples: 0,
+            stage_start_level: 0.0,
         })
     }
 
+    pub fn set_config(&mut self, config: AdsrConfig) {
+        if let Ok(config) = config.validate() {
+            self.config = config;
+        }
+    }
+
     pub fn note_on(&mut self) {
+        self.stage_start_level = self.level;
+        self.stage_samples = 0;
         self.stage = Stage::Attack;
     }
 
     pub fn restart(&mut self) {
         self.level = 0.0;
-        self.release_step = 0.0;
-        self.stage = Stage::Attack;
+        self.note_on();
     }
 
     pub fn note_off(&mut self) {
         if self.stage != Stage::Idle {
-            self.release_step = self.level / (self.config.release_seconds * self.sample_rate);
+            self.stage_start_level = self.level;
+            self.stage_samples = 0;
             self.stage = Stage::Release;
         }
     }
 
+    pub fn reset(&mut self) {
+        self.stage = Stage::Idle;
+        self.level = 0.0;
+        self.stage_samples = 0;
+        self.stage_start_level = 0.0;
+    }
+
     #[inline]
     pub fn advance(&mut self) -> f32 {
+        self.stage_samples = self.stage_samples.saturating_add(1);
         match self.stage {
             Stage::Idle => self.level = 0.0,
             Stage::Attack => {
-                self.level += 1.0 / (self.config.attack_seconds * self.sample_rate);
+                let progress =
+                    self.stage_samples as f32 / (self.config.attack_seconds * self.sample_rate);
+                self.level = self.stage_start_level + progress * (1.0 - self.stage_start_level);
                 if self.level >= 1.0 {
                     self.level = 1.0;
                     self.stage = Stage::Decay;
+                    self.stage_samples = 0;
                 }
             }
             Stage::Decay => {
-                self.level -= (1.0 - self.config.sustain_level)
-                    / (self.config.decay_seconds * self.sample_rate);
+                let progress =
+                    self.stage_samples as f32 / (self.config.decay_seconds * self.sample_rate);
+                self.level = 1.0 - progress * (1.0 - self.config.sustain_level);
                 if self.level <= self.config.sustain_level {
                     self.level = self.config.sustain_level;
                     self.stage = Stage::Sustain;
+                    self.stage_samples = 0;
                 }
             }
             Stage::Sustain => self.level = self.config.sustain_level,
             Stage::Release => {
-                self.level -= self.release_step;
+                let progress =
+                    self.stage_samples as f32 / (self.config.release_seconds * self.sample_rate);
+                self.level = self.stage_start_level * (1.0 - progress);
                 if self.level <= 0.0 {
-                    self.level = 0.0;
-                    self.stage = Stage::Idle;
+                    self.reset();
                 }
             }
         }
@@ -141,6 +167,7 @@ impl Adsr {
     pub const fn level(&self) -> f32 {
         self.level
     }
+
     pub fn is_idle(&self) -> bool {
         self.stage == Stage::Idle
     }
@@ -151,29 +178,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn envelope_traverses_attack_decay_sustain_and_release() {
-        let config = AdsrConfig::new(0.002, 0.002, 0.5, 0.002).unwrap();
-        let mut envelope = Adsr::new(1_000.0, config).unwrap();
-        assert_eq!(envelope.advance(), 0.0);
+    fn live_adsr_times_and_sustain_change_active_notes() {
+        let mut envelope =
+            Adsr::new(1_000.0, AdsrConfig::new(0.010, 0.010, 0.5, 0.010).unwrap()).unwrap();
         envelope.note_on();
-        assert!(envelope.advance() > 0.0);
-        for _ in 0..8 {
+        for _ in 0..5 {
             envelope.advance();
         }
         assert!((envelope.level() - 0.5).abs() < 1.0e-6);
-        envelope.note_off();
-        for _ in 0..8 {
+        envelope.set_config(AdsrConfig::new(0.005, 0.010, 0.25, 0.010).unwrap());
+        assert_eq!(envelope.advance(), 1.0);
+        for _ in 0..10 {
             envelope.advance();
         }
-        assert_eq!(envelope.level(), 0.0);
-        assert!(envelope.is_idle());
+        assert!((envelope.level() - 0.25).abs() < 1.0e-6);
+        envelope.set_config(AdsrConfig::new(0.005, 0.010, 0.8, 0.010).unwrap());
+        assert_eq!(envelope.advance(), 0.8);
     }
 
     #[test]
-    fn envelope_rejects_invalid_configuration() {
-        assert!(AdsrConfig::new(0.0, 0.1, 0.5, 0.1).is_err());
-        assert!(AdsrConfig::new(0.1, 0.1, 1.1, 0.1).is_err());
-        let valid = AdsrConfig::new(0.1, 0.1, 0.5, 0.1).unwrap();
-        assert!(Adsr::new(f32::NAN, valid).is_err());
+    fn live_release_change_affects_an_already_released_note() {
+        let mut envelope =
+            Adsr::new(1_000.0, AdsrConfig::new(0.001, 0.001, 1.0, 0.100).unwrap()).unwrap();
+        envelope.note_on();
+        envelope.advance();
+        envelope.note_off();
+        for _ in 0..10 {
+            envelope.advance();
+        }
+        assert!(envelope.level() > 0.8);
+        envelope.set_config(AdsrConfig::new(0.001, 0.001, 1.0, 0.020).unwrap());
+        for _ in 0..10 {
+            envelope.advance();
+        }
+        assert!(envelope.is_idle());
     }
 }

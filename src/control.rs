@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MacroId {
@@ -11,7 +12,6 @@ pub enum MacroId {
     Couple,
     Motion,
     Depth,
-    Width,
     Space,
     Attack,
     Decay,
@@ -20,7 +20,7 @@ pub enum MacroId {
 }
 
 impl MacroId {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 12] = [
         Self::Evolve,
         Self::Shape,
         Self::Color,
@@ -28,13 +28,23 @@ impl MacroId {
         Self::Couple,
         Self::Motion,
         Self::Depth,
-        Self::Width,
         Self::Space,
         Self::Attack,
         Self::Decay,
         Self::Sustain,
         Self::Release,
     ];
+    pub const TIMBRAL: [Self; 8] = [
+        Self::Evolve,
+        Self::Shape,
+        Self::Color,
+        Self::Edge,
+        Self::Couple,
+        Self::Motion,
+        Self::Depth,
+        Self::Space,
+    ];
+    pub const FIRST_CC: u8 = 20;
 
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -45,13 +55,45 @@ impl MacroId {
             Self::Couple => "couple",
             Self::Motion => "motion",
             Self::Depth => "depth",
-            Self::Width => "width",
             Self::Space => "space",
             Self::Attack => "attack",
             Self::Decay => "decay",
             Self::Sustain => "sustain",
             Self::Release => "release",
         }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Evolve => "EVOLVE",
+            Self::Shape => "SHAPE",
+            Self::Color => "COLOR",
+            Self::Edge => "EDGE",
+            Self::Couple => "COUPLE",
+            Self::Motion => "MOTION",
+            Self::Depth => "DEPTH",
+            Self::Space => "SPACE",
+            Self::Attack => "ATTACK",
+            Self::Decay => "DECAY",
+            Self::Sustain => "SUSTAIN",
+            Self::Release => "RELEASE",
+        }
+    }
+
+    pub const fn cc(self) -> u8 {
+        let mut index = 0;
+        while index < Self::ALL.len() {
+            if Self::ALL[index] as u8 == self as u8 {
+                return Self::FIRST_CC + index as u8;
+            }
+            index += 1;
+        }
+        Self::FIRST_CC
+    }
+
+    pub fn from_cc(cc: u8) -> Option<Self> {
+        let index = cc.checked_sub(Self::FIRST_CC)? as usize;
+        Self::ALL.get(index).copied()
     }
 }
 
@@ -147,12 +189,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exposes_exactly_thirteen_unique_macros() {
-        assert_eq!(MacroId::ALL.len(), 13);
+    fn exposes_exactly_twelve_unique_macros_with_stable_ccs() {
+        assert_eq!(MacroId::ALL.len(), 12);
+        assert_eq!(MacroId::TIMBRAL.len(), 8);
         let mut names = MacroId::ALL.map(MacroId::as_str).to_vec();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 13);
+        assert_eq!(names.len(), 12);
+        for (index, id) in MacroId::ALL.into_iter().enumerate() {
+            assert_eq!(id.cc(), 20 + index as u8);
+            assert_eq!(MacroId::from_cc(id.cc()), Some(id));
+        }
+        assert_eq!(MacroId::from_cc(19), None);
+        assert_eq!(MacroId::from_cc(32), None);
     }
 
     #[test]

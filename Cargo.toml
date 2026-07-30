@@ -1,6 +1,6 @@
 [package]
 name = "moj-sint"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 publish = false
@@ -15,8 +15,12 @@ name = "moj-sint"
 path = "src/main.rs"
 
 [dependencies]
+alsa = "0.7.1"
+anyhow = "1"
 hound = "3.5"
+libc = "0.2"
 serde = { version = "1", features = ["derive"] }
+signal-hook = "0.3"
 thiserror = "2"
 toml = "0.9"
 

@@ -372,6 +372,44 @@ impl ModelDVoice {
         })
     }
 
+    /// Map the eight public timbral controls onto the complete Model D study.
+    /// At the baseline values used by the reference preset, the result matches
+    /// the idealized diagnostic path; moving the controls continuously opens
+    /// every modeled character mechanism for evaluation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_live_controls(
+        &mut self,
+        evolve: f32,
+        shape: f32,
+        color: f32,
+        edge: f32,
+        couple: f32,
+        motion: f32,
+        depth: f32,
+        space: f32,
+    ) {
+        for vco in &mut self.vcos {
+            vco.set_character(evolve);
+        }
+
+        let shape = shape.clamp(0.0, 1.0);
+        let lower = (1.0 - 2.0 * shape).max(0.0);
+        let upper = (2.0 * shape - 1.0).max(0.0);
+        self.mixer.set_source_levels([
+            0.88 - 0.38 * upper + 0.12 * lower,
+            0.72 * (1.0 - lower) + 0.28 * upper,
+            0.34 * (1.0 - lower) + 0.46 * upper,
+        ]);
+        self.cutoff_normalized = 0.10 + 0.80 * color.clamp(0.0, 1.0);
+        self.mixer
+            .set_character(edge, 1.0 + 3.0 * edge.clamp(0.0, 1.0));
+        self.mixer.set_feedback(0.60 * couple.clamp(0.0, 1.0));
+        self.filter_contour_amount = 0.60 * motion.clamp(0.0, 1.0);
+        self.ladder
+            .set_character(depth, 1.0 + 3.0 * depth.clamp(0.0, 1.0));
+        self.ladder.set_resonance(0.75 * space.clamp(0.0, 1.0));
+    }
+
     /// Start or retrigger the monophonic note. Velocity is bounded to 0–1;
     /// non-finite or non-positive values leave the voice safely idle.
     pub fn note_on(&mut self, note: u8, velocity: f32) {

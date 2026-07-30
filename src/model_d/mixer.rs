@@ -25,7 +25,7 @@ pub struct ModelDMixer {
     source_levels: [f32; 3],
     feedback_level: f32,
     drive: f32,
-    mode: MixerMode,
+    character: f32,
 }
 
 impl ModelDMixer {
@@ -45,7 +45,10 @@ impl ModelDMixer {
             source_levels: config.source_levels,
             feedback_level: config.feedback_level,
             drive: config.drive,
-            mode: config.mode,
+            character: match config.mode {
+                MixerMode::Linear => 0.0,
+                MixerMode::Nonlinear => 1.0,
+            },
         })
     }
 
@@ -57,14 +60,29 @@ impl ModelDMixer {
             + sources[1] * self.source_levels[1]
             + sources[2] * self.source_levels[2]
             + feedback * self.feedback_level;
-        match self.mode {
-            MixerMode::Linear => input,
-            MixerMode::Nonlinear => {
-                let driven = (input * self.drive).clamp(-1.0, 1.0);
-                let curved = driven * (CUBIC_LINEAR_GAIN - 0.5 * driven * driven);
-                curved / (CUBIC_LINEAR_GAIN * self.drive)
-            }
+        let driven = (input * self.drive).clamp(-1.0, 1.0);
+        let curved =
+            driven * (CUBIC_LINEAR_GAIN - 0.5 * driven * driven) / (CUBIC_LINEAR_GAIN * self.drive);
+        if self.character <= 0.0 {
+            input
+        } else if self.character >= 1.0 {
+            curved
+        } else {
+            input + self.character * (curved - input)
         }
+    }
+
+    pub fn set_source_levels(&mut self, levels: [f32; 3]) {
+        self.source_levels = levels.map(|level| level.clamp(0.0, 1.0));
+    }
+
+    pub fn set_feedback(&mut self, level: f32) {
+        self.feedback_level = level.clamp(0.0, 1.0);
+    }
+
+    pub fn set_character(&mut self, amount: f32, drive: f32) {
+        self.character = amount.clamp(0.0, 1.0);
+        self.drive = drive.clamp(MIN_DRIVE, MAX_DRIVE);
     }
 
     pub const fn reset(&mut self) {}

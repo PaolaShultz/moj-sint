@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-07-29, Europe/Zagreb.
+Last updated: 2026-07-30, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -98,6 +98,29 @@ must not be presented as the musical-variation listening gate.
 
 At this checkpoint:
 
+- Version 0.2.0 is the first public live-host/control boundary. The production
+  `Engine` now uses the Model D voice and SHR-DAW 0.4.4 integrates it as a
+  distinct fourth backend.
+- `moj-sint --client-name NAME --preset FILE` implements the owned live
+  process: dynamic JACK with `JACK_NO_START_SERVER`, exactly `out_l`/`out_r`,
+  one ALSA Sequencer `input`, fixed SPSC timing handoff, overflow counters,
+  panic, and SIGINT/SIGTERM/JACK-shutdown cleanup. Connected JACK and physical
+  acceptance remain intentionally untested.
+- The stable schema is version 2 with exactly twelve CC 20–31 controls:
+  `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`, `SPACE`,
+  and ADSR. Strict version-1 migration discards only its provisional `WIDTH`
+  value and redundant envelope table.
+- `04_matched_idealized_path.wav` supplies the reference preset defaults, but
+  it is not a rejection verdict. The user explicitly requires every modeled
+  Model D mechanism to remain controllable before judging it.
+- `WIDTH` was removed solely because this Model D production path is dual-mono
+  and contains no width experiment. There is no hidden thirteenth control.
+- The original external development-PC zk notebook is not available on this
+  machine. The local replacement lives at
+  `/home/shome/Documents/knowledge/Moj-Sint/Current.md`; tracked docs and live
+  source remain authoritative. After material decisions, update this handoff
+  and that concise note, then run the local `.zk/validate.sh`.
+
 - Git state, branch, and artifact existence must be inspected live rather than
   inferred from this handoff.
 - The Rust crate contains the portable DSP/control/preset/engine library,
@@ -118,12 +141,11 @@ At this checkpoint:
   simulation at 48 kHz/64 frames established an engine-budget provisional cap
   of eight tested voices: the corrected ten-minute rapid-control soak had zero
   deadline misses, 3.992% p99.9 period use, 9.751% maximum period use, finite
-  output, flat RSS, and no new throttling. Moj still has no live host, so final
-  SHR/JACK polyphony remains open.
+  output, flat RSS, and no new throttling. The new live host has not been
+  measured in connected SHR/JACK, so final whole-system polyphony remains open.
 - User-local stable Rust 1.97.1, Cargo, rustfmt, Clippy, cargo-audit, and
   cargo-deny are installed.
-- The live JACK/ALSA host is not implemented and no audio service or hardware
-  was touched.
+- No audio service or hardware was touched while implementing the live host.
 - The approved five-family comparison is implemented as isolated disposable
   offline research code. The user found the direction promising but still far
   from the intended instrument; no family is selected and none is routed into
@@ -173,11 +195,10 @@ At this checkpoint:
   hard-crest character into a 105-500 Hz branch for a short onset window.
   Its historical engineering checkpoint is recorded below; nothing from that
   experiment was integrated.
-- A separate isolated Model D character model now exercises a documented
+- The formerly isolated Model D character model exercises a documented
   three-VCO, nonlinear mixer, four-stage nonlinear ladder, dual-contour, VCA,
-  and output-feedback path. Automated engineering gates pass in the generated
-  report, but human listening is pending. It is not integrated into production
-  `Engine`, presets, stable macros, JACK, ALSA, or SHR-DAW.
+  and output-feedback path. It is now the production `Engine`; all its modeled
+  mechanisms remain open for user evaluation through the complete controls.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
@@ -310,7 +331,7 @@ The desired live executable shape is provisionally:
 moj-sint --client-name shs-moj-sint --preset /path/to/file.mojsint
 ```
 
-The live host should expose:
+The live host exposes:
 
 - one stable discoverable ALSA Sequencer MIDI input;
 - exactly two JACK audio outputs with stable short names;
@@ -329,11 +350,9 @@ Embedding Moj Sint directly into SHR-DAW is also not recommended initially
 because it breaks the established process-ownership and failure-isolation
 model. Direct ALSA audio would bypass and compete with SHR's JACK graph.
 
-Future SHR-DAW integration will require a real fourth `BackendKind`, preset ID,
-catalog discovery path, configuration block, process command, Project route
-identity, controller schema, pickup/reset handling, and UI labels. That work is
-not part of the initial Moj Sint workspace preparation unless separately
-requested.
+SHR-DAW 0.4.4 supplies the fourth `BackendKind`, preset ID, catalog discovery,
+configuration block, process command, Project/Idea/FT2 route identity,
+controller schema, pickup/reset handling, and Playback labels.
 
 ## Performance controller contract
 
@@ -342,17 +361,11 @@ surface exposes exactly twelve continuous synth controls: eight sound-shaping
 rotaries and four ADSR pots. SHR's relative master rotary remains a host
 navigation/context control and is not a thirteenth Moj Sint control.
 
-The current Rust `MacroId` and version-1 preset schema contain nine timbral
-candidates plus ADSR: `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`,
-`DEPTH`, `WIDTH`, `SPACE`, `ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. That
-thirteen-ID implementation is provisional foundation scaffolding, not the
-settled hardware or product contract.
-
-Before production controller integration, evaluate the nine timbral candidates
-and remove the least musically useful one. Do not invent a button, hidden page,
-mode, or master-encoder takeover to retain it. The final eight names remain
-open until automated control-travel evidence and human listening support the
-choice.
+The version-2 schema implements the settled twelve-control surface:
+`EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`, `SPACE`,
+`ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. `WIDTH` was removed because the
+production Model D path is dual-mono and has no width mechanism. No button,
+hidden page, mode, or master-encoder takeover retains it.
 
 Settled physical roles:
 
@@ -473,14 +486,15 @@ Suggested focused modules, subject to the approved implementation plan:
 ```text
 src/lib.rs              public engine boundary
 src/engine.rs           voices, events, block rendering
-src/control.rs          provisional 13 IDs pending final 12-control migration
+src/control.rs          stable 12 IDs and CC 20-31 mapping
 src/envelope.rs         perceptual ADSR behavior
 src/dsp/mod.rs          finite guards and DSP primitives
 src/dsp/oscillator.rs   first reference oscillator
 src/preset.rs           strict versioned .mojsint parsing/validation
 src/offline.rs          deterministic rendering
-src/host/jack.rs        JACK lifecycle and callback boundary
-src/host/midi.rs        ALSA Sequencer input and bounded event handoff
+src/host/jack.rs        dynamic JACK lifecycle and callback boundary
+src/host/midi.rs        ALSA Sequencer translation
+src/host/queue.rs       bounded SPSC event handoff
 src/main.rs             headless CLI and shutdown
 ```
 
@@ -699,11 +713,14 @@ matched causal ablations. Listen in filename order:
 
 On 2026-07-29 the user preferred `04_matched_idealized_path.wav` over the
 other six renders, while explicitly qualifying the verdict as a non-expert
-assessment. This is a directionally positive selection of the idealized path
-as the best current listening baseline. It is not acceptance of the full
-character path, proof that the added imperfections/nonlinearities help, a
-hardware-equivalence claim, or authorization to integrate the experiment into
-the production `Engine`.
+assessment. On 2026-07-30 the user clarified that this selects the default
+baseline only: none of the Model D mechanisms is rejected because the batch
+did not provide the complete live parameter surface needed to judge their
+travel. The production controls therefore expose oscillator character/drift,
+mixer and ladder nonlinearity, feedback, source balance, cutoff, contour
+motion, and resonance. Future documentation must record actual control
+auditions rather than converting the earlier whole-file preference into a
+rejection.
 
 The presentation gains are fixed at 1.0 for the bass and every matched
 ablation, 0.75 for the lead, and 1.6 for the filter-articulation phrase.
@@ -820,13 +837,12 @@ final run must replace it before a current full-verification claim:
 - artifact hygiene found zero tracked artifact files and no staging/backup
   residue.
 
-Human listening must decide whether the full path sounds like one coherent
-instrument, whether three-oscillator movement stays useful rather than
-chorused, whether mixer and ladder nonlinearities add proportionate character,
-whether the filter retains body under articulation/resonance, and whether the
-matched ablations expose audible causal contributions. Until that verdict,
-nothing is selected, preserved outside the disposable artifact policy, mapped,
-or integrated.
+Human listening must still decide whether the full path sounds like one
+coherent instrument, whether three-oscillator movement stays useful rather
+than chorused, whether mixer and ladder nonlinearities add proportionate
+character, and whether the filter retains body under articulation/resonance.
+Those mechanisms are now mapped for that evaluation; no listening approval is
+claimed.
 
 ## Current continuation prompt
 
@@ -841,27 +857,23 @@ Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
 `docs/superpowers/specs/2026-07-29-model-d-character-design.md` before changing
 files.
 
-Continue from the first listening verdict: `04_matched_idealized_path.wav` was
-preferred over the other six renders, with the user's explicit non-expert
-qualification. Treat it as the best current baseline, not as hardware
-equivalence or production acceptance. Before integrating anything, use a
-separately approved refinement task to identify whether any oscillator
-imperfection, mixer nonlinearity, ladder nonlinearity, drift, or feedback can
-be reintroduced individually without making that baseline worse.
+Continue from the implemented 0.2.0 live Model D host and SHR-DAW 0.4.4
+integration. `04_matched_idealized_path.wav` supplies the default baseline, but
+the user has not rejected any modeled Model D mechanism and wants to audition
+all of them through the full control surface before deciding.
 
-Do not modify SHR-DAW, touch JACK/hardware, add SIMD, claim Pi performance, or
-expand production polyphony without explicit scope and native evidence. Keep
-the settled 12-control budget, follow SHR-DAW's live control path, and do not
-turn next-note application into a global constraint.
+Do not touch connected JACK/hardware, add SIMD, claim whole-system Pi
+performance, or expand production polyphony without explicit scope and native
+evidence. Keep the settled 12-control budget and follow SHR-DAW's pickup/reset
+path.
 ```
 
 ## Next action
 
-Use `04_matched_idealized_path.wav` as the current listening baseline in a
-future, separately scoped refinement. Reintroduce character mechanisms
-individually and compare them causally before deciding whether to preserve a
-specific result or propose production integration. The current ignored batch
-remains disposable and no experiment output has been added to Git.
+Use SHR-DAW Playback to audition the eight timbral controls from the idealized
+baseline, then record the user's actual judgments about individual Model D
+mechanisms. Connected JACK, physical routing, and listening are the remaining
+acceptance boundary; no experiment output belongs in Git.
 
 ## Executed foundation checkpoint
 

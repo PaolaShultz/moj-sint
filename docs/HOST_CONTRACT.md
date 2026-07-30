@@ -1,72 +1,61 @@
 # Live Host Contract
 
-This document fixes the boundary for the later live-host milestone. It does not
-claim that the current binary already implements the live host.
-
-## Process and ports
-
-The provisional invocation is:
+The live host is implemented by the `moj-sint` binary:
 
 ```sh
 moj-sint --client-name shs-moj-sint --preset /path/to/file.mojsint
 ```
 
-The process must:
+The existing `validate` and `render` subcommands remain available.
 
-- use the exact configured JACK client name;
-- register exactly two JACK audio outputs with stable short names `out_l` and
-  `out_r`;
-- publish one stable, discoverable ALSA Sequencer MIDI input;
-- never start, restart, or reconfigure JACK;
-- handle SIGINT and SIGTERM gracefully; and
-- return a non-zero status with a clear diagnostic if setup fails.
+## Process and ports
 
-SHR-DAW readiness is the unambiguous configured/prefixed JACK client plus
-exactly two outputs. A MIDI port alone is not readiness.
+Before joining audio, the process reads one regular preset file no larger than
+1 MiB and strictly validates its versioned schema. It opens JACK with
+`JACK_NO_START_SERVER`, uses the configured client name, and registers exactly
+two audio outputs with stable short names `out_l` and `out_r`. It never starts,
+restarts, reconfigures, or auto-connects JACK.
 
-## Thread boundary
+The same configured name is used for one discoverable ALSA Sequencer client
+with one subscribable MIDI input port named `input`. Setup failures are printed
+outside the callback and return non-zero. SIGINT, SIGTERM, ALSA failure, JACK
+shutdown, or a callback fault cause bounded shutdown: the MIDI thread exits,
+the JACK client deactivates, and owned resources close.
 
-The MIDI/control thread converts ALSA events into a fixed-capacity,
-single-producer/single-consumer queue. Overflow has a counted, observable policy
-and never blocks. The JACK callback drains only events for its current period,
-maps timestamps to sample offsets, and calls `Engine::render_block`.
+## MIDI and timing
 
-The callback must not allocate or deallocate, lock, access files, spawn
-processes, log, format strings, panic, wait, or perform per-sample trigonometric
-setup. Construction, preset parsing, port registration, and diagnostics happen
-outside it. JACK's own API states that callback code must be suitable for
-real-time execution: <https://jackaudio.org/api/group__NonCallbackAPI.html>.
+The ALSA thread translates:
 
-## Adapter decision to make later
+- Note On, including velocity-zero Note On as Note Off;
+- Note Off;
+- CC 20–31 as the twelve stable macros;
+- CC 120, CC 123, and Sequencer Reset as immediate All Notes Off.
 
-Evaluate both of these with a minimal prototype:
+It writes fixed-size events into a 1,024-slot SPSC queue. A full queue drops the
+new event, increments an atomic overflow counter, and never blocks. Queue and
+per-period overflow totals are reported only by non-real-time threads.
 
-1. `jack` crate 0.13.x with default dynamic loading. It avoids a link-time JACK
-   dependency and includes a controller/ring-buffer option, but the callback and
-   shutdown behavior must be audited.
-2. A small, auditable dynamic FFI layer matching SHR-DAW's `libjack.so.0`
-   approach. This minimizes abstraction but increases local unsafe code.
+The ALSA thread calls JACK's non-process-thread
+`jack_frames_since_cycle_start` query, associates the resulting offset with the
+next callback cycle, and queues that schedule. The callback clamps current
+period offsets, applies late events at offset zero, retains one future event,
+orders the bounded per-period batch by offset, and passes it to
+`Engine::render_block`.
 
-For ALSA Sequencer, compare the maintained `alsa` crate's `seq` module with a
-small FFI boundary. Either path requires `libasound2-dev` to build on Debian
-systems. The GObject-based `alsaseq` crate adds GLib/event-loop machinery that
-is unnecessary for this host.
+## Real-time boundary
 
-## Future SHR-DAW work
+The callback uses caller-owned JACK buffers, preallocated engine voices, a
+fixed 256-event period array, and the lock-free queue. It performs no allocation
+or free, locks, file I/O, logging, formatting, process work, waiting, or
+trigonometric/exponential coefficient setup. Model D cutoff and filter
+coefficients are prepared before activation; macro smoothing and runtime
+mappings use bounded scalar arithmetic.
 
-Verified against `PaolaShultz/shr-daw` main commit
-`8b7d0d7c17c582292ac06a915ca1fe750d77bc40` on 2026-07-22. A separate SHR-DAW
-change must add:
+The adapter choice is the small dynamic `libjack.so.0` FFI boundary already
+used by SHR-DAW, plus `alsa` 0.7.1 for Sequencer input. This avoids a link-time
+JACK development dependency while keeping unsafe JACK ownership in one module.
+`libasound2-dev` is required to build the ALSA dependency.
 
-- a fourth `BackendKind::MojSint` and exhaustive-match handling;
-- a distinct Moj Sint `PresetId` and `.mojsint` catalog root/discovery rules;
-- `moj_sint.command`, client, preset-root, MIDI destination, and port config;
-- process argument construction and owned-process shutdown behavior;
-- Project/Idea route identity and persistence;
-- a Moj Sint CC schema for the twelve absolute controls, with pickup/reset;
-- Playback master-encoder `EVOLVE` accumulation/reset that yields to N00B scale
-  selection without losing the stored value; and
-- backend-specific labels/help/status without altering synthv1 indices.
-
-That change must retain SHR's All Notes Off, child-only termination, direct
-playback transaction, optional owned graph, and unrelated-route protections.
+SHR-DAW readiness requires the unambiguous configured or uniquely prefixed
+client plus exactly the configured `out_l` and `out_r` ports. The host owns no
+graph connections.

@@ -23,34 +23,27 @@ events. The current production engine writes the same mono mix to both output
 buffers; two JACK ports and two-channel WAV metadata do not yet imply stereo
 sound generation.
 
-The current scalar voice still contains the evidence-selected generic
-integrated-wavetable oscillator and the rejected per-voice parallel character
-layer. The latter remains implementation residue for reproducibility, not an
-accepted factory sound or macro mapping.
-Shared 2,049-point antiderivative tables represent a saw and square target; each
-voice performs linear table lookup, one-sample differentiation, and phase-
-increment normalization. The untouched `SHAPE`/`COLOR` result is the dry
-anchor. A parallel copy passes through a four-pole 6 kHz low-pass, a bounded
-odd cubic soft clip, linear-component subtraction, a 10 Hz DC blocker, and a
-two-stage note-tracked high-pass before an explicitly bounded inverted return.
-The high-pass cutoff is prepared at 2.5 times note frequency and capped at
-6 kHz. Direct evaluation was selected over first-order ADAA and a two-times
-research variant by the recorded eight-times-reference alias/error rule. No
-sample path allocates or performs per-sample trigonometric setup.
-
-The rejected 0/120/240-degree selector remains a tested DSP primitive and a
-direct disposable lab generator, but it is no longer in the voice render path.
+The production voice is the circuit-informed Model D path: three independently
+phased bandlimited VCOs, a continuously variable linear/nonlinear mixer,
+prepared four-times-oversampled ladder, filter contour, output feedback, and a
+separate live ADSR. Historical generic oscillators, character layers, and
+listening labs remain research evidence but are not reached by `Engine`.
+The production render is dual-mono; its two host ports do not claim stereo
+generation.
 
 ## Production control and polyphony contract
 
-SHR-DAW exposes exactly twelve continuous synth controls. Moj Sint's production
-mapping must use eight timbral/performance roles plus `ATTACK`, `DECAY`,
-`SUSTAIN`, and `RELEASE`. The current `MacroId` and version-1 preset schema
-still contain nine timbral candidates plus ADSR. Those thirteen IDs are
-provisional implementation history, not a product requirement. A later
-test-first migration must remove the least useful timbral candidate after
-automated travel evidence and human listening; it must not consume SHR's master
-encoder or invent a hidden page, button, or mode.
+SHR-DAW exposes exactly twelve continuous synth controls. Moj Sint implements
+eight Model D roles—`EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`,
+`DEPTH`, and `SPACE`—plus `ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`.
+`WIDTH` was removed because this Model D engine has no supported width
+experiment. There is no hidden page or master-encoder takeover.
+
+The preferred idealized path is the reference preset's default baseline, not a
+rejection of the other Model D mechanisms. The eight timbral controls expose
+oscillator character/drift, source balance, cutoff, mixer nonlinearity,
+feedback, filter motion, ladder nonlinearity, and resonance so the user can
+audition them before making any rejection decision.
 
 Parameter timing follows SHR-DAW's actual live-control path. Safe continuous
 changes should reach held voices through prepared, smoothed events. A
@@ -64,9 +57,8 @@ possible product result; eight has no special status and is not required.
 
 ## Modules
 
-- `control`: the currently implemented thirteen provisional identities,
-  normalized values, perceptual ADSR time mapping, and smoothing primitive;
-  production must migrate to the settled twelve-control budget.
+- `control`: twelve stable identities, CC 20–31, normalized values,
+  perceptual ADSR time mapping, and the smoothing primitive.
 - `dsp`: finite guards, the retained reference sine, independently implemented
   PolyBLEP and integrated-wavetable candidates, the negative-result shared-
   phase selector, and the parallel character layer. Frequency changes prepare
@@ -74,13 +66,11 @@ possible product result; eight has no special status and is not required.
   sample loop.
 - `envelope`: validated, sample-rate-aware ADSR state machine.
 - `preset`: strict, versioned `.mojsint` TOML parsing and validation.
-- `engine`: timestamped note/macro events, fixed voice storage, voice stealing,
-  10 ms `SHAPE`/`COLOR`/`EDGE`/`COUPLE` smoothing, bounded level compensation,
-  and block rendering. `SHAPE` morphs corrected saw to square; `COLOR` moves
-  from a note-tracked one-pole dark path to the direct bright path. As an
-  unaccepted research mapping, `EDGE` controls character drive/intensity and
-  `COUPLE` controls return interaction. `COUPLE=0` is sample-identical and
-  independent of `EDGE`.
+- `engine`: timestamped note/macro/panic events, fixed voice storage, voice
+  stealing, 10 ms smoothing for every control, live ADSR, Model D macro
+  mapping, finite guards, and dual-mono block rendering.
+- `host`: dynamic JACK ownership/callback, ALSA Sequencer translation,
+  fixed-capacity SPSC handoff, period timing, overflow reporting, and shutdown.
 - `native_bench`: reusable native callback-simulation cases for the exact
   allocation-free `Engine::render_block` boundary and the separate isolated
   Model-D idealized research path. It prepares voices, buffers, and bounded
@@ -121,7 +111,8 @@ possible product result; eight has no special status and is not required.
   delay memory are allocated only during construction. The sample method is
   deterministic, finite, bounded to 0.999, and allocation-free. It is not
   reachable from `Engine`, presets, or stable macros.
-- `main`: non-real-time `validate` and `render` commands.
+- `main`: live host invocation plus non-real-time `validate` and `render`
+  commands.
 
 The separate `five-family-lab` binary renders those research sources into an
 explicit output directory. Its mechanisms are nonlinear PM, excited comb,

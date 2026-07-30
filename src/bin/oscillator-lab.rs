@@ -283,7 +283,7 @@ fn render_character_listening_gate(
                 seconds: 1.25,
             };
             let mut samples = render_note(&preset, spec)?;
-            loudness_match(&mut samples, spec.sample_rate, 0.08);
+            loudness_match(&mut samples, spec.sample_rate, midi_frequency(note), 0.08);
             let filename = format!("note{note:03}_{condition}.wav");
             write_listening_wav(
                 &output_directory.join(&filename),
@@ -388,7 +388,7 @@ fn render_harmonic_selector_evidence(
                     edge,
                     couple,
                 )?;
-                loudness_match(&mut samples, spec.sample_rate, 0.08);
+                loudness_match(&mut samples, spec.sample_rate, midi_frequency(note), 0.08);
                 let filename = format!(
                     "note{note:03}_edge{:03}_couple{:03}.wav",
                     (edge * 100.0).round() as u8,
@@ -517,8 +517,8 @@ fn coherent_sample_count(maximum: usize, sample_rate: f32, frequency_hz: f32) ->
         .unwrap_or(maximum)
 }
 
-fn loudness_match(samples: &mut [f32], sample_rate: u32, target_rms: f64) {
-    let active = analysis_window(samples, sample_rate, None);
+fn loudness_match(samples: &mut [f32], sample_rate: u32, frequency_hz: f32, target_rms: f64) {
+    let active = analysis_window(samples, sample_rate, Some(frequency_hz));
     let rms = (active
         .iter()
         .map(|sample| f64::from(*sample).powi(2))

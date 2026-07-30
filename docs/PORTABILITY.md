@@ -2,13 +2,15 @@
 
 ## Current evidence
 
-The source is scalar Rust with `f32` audio and no native library dependency.
+The DSP source is scalar Rust with `f32` audio. The live binary dynamically
+loads `libjack.so.0` and links the ALSA Sequencer adapter through `alsa`.
 Native Raspberry Pi 5 callback simulation now establishes an engine-budget
 provisional cap of eight tested voices at 48 kHz/64 frames. A corrected
 ten-minute eight-voice rapid-control soak used 3.992% of the period at p99.9
 and 9.751% at maximum, with zero deadline misses, finite output, flat RSS, and
 no new throttling. This does not establish whole-system SHR/JACK polyphony:
-Moj Sint still has no live host and was not measured inside SHR's audio graph.
+The live host is now implemented but has not been exercised against connected
+JACK or measured inside SHR's audio graph.
 
 The native x86_64 Ubuntu test/build remains the other development check.
 An `aarch64-unknown-linux-gnu` compile check proves Rust-level portability only;
@@ -43,12 +45,18 @@ specifications are not performance evidence:
 ## Dependencies
 
 Current foundation: Rust stable, rustfmt, and Clippy, all user-local through
-rustup. The live ALSA adapter is expected to require:
+rustup. Building the ALSA adapter requires:
 
 ```sh
 sudo apt update
 sudo apt install libasound2-dev
 ```
 
-Do not install `libjack-jackd2-dev` until the later adapter comparison shows it
-is necessary. JACK/PipeWire services and hardware are outside setup scope.
+JACK headers are not required because the host loads `libjack.so.0` dynamically.
+JACK/PipeWire services and hardware remain outside installation scope; the host
+will fail rather than start or reconfigure a server.
+
+Install the validated binary and public reference preset for SHR-DAW with the
+commands in the repository README. The binary belongs in the user's Cargo
+`bin` directory; `.mojsint` files belong under the configured data root, never
+under ignored repository `artifacts/`.
