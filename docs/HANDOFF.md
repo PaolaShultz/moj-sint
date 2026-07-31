@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-07-30, Europe/Zagreb.
+Last updated: 2026-07-31, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -155,6 +155,16 @@ At this checkpoint:
   from the intended instrument; no family is selected and none is routed into
   `Engine` or stable macros. The reviewed 15-file batch was deleted under the
   experimental-output policy.
+- The user approved a clean-room six-operator PM research direction using
+  category-authentic calibration sounds beside original Moj Sint developments.
+  The design is
+  `docs/superpowers/specs/2026-07-31-six-operator-pm-listening-gate-design.md`:
+  a generic fixed-capacity six-operator graph core capable of representing the
+  classic 32 routing shapes, with only three structurally different graphs and
+  six dry paired files in the first listening gate. It explicitly excludes
+  Yamaha firmware, ROMs, factory patches, SysEx compatibility, branding,
+  production integration, and claims of historical emulation. Implementation
+  has not started.
 - A second isolated gate now implements three complete, structurally different
   hybrid voices with genuine stereo plus single-note, held-chord,
   four-chord-progression, and explicit mono-fold auditions. Automated evidence
