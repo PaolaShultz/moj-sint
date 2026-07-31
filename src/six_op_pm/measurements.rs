@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::{ListeningPatch, RenderError, render};
+use super::{ListeningPatch, Render, RenderError, render};
 use crate::dsp::six_op_pm::algorithm::CLASSIC_ALGORITHMS;
 use crate::dsp::six_op_pm::operator::SharedSineTable;
 use crate::dsp::six_op_pm::{SineTable, SixOpPatch, SixOpVoice, VoiceError};
@@ -13,6 +13,7 @@ const ALIAS_SAMPLES: usize = 32_768;
 const PITCH_SAMPLES: usize = 65_536;
 const SPECTRAL_SAMPLES: usize = 8_192;
 const ACTIVE_THRESHOLD: f32 = 1.0e-5;
+const MIN_HARMONIC_PITCH_STRENGTH_DB: f64 = -12.0;
 const NOTES: [u8; 3] = [36, 60, 84];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -42,6 +43,7 @@ pub struct PitchRow {
     pub anchor_frequency_hz: f64,
     pub anchor_db: f64,
     pub pitch_error_cents: Option<f64>,
+    pub pitch_strength_db: Option<f64>,
     pub inharmonic_rule: bool,
     pub status: EvidenceStatus,
 }
@@ -121,6 +123,13 @@ pub struct SweepRow {
     pub stage: SpectralStage,
     pub peak: f64,
     pub finite: bool,
+    pub clamp_contacts: u64,
+}
+
+impl SweepRow {
+    pub fn status(&self) -> EvidenceStatus {
+        status(self.finite && self.peak <= 1.0 && self.clamp_contacts == 0)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
@@ -143,12 +152,7 @@ pub fn measure_listening_gate() -> Result<GateEvidence, MeasurementError> {
     let mut errors = Vec::new();
     for patch in ListeningPatch::ALL {
         let musical = render(patch, SAMPLE_RATE)?;
-        let mono: Vec<f32> = musical.samples.iter().step_by(2).copied().collect();
-        let metrics = measure_mono(
-            &mono,
-            musical.diagnostics.clamp_contacts,
-            musical.sample_hash,
-        )?;
+        let metrics = measure_render(&musical)?;
 
         let mut pitch_rows = Vec::with_capacity(NOTES.len());
         let mut spectral_rows = Vec::with_capacity(NOTES.len() * 3);
@@ -163,13 +167,13 @@ pub fn measure_listening_gate() -> Result<GateEvidence, MeasurementError> {
                 sine_table.clone(),
             )?;
             let mut pitch = measure_pitch(patch, note, &sustained.samples);
-            pitch.status = probe_status(pitch.status, sustained.finite);
+            pitch.status = probe_status(pitch.status, sustained.finite, sustained.clamp_contacts);
             if pitch.status == EvidenceStatus::Fail {
                 errors.push(format!("pitch:{patch:?}:{note}"));
             }
             pitch_rows.push(pitch);
 
-            let mut spectral_probes_finite = sustained.finite;
+            let mut spectral_probes_clean = sustained.finite && sustained.clamp_contacts == 0;
             for stage in [
                 SpectralStage::Attack,
                 SpectralStage::Sustain,
@@ -186,13 +190,13 @@ pub fn measure_listening_gate() -> Result<GateEvidence, MeasurementError> {
                         SPECTRAL_SAMPLES,
                         sine_table.clone(),
                     )?;
-                    spectral_probes_finite &= probe.finite;
+                    spectral_probes_clean &= probe.finite && probe.clamp_contacts == 0;
                     measure_spectrum(patch, note, stage, &probe.samples)
                 };
                 spectral_rows.push(row);
             }
-            if !spectral_probes_finite {
-                errors.push(format!("spectral-non-finite:{patch:?}:{note}"));
+            if !spectral_probes_clean {
+                errors.push(format!("spectral-invalid-probe:{patch:?}:{note}"));
             }
 
             let alias = measure_alias(patch, note, sine_table.clone())?;
@@ -205,15 +209,10 @@ pub fn measure_listening_gate() -> Result<GateEvidence, MeasurementError> {
             alias_rows.push(alias);
         }
 
-        let metrics_pass = metrics.finite
-            && metrics.peak <= 0.95
-            && metrics.ceiling_contacts == 0
-            && metrics.dc.abs() <= 0.0002
-            && metrics.maximum_jump <= 0.25
-            && metrics.crest_factor.is_finite();
+        let metrics_pass = metrics_status(&metrics) == EvidenceStatus::Pass;
         let spectral_pass = !errors
             .iter()
-            .any(|error| error.starts_with(&format!("spectral-non-finite:{patch:?}:")))
+            .any(|error| error.starts_with(&format!("spectral-invalid-probe:{patch:?}:")))
             && spectral_rows.iter().all(|row| {
                 row.harmonic_energy_db.is_finite() && row.inharmonic_residual_db.is_finite()
             });
@@ -317,6 +316,7 @@ pub fn engineering_sweep() -> Result<Vec<SweepRow>, MeasurementError> {
                             stage,
                             peak,
                             finite: probe.finite && peak.is_finite(),
+                            clamp_contacts: probe.clamp_contacts,
                         });
                     }
                 }
@@ -324,6 +324,28 @@ pub fn engineering_sweep() -> Result<Vec<SweepRow>, MeasurementError> {
         }
     }
     Ok(rows)
+}
+
+fn measure_render(rendered: &Render) -> Result<RenderMetrics, MeasurementError> {
+    let mono: Vec<f32> = rendered.samples.iter().step_by(2).copied().collect();
+    let mut metrics = measure_mono(
+        &mono,
+        rendered.diagnostics.clamp_contacts,
+        rendered.sample_hash,
+    )?;
+    metrics.finite &= rendered.diagnostics.non_finite_voices == 0;
+    Ok(metrics)
+}
+
+fn metrics_status(metrics: &RenderMetrics) -> EvidenceStatus {
+    status(
+        metrics.finite
+            && metrics.peak <= 0.95
+            && metrics.ceiling_contacts == 0
+            && metrics.dc.abs() <= 0.0002
+            && metrics.maximum_jump <= 0.25
+            && metrics.crest_factor.is_finite(),
+    )
 }
 
 fn measure_mono(
@@ -394,6 +416,7 @@ fn measure_pitch(patch: ListeningPatch, note: u8, samples: &[f32]) -> PitchRow {
             anchor_frequency_hz,
             anchor_db,
             pitch_error_cents: None,
+            pitch_strength_db: None,
             inharmonic_rule: true,
             status: status(
                 anchor_db.is_finite()
@@ -404,6 +427,14 @@ fn measure_pitch(patch: ListeningPatch, note: u8, samples: &[f32]) -> PitchRow {
     } else {
         let measured_frequency_hz = fitted_pitch_frequency(samples, anchor_frequency_hz);
         let pitch_error_cents = 1_200.0 * (measured_frequency_hz / anchor_frequency_hz).log2();
+        // The 8,192-frame Hann analysis and +/-3-bin harmonic bands admit
+        // authored envelope/LFO sidebands through roughly +/-18 Hz while
+        // requiring substantial normalized energy near the played harmonic
+        // series. A coincidental narrow projection is therefore insufficient.
+        let strength_samples = &samples[..samples.len().min(SPECTRAL_SAMPLES)];
+        let partition = spectral_partition(strength_samples, anchor_frequency_hz);
+        let pitch_strength_db =
+            power_db(partition.harmonic_energy / partition.total_energy.max(1.0e-24));
         PitchRow {
             patch,
             note,
@@ -411,15 +442,32 @@ fn measure_pitch(patch: ListeningPatch, note: u8, samples: &[f32]) -> PitchRow {
             anchor_frequency_hz,
             anchor_db,
             pitch_error_cents: Some(pitch_error_cents),
+            pitch_strength_db: Some(pitch_strength_db),
             inharmonic_rule: false,
             status: status(
-                measured_frequency_hz.is_finite()
-                    && anchor_db.is_finite()
-                    && pitch_error_cents.is_finite()
-                    && pitch_error_cents.abs() <= 20.0,
+                anchor_db.is_finite()
+                    && harmonic_pitch_status(
+                        measured_frequency_hz,
+                        pitch_error_cents,
+                        pitch_strength_db,
+                    ) == EvidenceStatus::Pass,
             ),
         }
     }
+}
+
+fn harmonic_pitch_status(
+    measured_frequency_hz: f64,
+    pitch_error_cents: f64,
+    pitch_strength_db: f64,
+) -> EvidenceStatus {
+    status(
+        measured_frequency_hz.is_finite()
+            && pitch_error_cents.is_finite()
+            && pitch_error_cents.abs() <= 20.0
+            && pitch_strength_db.is_finite()
+            && pitch_strength_db >= MIN_HARMONIC_PITCH_STRENGTH_DB,
+    )
 }
 
 fn fitted_pitch_frequency(samples: &[f32], expected_hz: f64) -> f64 {
@@ -453,29 +501,114 @@ fn measure_spectrum(
     stage: SpectralStage,
     samples: &[f32],
 ) -> SpectralRow {
-    let total_energy = samples
-        .iter()
-        .map(|sample| f64::from(*sample).powi(2))
-        .sum::<f64>()
-        / samples.len() as f64;
     let fundamental = f64::from(midi_frequency(note));
-    let mut harmonic_energy = 0.0;
-    for harmonic in 1..=16 {
-        let frequency = fundamental * f64::from(harmonic);
-        if frequency >= SAMPLE_RATE as f64 * 0.5 {
-            break;
-        }
-        let amplitude = projected_amplitude(samples, SAMPLE_RATE as f64, frequency);
-        harmonic_energy += 0.5 * amplitude * amplitude;
-    }
-    harmonic_energy = harmonic_energy.min(total_energy.max(0.0));
-    let residual_energy = (total_energy - harmonic_energy).max(1.0e-24);
+    let partition = spectral_partition(samples, fundamental);
     SpectralRow {
         patch,
         note,
         stage,
-        harmonic_energy_db: power_db(harmonic_energy),
-        inharmonic_residual_db: power_db(residual_energy),
+        harmonic_energy_db: power_db(partition.harmonic_energy),
+        inharmonic_residual_db: power_db(partition.residual_energy),
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SpectralPartition {
+    total_energy: f64,
+    harmonic_energy: f64,
+    residual_energy: f64,
+}
+
+fn spectral_partition(samples: &[f32], fundamental_hz: f64) -> SpectralPartition {
+    assert!(!samples.is_empty() && samples.len().is_power_of_two());
+    let sample_count = samples.len();
+    let mean = samples.iter().map(|sample| f64::from(*sample)).sum::<f64>() / sample_count as f64;
+    let mut window_power = 0.0;
+    let mut spectrum: Vec<_> = samples
+        .iter()
+        .enumerate()
+        .map(|(index, sample)| {
+            let phase = std::f64::consts::TAU * index as f64 / (sample_count - 1) as f64;
+            let window = 0.5 - 0.5 * phase.cos();
+            window_power += window * window;
+            ((f64::from(*sample) - mean) * window, 0.0_f64)
+        })
+        .collect();
+    fft_in_place(&mut spectrum);
+
+    let maximum_bin = sample_count / 2;
+    let resolution_hz = SAMPLE_RATE as f64 / sample_count as f64;
+    let mut harmonic_mask = vec![false; maximum_bin + 1];
+    for harmonic in 1..=16 {
+        let frequency_hz = fundamental_hz * f64::from(harmonic);
+        if frequency_hz >= SAMPLE_RATE as f64 * 0.5 {
+            break;
+        }
+        let center = (frequency_hz / resolution_hz).round() as usize;
+        let first = center.saturating_sub(3).max(1);
+        let last = (center + 3).min(maximum_bin);
+        harmonic_mask[first..=last].fill(true);
+    }
+
+    let normalization = sample_count as f64 * window_power;
+    let mut harmonic_energy = 0.0;
+    let mut residual_energy = 0.0;
+    for (bin, &(real, imaginary)) in spectrum[..=maximum_bin].iter().enumerate() {
+        let one_sided_factor = if bin == 0 || bin == maximum_bin {
+            1.0
+        } else {
+            2.0
+        };
+        let energy = one_sided_factor * (real * real + imaginary * imaginary) / normalization;
+        if harmonic_mask[bin] {
+            harmonic_energy += energy;
+        } else {
+            residual_energy += energy;
+        }
+    }
+    SpectralPartition {
+        total_energy: harmonic_energy + residual_energy,
+        harmonic_energy,
+        residual_energy,
+    }
+}
+
+fn fft_in_place(values: &mut [(f64, f64)]) {
+    let sample_count = values.len();
+    let mut reversed = 0;
+    for index in 1..sample_count {
+        let mut bit = sample_count >> 1;
+        while reversed & bit != 0 {
+            reversed ^= bit;
+            bit >>= 1;
+        }
+        reversed ^= bit;
+        if index < reversed {
+            values.swap(index, reversed);
+        }
+    }
+
+    let mut block_size = 2;
+    while block_size <= sample_count {
+        let angle = -std::f64::consts::TAU / block_size as f64;
+        let (step_imaginary, step_real) = angle.sin_cos();
+        for block_start in (0..sample_count).step_by(block_size) {
+            let mut twiddle_real = 1.0_f64;
+            let mut twiddle_imaginary = 0.0_f64;
+            for offset in 0..block_size / 2 {
+                let even = values[block_start + offset];
+                let odd = values[block_start + offset + block_size / 2];
+                let odd_real = odd.0 * twiddle_real - odd.1 * twiddle_imaginary;
+                let odd_imaginary = odd.0 * twiddle_imaginary + odd.1 * twiddle_real;
+                values[block_start + offset] = (even.0 + odd_real, even.1 + odd_imaginary);
+                values[block_start + offset + block_size / 2] =
+                    (even.0 - odd_real, even.1 - odd_imaginary);
+                let next_real = twiddle_real * step_real - twiddle_imaginary * step_imaginary;
+                twiddle_imaginary = twiddle_real * step_imaginary + twiddle_imaginary * step_real;
+                twiddle_real = next_real;
+            }
+        }
+        block_size *= 2;
     }
 }
 
@@ -501,16 +634,12 @@ fn measure_alias(
         ALIAS_SAMPLES * REFERENCE_FACTOR,
         sine_table,
     )?;
-    let probes_finite = target.finite && reference.finite;
-    let reference: Vec<f32> = reference
-        .samples
-        .chunks_exact(REFERENCE_FACTOR)
-        .map(|chunk| {
-            chunk.iter().map(|sample| f64::from(*sample)).sum::<f64>() as f32
-                / REFERENCE_FACTOR as f32
-        })
-        .collect();
-    let alias_error_db = if probes_finite {
+    let probes_clean = target.finite
+        && reference.finite
+        && target.clamp_contacts == 0
+        && reference.clamp_contacts == 0;
+    let reference = box_decimate(&reference.samples, REFERENCE_FACTOR);
+    let alias_error_db = if probes_clean {
         fitted_residual_db(&target.samples, &reference)
     } else {
         0.0
@@ -521,16 +650,30 @@ fn measure_alias(
         note,
         alias_error_db,
         floor_db,
-        status: alias_status(alias_error_db, floor_db),
+        status: probe_status(alias_status(alias_error_db, floor_db), probes_clean, 0),
     })
+}
+
+fn box_decimate(samples: &[f32], factor: usize) -> Vec<f32> {
+    assert!(factor > 0 && samples.len() % factor == 0);
+    samples
+        .chunks_exact(factor)
+        .map(|chunk| {
+            (chunk.iter().map(|sample| f64::from(*sample)).sum::<f64>() / factor as f64) as f32
+        })
+        .collect()
 }
 
 fn alias_status(alias_error_db: f64, floor_db: f64) -> EvidenceStatus {
     status(alias_error_db.is_finite() && floor_db.is_finite() && alias_error_db <= floor_db)
 }
 
-const fn probe_status(current: EvidenceStatus, finite: bool) -> EvidenceStatus {
-    if finite && matches!(current, EvidenceStatus::Pass) {
+const fn probe_status(
+    current: EvidenceStatus,
+    finite: bool,
+    clamp_contacts: u64,
+) -> EvidenceStatus {
+    if finite && clamp_contacts == 0 && matches!(current, EvidenceStatus::Pass) {
         EvidenceStatus::Pass
     } else {
         EvidenceStatus::Fail
@@ -606,6 +749,7 @@ impl From<SpectralStage> for ProbeStage {
 struct Probe {
     samples: Vec<f32>,
     finite: bool,
+    clamp_contacts: u64,
 }
 
 fn render_probe(
@@ -638,7 +782,11 @@ fn render_probe(
         samples.push(voice.sample());
     }
     let finite = samples.iter().all(|sample| sample.is_finite()) && !voice.non_finite_seen();
-    Ok(Probe { samples, finite })
+    Ok(Probe {
+        samples,
+        finite,
+        clamp_contacts: voice.clamp_contacts(),
+    })
 }
 
 fn apply_modulation_level(patch: &mut SixOpPatch, level: SweepLevel) {
@@ -685,17 +833,162 @@ mod tests {
     #[test]
     fn recovered_non_finite_probe_cannot_retain_a_passing_status() {
         assert_eq!(
-            probe_status(EvidenceStatus::Pass, false),
+            probe_status(EvidenceStatus::Pass, false, 0),
             EvidenceStatus::Fail
         );
         assert_eq!(
-            probe_status(EvidenceStatus::Pass, true),
+            probe_status(EvidenceStatus::Pass, true, 0),
             EvidenceStatus::Pass
         );
         assert_eq!(
-            probe_status(EvidenceStatus::Fail, true),
+            probe_status(EvidenceStatus::Fail, true, 0),
             EvidenceStatus::Fail
         );
+        assert_eq!(
+            probe_status(EvidenceStatus::Pass, true, 1),
+            EvidenceStatus::Fail
+        );
+    }
+
+    #[test]
+    fn recovered_non_finite_musical_render_cannot_pass_metrics() {
+        let rendered = super::super::Render {
+            samples: vec![0.0, 0.0, 0.5, 0.5, -0.5, -0.5, 0.0, 0.0],
+            format: super::super::RenderFormat {
+                sample_rate: SAMPLE_RATE,
+                channels: 2,
+                bits_per_sample: 32,
+                float: true,
+            },
+            diagnostics: super::super::RenderDiagnostics {
+                non_finite_voices: 1,
+                ..super::super::RenderDiagnostics::default()
+            },
+            sample_hash: 9,
+        };
+        let metrics = measure_render(&rendered).unwrap();
+        assert!(!metrics.finite);
+        assert_eq!(metrics_status(&metrics), EvidenceStatus::Fail);
+    }
+
+    #[test]
+    fn clamped_probe_and_sweep_row_cannot_pass() {
+        let mut patch = ListeningPatch::MechanicalStab.patch();
+        patch.output_gain = 4.0;
+        let table: SharedSineTable = SineTable::new().into();
+        let probe = render_probe(
+            patch,
+            SAMPLE_RATE as f32,
+            60,
+            ProbeStage::Attack,
+            2_048,
+            table,
+        )
+        .unwrap();
+        assert!(probe.clamp_contacts > 0);
+        let row = SweepRow {
+            patch: ListeningPatch::MechanicalStab,
+            note: 60,
+            ratio_kind: RatioKind::Inharmonic,
+            modulation: SweepLevel::High,
+            feedback: SweepLevel::High,
+            stage: SpectralStage::Attack,
+            peak: 1.0,
+            finite: true,
+            clamp_contacts: probe.clamp_contacts,
+        };
+        assert_eq!(row.status(), EvidenceStatus::Fail);
+    }
+
+    #[test]
+    fn spectral_partition_conserves_energy_and_retains_nonharmonic_fixture_energy() {
+        let fundamental = f64::from(midi_frequency(60));
+        let samples: Vec<f32> = (0..SPECTRAL_SAMPLES)
+            .map(|index| {
+                let seconds = index as f64 / SAMPLE_RATE as f64;
+                (0.7 * (std::f64::consts::TAU * fundamental * seconds).sin()
+                    + 0.3 * (std::f64::consts::TAU * fundamental * 1.37 * seconds).sin())
+                    as f32
+            })
+            .collect();
+
+        let partition = spectral_partition(&samples, fundamental);
+        let mean =
+            samples.iter().map(|sample| f64::from(*sample)).sum::<f64>() / samples.len() as f64;
+        let (windowed_energy, window_power) =
+            samples
+                .iter()
+                .enumerate()
+                .fold((0.0, 0.0), |(energy, power), (index, sample)| {
+                    let phase = std::f64::consts::TAU * index as f64 / (samples.len() - 1) as f64;
+                    let window = 0.5 - 0.5 * phase.cos();
+                    (
+                        energy + (f64::from(*sample) - mean).powi(2) * window.powi(2),
+                        power + window.powi(2),
+                    )
+                });
+        let expected_total_energy = windowed_energy / window_power;
+        assert!(partition.total_energy > 0.0);
+        assert!(partition.harmonic_energy > 0.0);
+        assert!(partition.residual_energy > 1.0e-6);
+        assert!(
+            (partition.total_energy - expected_total_energy).abs()
+                <= expected_total_energy * 1.0e-12
+        );
+        assert!(
+            (partition.total_energy - (partition.harmonic_energy + partition.residual_energy))
+                .abs()
+                <= partition.total_energy * 1.0e-12
+        );
+    }
+
+    #[test]
+    fn harmonic_pitch_admission_rejects_leakage_only_strength() {
+        assert_eq!(
+            harmonic_pitch_status(261.625_6, 0.0, -90.0),
+            EvidenceStatus::Fail
+        );
+    }
+
+    #[test]
+    fn harmonic_pitch_strength_tolerates_authored_lfo_and_envelope_motion() {
+        let fundamental = f64::from(midi_frequency(60));
+        let samples: Vec<f32> = (0..PITCH_SAMPLES)
+            .map(|index| {
+                let seconds = index as f64 / SAMPLE_RATE as f64;
+                let envelope = 0.4 + 0.6 * index as f64 / (PITCH_SAMPLES - 1) as f64;
+                let lfo = 1.0 + 0.2 * (std::f64::consts::TAU * 5.0 * seconds).sin();
+                (0.5 * envelope * lfo * (std::f64::consts::TAU * fundamental * seconds).sin())
+                    as f32
+            })
+            .collect();
+        let row = measure_pitch(ListeningPatch::BrassBass, 60, &samples);
+        assert_eq!(row.status, EvidenceStatus::Pass, "{row:#?}");
+        assert!(
+            row.pitch_strength_db.unwrap() >= MIN_HARMONIC_PITCH_STRENGTH_DB,
+            "{row:#?}"
+        );
+    }
+
+    #[test]
+    fn nontrivial_current_release_spectrum_cannot_report_floor_residual() {
+        let table: SharedSineTable = SineTable::new().into();
+        let probe = render_probe(
+            ListeningPatch::ElectricPianoMallet.patch(),
+            SAMPLE_RATE as f32,
+            36,
+            ProbeStage::Release,
+            SPECTRAL_SAMPLES,
+            table,
+        )
+        .unwrap();
+        let row = measure_spectrum(
+            ListeningPatch::ElectricPianoMallet,
+            36,
+            SpectralStage::Release,
+            &probe.samples,
+        );
+        assert!(row.inharmonic_residual_db > -200.0, "{row:#?}");
     }
 
     #[test]
@@ -704,17 +997,45 @@ mod tests {
             measure_mono(&[0.0; 64], 0, 7),
             Err(MeasurementError::SilentRender)
         );
-        let samples = [-0.25, 0.5, -0.125, 0.0];
+        let samples = [0.0, 0.5, 0.0, -0.5, 0.0];
         let before = samples;
         let metrics = measure_mono(&samples, 0, 7).unwrap();
         assert_eq!(samples, before);
         assert_eq!(metrics.peak, 0.5);
-        assert_eq!(metrics.maximum_jump, 0.75);
+        assert_eq!(metrics.maximum_jump, 0.5);
         assert_eq!(metrics.sample_hash, 7);
-        assert!(metrics.active_rms > 0.0);
-        assert!(metrics.active_rms_dbfs.is_finite());
-        assert!(metrics.crest_factor.is_finite());
+        assert_eq!(metrics.dc, 0.0);
+        // The exact RMS proves the interior silent frame remains part of the
+        // first-to-last-active interval: sqrt((0.25 + 0 + 0.25) / 3).
+        let expected_rms = (1.0_f64 / 6.0).sqrt();
+        assert!((metrics.active_rms - expected_rms).abs() <= f64::EPSILON);
+        assert!((metrics.active_rms_dbfs - amplitude_db(expected_rms)).abs() <= f64::EPSILON);
+        assert!((metrics.crest_factor - 1.5_f64.sqrt()).abs() <= f64::EPSILON);
         assert!(metrics.finite);
+    }
+
+    #[test]
+    fn bandlimited_fixture_validates_full_rate_alignment_and_box_decimation() {
+        fn render_sine(sample_rate: usize, warmup: usize, sample_count: usize) -> Vec<f32> {
+            let frequency_hz = 220.0;
+            (warmup..warmup + sample_count)
+                .map(|index| {
+                    (std::f64::consts::TAU * frequency_hz * index as f64 / sample_rate as f64).sin()
+                        as f32
+                })
+                .collect()
+        }
+
+        let target = render_sine(SAMPLE_RATE as usize, PROBE_WARMUP, ALIAS_SAMPLES);
+        let high_rate = render_sine(
+            SAMPLE_RATE as usize * REFERENCE_FACTOR,
+            PROBE_WARMUP * REFERENCE_FACTOR - 4,
+            ALIAS_SAMPLES * REFERENCE_FACTOR,
+        );
+        let reference = box_decimate(&high_rate, REFERENCE_FACTOR);
+        assert_eq!(target.len(), reference.len());
+        let residual_db = fitted_residual_db(&target, &reference);
+        assert!(residual_db <= -50.0, "residual_db={residual_db}");
     }
 
     #[test]
@@ -773,7 +1094,8 @@ mod tests {
                     .spectral_rows
                     .iter()
                     .all(|row| row.harmonic_energy_db.is_finite()
-                        && row.inharmonic_residual_db.is_finite())
+                        && row.inharmonic_residual_db.is_finite()
+                        && row.inharmonic_residual_db > -200.0)
             );
             assert_eq!(
                 patch.status,
@@ -786,6 +1108,11 @@ mod tests {
                 .pair_rms
                 .iter()
                 .all(|pair| pair.difference_db <= 3.0 && pair.status == EvidenceStatus::Pass)
+        );
+        assert!(
+            evidence.pair_rms[0].difference_db <= 2.9,
+            "pair0={:#?}",
+            evidence.pair_rms[0]
         );
         assert_eq!(evidence.status, EvidenceStatus::Pass, "{evidence:#?}");
         assert!(evidence.errors.is_empty(), "{:#?}", evidence.errors);
@@ -824,6 +1151,7 @@ mod tests {
                 }
             }
         }
-        assert!(rows.iter().all(|row| row.finite && row.peak <= 1.0));
+        assert!(rows.iter().all(|row| row.status() == EvidenceStatus::Pass));
+        assert!(rows.iter().all(|row| row.clamp_contacts == 0));
     }
 }
