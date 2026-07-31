@@ -119,11 +119,11 @@ At this checkpoint:
   points, not seven invented sound families or rejection verdicts.
 - `WIDTH` was removed solely because this Model D production path is dual-mono
   and contains no width experiment. There is no hidden thirteenth control.
-- The original external development-PC zk notebook is not available on this
-  machine. The local replacement lives at
-  `/home/shome/Documents/knowledge/Moj-Sint/Current.md`; tracked docs and live
-  source remain authoritative. After material decisions, update this handoff
-  and that concise note, then run the local `.zk/validate.sh`.
+- The shared project notebook lives at `/home/shome/Documents/knowledge/Moj
+  Sint/`. Tracked docs and live source remain authoritative. After material
+  decisions, update this handoff first, then the concise `01 Current State.md`
+  and `04 Next Actions And Open Questions.md` notes, and run both knowledge
+  validators.
 
 - Git state, branch, and artifact existence must be inspected live rather than
   inferred from this handoff.
@@ -155,16 +155,15 @@ At this checkpoint:
   from the intended instrument; no family is selected and none is routed into
   `Engine` or stable macros. The reviewed 15-file batch was deleted under the
   experimental-output policy.
-- The user approved a clean-room six-operator PM research direction using
-  category-authentic calibration sounds beside original Moj Sint developments.
-  The design is
-  `docs/superpowers/specs/2026-07-31-six-operator-pm-listening-gate-design.md`:
-  a generic fixed-capacity six-operator graph core capable of representing the
-  classic 32 routing shapes, with only three structurally different graphs and
-  six dry paired files in the first listening gate. It explicitly excludes
-  Yamaha firmware, ROMs, factory patches, SysEx compatibility, branding,
-  production integration, and claims of historical emulation. Implementation
-  has not started.
+- The approved clean-room six-operator PM research gate is implemented and
+  passes its automated acceptance bounds. An independently authored,
+  fixed-capacity six-operator core validates 32 functional connectivity facts,
+  but the listening gate uses only source algorithms 1, 5, and 10 as three
+  paired reference/original sounds with shared scores and fixed pair gains.
+  The implementation copied no Yamaha code, prose, diagrams, firmware, ROMs,
+  presets, voice data, SysEx, or branding, makes no compatibility or historical
+  emulation claim, and remains isolated from production `Engine`, schema,
+  twelve controls, host, JACK/ALSA, and SHR-DAW. Human listening is open.
 - A second isolated gate now implements three complete, structurally different
   hybrid voices with genuine stereo plus single-note, held-chord,
   four-chord-progression, and explicit mono-fold auditions. Automated evidence
@@ -828,6 +827,76 @@ hardware-equivalent. AArch64 compilation and x86_64 offline generation do not
 establish Raspberry Pi callback cost, latency, safe polyphony, or sound
 quality.
 
+## Six-operator PM listening-gate checkpoint
+
+Implemented on 2026-07-31 as the clean-room experiment specified in
+`docs/superpowers/specs/2026-07-31-six-operator-pm-listening-gate-design.md`.
+The implementation uses John Chowning's 1973 JAES paper, Yamaha's official
+DX7 operating manual, and the Yamaha Corporation *PLG100-DX Owner's Manual*
+algorithm chart on pp. 28–29 as a narrow factual source register. The official
+PLG chart is published at
+<https://usa.yamaha.com/files/download/other_assets/1/320951/PLG100DXE.pdf>;
+its PDF metadata records 1999 and its MIDI chart is dated March 20, 1998. The
+manuals and their prose, diagrams, factory voices, presets, voice data, SysEx,
+artwork, and product branding remain Yamaha material. Moj Sint transcribed
+only the 32 functional connectivity facts and independently authored all code,
+tables, patches, scores, reports, and prose. It makes no Yamaha affiliation,
+DX7 compatibility, file-format compatibility, or historical-emulation claim.
+
+`dsp::six_op_pm` provides a fixed-capacity scalar core with six operators and a
+validated catalog of 32 unique connectivity fingerprints. Operator frequency,
+envelope, keyboard scaling, velocity, detune, shared sine-table access, pitch
+envelope, LFO rotation, and graph order are prepared before rendering. Every
+declared feedback edge consumes the source operator's previous-sample output;
+source algorithm 4 therefore implements group feedback from operator 4 to
+operator 6 rather than treating it as a same-sample ordinary edge. The
+prepared sample path is finite-guarded, deterministic, and allocation-free.
+
+`six_op_pm`, including its focused `measurements` submodule, owns the fixed
+four-slot event scheduler, renderer, independently authored listening
+inventory, and engineering evidence. `six-op-pm-lab` owns offline validation,
+WAV/report I/O, atomic publication, and workstation timing. None is called by
+production `Engine`, presets, macros, host, JACK, ALSA, or SHR-DAW.
+
+The gate deliberately presents only three graphs and six patches:
+
+1. source algorithm 1, score `bell-strikes`: `bell-metal` then
+   `fractured-metal`, fixed pair gain `0.25`;
+2. source algorithm 5, score `mallet-single-and-chord`:
+   `electric-piano-mallet` then `glass-wood`, fixed pair gain `0.23`; and
+3. source algorithm 10, score `brass-low-mid-phrase`: `brass-bass` then
+   `mechanical-stab`, fixed pair gain `0.20`.
+
+All six presentations are dry dual-mono 48 kHz, 32-bit-float renders with no
+per-file normalization, effect, compressor, limiter, clipper, filter,
+oversampling, or mastering. The automated gate reports a maximum peak of
+`0.247308403`, maximum absolute DC of `0.000125243`, maximum adjacent-sample
+jump of `0.238479972`, zero ceiling contacts, and pair active-RMS differences
+of `2.806095/2.807908/2.059745` dB. Harmonic pitch evidence has a worst
+absolute error of 10 cents and a weakest strength of `-0.568402` dB against
+the `-12` dB floor; the two inharmonic patches use the declared conservative
+nominal-note anchor rule.
+
+All 18 alias/error rows at MIDI 36/60/84 pass the predeclared
+`-20/-20/-12` dB floors; the tightest margin is `16.175919` dB. The aligned
+48 kHz versus eight-times-rate fitted residual includes transfer and phase
+differences as well as aliasing, so it is conservative engineering evidence,
+not an alias-only or perceptual score. All 54 attack/sustain/release spectral
+rows are finite, and all 162 rational/inharmonic, modulation, feedback,
+register, and stage sweep rows are finite and unclamped.
+
+Three fresh release renders were byte-identical for every deterministic file;
+only the intentionally volatile `workstation-cost.txt` differed. The scalar
+workstation verification took approximately `1.37–1.42` seconds. That timing
+is offline development evidence only, not callback timing, Raspberry Pi
+evidence, latency, polyphony, or sound-quality evidence.
+
+The canonical ignored listening batch is disposable under the experimental
+output policy. Its automated status does not select a graph or establish
+musical usefulness. The next research gate is human listening of the three
+exact pairs in order; retain or integrate nothing unless the user explicitly
+selects it afterward.
+
 The following full-suite verification snapshot predates the final-review
 evidence and publication corrections. It is historical context only; the root
 final run must replace it before a current full-verification claim:
@@ -868,28 +937,34 @@ Continue Moj Sint in `/home/shome/p/moj-sint`. Confirm the owning repository
 and inspect live Git state before changing files.
 
 Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
-`docs/superpowers/specs/2026-07-29-model-d-character-design.md` before changing
-files.
+`docs/superpowers/specs/2026-07-31-six-operator-pm-listening-gate-design.md`
+before changing files.
 
 Continue from the implemented Moj Sint 0.2.1 live Model D host and SHR-DAW
 0.4.5 integration. Seven live factory starting points preserve the exact
-authored Model D audition patch/diagnostic coordinates. The user has not
-rejected any modeled mechanism and wants to audition every start through the
-full control surface before deciding.
+authored Model D audition patch/diagnostic coordinates, and its exact twelve
+controls remain the production contract. Separately, the isolated clean-room
+six-operator PM gate now passes its automated bounds. Present only its three
+exact reference/original pairs in order and record the user's listening
+verdict; do not select or integrate a graph beforehand.
 
 Do not touch connected JACK/hardware, add SIMD, claim whole-system Pi
 performance, or expand production polyphony without explicit scope and native
-evidence. Keep the settled 12-control budget and follow SHR-DAW's pickup/reset
-path.
+evidence. Keep the production Model D `Engine`, schema, host, SHR-DAW path,
+and settled 12-control budget unchanged.
 ```
 
 ## Next action
 
-Use SHR-DAW Presets to select each of the seven Model D starts, then use
-Playback to audition all eight timbral controls and ADSR from each. Record the
-user's actual judgments only afterward. Connected JACK, physical routing, and
-listening are the remaining acceptance boundary; no experiment output belongs
-in Git.
+Listen to the six-operator PM gate as three exact pairs: bell/metal then
+fractured metal, electric-piano/mallet then glass/wood, and brass/bass then
+mechanical stab. Start at a low playback level because the float renders are
+dry and not acoustic-level calibrated. Ask only for the musical verdict:
+category recognition, whether each original partner is meaningfully distinct,
+and whether any pair deserves refinement. Automated evidence does not answer
+those questions. Do not select/integrate a graph, alter production Model D or
+the twelve controls, preserve an experimental output, or touch JACK/ALSA and
+SHR-DAW without the subsequent explicit decision.
 
 ## Executed foundation checkpoint
 
