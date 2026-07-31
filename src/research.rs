@@ -261,7 +261,16 @@ fn amplitude_db(amplitude: f64) -> f64 {
     20.0 * amplitude.max(1.0e-12).log10()
 }
 
-fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
+pub(crate) fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
+    if target.is_empty()
+        || target.len() != reference.len()
+        || target
+            .iter()
+            .chain(reference)
+            .any(|sample| !sample.is_finite())
+    {
+        return 0.0;
+    }
     let target_dc =
         target.iter().map(|sample| f64::from(*sample)).sum::<f64>() / target.len() as f64;
     let reference_dc = reference
@@ -279,6 +288,9 @@ fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
         reference_energy += reference * reference;
         target_energy += target * target;
     }
+    if !target_energy.is_finite() || target_energy <= 1.0e-24 {
+        return 0.0;
+    }
     let gain = if reference_energy > 0.0 {
         dot / reference_energy
     } else {
@@ -293,15 +305,37 @@ fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
             residual * residual
         })
         .sum::<f64>();
-    10.0 * (residual_energy / target_energy.max(1.0e-24))
-        .max(1.0e-24)
-        .log10()
+    10.0 * (residual_energy / target_energy).max(1.0e-24).log10()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::dsp::research::ResearchFamily;
+
+    #[test]
+    fn fitted_residual_removes_dc_and_finite_gain() {
+        let reference = [0.25_f32, 0.75, -0.5, 0.125, -0.25, 0.5];
+        let identical = fitted_residual_db(&reference, &reference);
+        let half_gain = reference.map(|sample| sample * 0.5);
+        let scaled = fitted_residual_db(&half_gain, &reference);
+
+        assert!(identical < -200.0, "identical={identical}");
+        assert!(scaled < -200.0, "scaled={scaled}");
+    }
+
+    #[test]
+    fn fitted_residual_rejects_unsafe_or_unmeasurable_input_deterministically() {
+        for (target, reference) in [
+            (&[][..], &[][..]),
+            (&[1.0][..], &[1.0, 2.0][..]),
+            (&[0.0, 0.0][..], &[0.0, 0.0][..]),
+            (&[f32::NAN, 1.0][..], &[0.0, 1.0][..]),
+            (&[0.0, 1.0][..], &[f32::INFINITY, 1.0][..]),
+        ] {
+            assert_eq!(fitted_residual_db(target, reference), 0.0);
+        }
+    }
 
     #[test]
     fn research_metrics_are_deterministic_finite_and_distinct() {
