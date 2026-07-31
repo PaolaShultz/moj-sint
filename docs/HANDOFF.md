@@ -155,14 +155,15 @@ At this checkpoint:
   from the intended instrument; no family is selected and none is routed into
   `Engine` or stable macros. The reviewed 15-file batch was deleted under the
   experimental-output policy.
-- The approved clean-room six-operator PM research gate is implemented and
-  passes its automated acceptance bounds. An independently authored,
-  fixed-capacity six-operator core validates 32 functional connectivity facts,
-  but the listening gate uses only source algorithms 1, 5, and 10 as three
-  paired reference/original sounds with shared scores and fixed pair gains.
-  The implementation copied no Yamaha code, prose, diagrams, firmware, ROMs,
-  presets, voice data, SysEx, or branding, makes no compatibility or historical
-  emulation claim, and remains isolated from production `Engine`, schema,
+- The approved clean-room-oriented six-operator PM research gate is
+  implemented and passes its automated acceptance bounds. An independently
+  authored, fixed-capacity core validates 32 source-numbered connectivity
+  records, but the listening gate uses only source algorithms 1, 5, and 10 as
+  three paired reference/original sounds with shared scores and fixed pair
+  gains. No expressive manual content, code, diagrams, factory presets, voice
+  data, or SysEx data was reproduced in this recorded process. It makes no
+  compatibility or historical-emulation claim; separate legal review governs
+  distribution. The gate remains isolated from production `Engine`, schema,
   twelve controls, host, JACK/ALSA, and SHR-DAW. Human listening is open.
 - A second isolated gate now implements three complete, structurally different
   hybrid voices with genuine stereo plus single-note, held-chord,
@@ -829,7 +830,7 @@ quality.
 
 ## Six-operator PM listening-gate checkpoint
 
-Implemented on 2026-07-31 as the clean-room experiment specified in
+Implemented on 2026-07-31 as the clean-room-oriented experiment specified in
 `docs/superpowers/specs/2026-07-31-six-operator-pm-listening-gate-design.md`.
 The implementation uses John Chowning's 1973 JAES paper, Yamaha's official
 DX7 operating manual, and the Yamaha Corporation *PLG100-DX Owner's Manual*
@@ -837,17 +838,20 @@ algorithm chart on pp. 28–29 as a narrow factual source register. The official
 PLG chart is published at
 <https://usa.yamaha.com/files/download/other_assets/1/320951/PLG100DXE.pdf>;
 its PDF metadata records 1999 and its MIDI chart is dated March 20, 1998. The
-manuals and their prose, diagrams, factory voices, presets, voice data, SysEx,
-artwork, and product branding remain Yamaha material. Moj Sint transcribed
-only the 32 functional connectivity facts and independently authored all code,
-tables, patches, scores, reports, and prose. It makes no Yamaha affiliation,
-DX7 compatibility, file-format compatibility, or historical-emulation claim.
+implementation was independently authored from the cited mathematical and
+functional facts, including 32 source-numbered connectivity records. No
+expressive manual content, source code, diagrams, factory presets, voice data,
+or SysEx data was reproduced in this recorded process. It makes no Yamaha
+affiliation, DX7 compatibility, file-format compatibility, or
+historical-emulation claim. Separate legal review governs distribution; this
+research boundary is not a legal conclusion.
 
 `dsp::six_op_pm` provides a fixed-capacity scalar core with six operators and a
-validated catalog of 32 unique connectivity fingerprints. Operator frequency,
-envelope, keyboard scaling, velocity, detune, shared sine-table access, pitch
-envelope, LFO rotation, and graph order are prepared before rendering. Every
-declared feedback edge consumes the source operator's previous-sample output;
+validated catalog of 32 unique source-numbered connectivity records and
+fingerprints. Operator frequency, envelope, keyboard scaling, velocity,
+detune, shared sine-table access, pitch envelope, LFO rotation, and graph order
+are prepared before rendering. Every declared feedback edge consumes the
+source operator's previous-sample output;
 source algorithm 4 therefore implements group feedback from operator 4 to
 operator 6 rather than treating it as a same-sample ordinary edge. The
 prepared sample path is finite-guarded, deterministic, and allocation-free.
@@ -855,10 +859,14 @@ prepared sample path is finite-guarded, deterministic, and allocation-free.
 `six_op_pm`, including its focused `measurements` submodule, owns the fixed
 four-slot event scheduler, renderer, independently authored listening
 inventory, and engineering evidence. `six-op-pm-lab` owns offline validation,
-WAV/report I/O, atomic publication, and workstation timing. None is called by
-production `Engine`, presets, macros, host, JACK, ALSA, or SHR-DAW.
+WAV/report I/O, staged single-rename publication, and workstation timing. None
+is called by production `Engine`, presets, macros, host, JACK, ALSA, or
+SHR-DAW.
 
-The gate deliberately presents only three graphs and six patches:
+The gate deliberately presents only three graphs and six patches. Source/manual
+algorithm IDs 1, 5, and 10 correspond to zero-based internal
+`SixOpPatch::algorithm` indices 0, 4, and 9; `manifest.tsv` records those
+internal indices:
 
 1. source algorithm 1, score `bell-strikes`: `bell-metal` then
    `fractured-metal`, fixed pair gain `0.25`;
@@ -868,14 +876,16 @@ The gate deliberately presents only three graphs and six patches:
    `mechanical-stab`, fixed pair gain `0.20`.
 
 All six presentations are dry dual-mono 48 kHz, 32-bit-float renders with no
-per-file normalization, effect, compressor, limiter, clipper, filter,
-oversampling, or mastering. The automated gate reports a maximum peak of
-`0.247308403`, maximum absolute DC of `0.000125243`, maximum adjacent-sample
-jump of `0.238479972`, zero ceiling contacts, and pair active-RMS differences
-of `2.806095/2.807908/2.059745` dB. Harmonic pitch evidence has a worst
-absolute error of 10 cents and a weakest strength of `-0.568402` dB against
-the `-12` dB floor; the two inharmonic patches use the declared conservative
-nominal-note anchor rule.
+post-render clipper, per-file normalization, effect, compressor, limiter,
+filter, oversampling, or mastering. `SixOpVoice` has a built-in emergency
+safety clamp; the retained renders recorded zero contacts. The automated gate
+reports a maximum peak of `0.247308403` against the `<= 0.95` bound, maximum
+absolute DC of `0.000125243` against `<= 0.0002`, and maximum adjacent-sample
+jump of `0.238479972` against `<= 0.25`. Pair active-RMS differences are
+`2.806095/2.807908/2.059745` dB against the `<= 3` dB bound. Harmonic pitch
+evidence has a worst absolute error of 10 cents and a weakest strength of
+`-0.568402` dB against the `-12` dB floor; the two inharmonic patches use the
+declared conservative nominal-note anchor rule.
 
 All 18 alias/error rows at MIDI 36/60/84 pass the predeclared
 `-20/-20/-12` dB floors; the tightest margin is `16.175919` dB. The aligned
@@ -943,10 +953,17 @@ before changing files.
 Continue from the implemented Moj Sint 0.2.1 live Model D host and SHR-DAW
 0.4.5 integration. Seven live factory starting points preserve the exact
 authored Model D audition patch/diagnostic coordinates, and its exact twelve
-controls remain the production contract. Separately, the isolated clean-room
-six-operator PM gate now passes its automated bounds. Present only its three
-exact reference/original pairs in order and record the user's listening
-verdict; do not select or integrate a graph beforehand.
+controls remain the production contract. Separately, the isolated
+clean-room-oriented six-operator PM gate now passes its automated bounds.
+Present only its three exact reference/original pairs in order and record the
+user's listening verdict; do not select or integrate a graph beforehand.
+
+The relative ignored listening path is
+`artifacts/six-operator-pm-listening-gate/`. Check its existence and contents
+live. Only when that target is absent or an empty directory, regenerate with:
+cargo run --release --bin six-op-pm-lab -- render artifacts/six-operator-pm-listening-gate
+The CLI refuses an existing non-empty destination; do not overwrite or delete a
+batch merely to regenerate it.
 
 Do not touch connected JACK/hardware, add SIMD, claim whole-system Pi
 performance, or expand production polyphony without explicit scope and native
@@ -965,6 +982,18 @@ and whether any pair deserves refinement. Automated evidence does not answer
 those questions. Do not select/integrate a graph, alter production Model D or
 the twelve controls, preserve an experimental output, or touch JACK/ALSA and
 SHR-DAW without the subsequent explicit decision.
+
+The relative ignored batch path is
+`artifacts/six-operator-pm-listening-gate/`; inspect its existence and contents
+live. If and only if it is absent or an empty directory, the exact regeneration
+command is:
+
+```bash
+cargo run --release --bin six-op-pm-lab -- render artifacts/six-operator-pm-listening-gate
+```
+
+The CLI refuses a non-empty destination. Do not delete, overwrite, or infer the
+batch state from this handoff.
 
 ## Executed foundation checkpoint
 

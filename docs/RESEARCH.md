@@ -650,7 +650,7 @@ isolated ideal oscillator.
   practical, but nonlinear stages, tuning correction, feedback, and
   oversampling are materially more expensive than one table lookup.
 
-### 2026-07-31 clean-room six-operator PM listening gate
+### 2026-07-31 clean-room-oriented six-operator PM listening gate
 
 This isolated experiment tests whether a generic six-operator
 phase-modulation machine can support both recognizable calibration categories
@@ -673,19 +673,21 @@ project. The source register is deliberately narrow:
   [PDF](https://usa.yamaha.com/files/download/other_assets/1/320951/PLG100DXE.pdf).
   Yamaha is the corporate author and publisher; the PDF file metadata records
   creation in 1999 and its MIDI implementation chart is dated March 20, 1998.
-  The project transcribed only the 32 functional connectivity facts,
+  The project transcribed only the 32 source-numbered connectivity records,
   carrier sets, feedback edges, and source numbers needed for validation.
 
-Those manuals, their diagrams, prose, product names, artwork, voice lists,
-factory voices, presets, voice data, ROMs, firmware, and SysEx formats remain
-copyrighted or proprietary Yamaha material. Moj Sint copied none of those
-materials, copied no third-party emulator source, and makes no affiliation,
-branding, file-format, SysEx, preset, or historical-sound compatibility claim.
-The fixed-capacity graph structures, DSP, lookup table, envelopes, patches,
+The implementation was independently authored from those cited mathematical
+and functional facts. No expressive manual content, source code, diagrams,
+factory presets, voice data, or SysEx data was reproduced in this recorded
+process, and no third-party emulator implementation was used as source. The
+project makes no affiliation, branding, file-format, SysEx, preset, or
+historical-sound compatibility claim. A separate legal review governs any
+distribution; this research record is not a legal conclusion. The
+fixed-capacity graph structures, DSP, lookup table, envelopes, patches,
 scores, renderer, reports, tests, and documentation were independently
-authored. The 32-entry catalog records interoperability-relevant functional
-connectivity; only source algorithms 1, 5, and 10 are exercised musically in
-this gate.
+authored. The 32-entry catalog records source-numbered functional connectivity
+shapes; only source algorithms 1, 5, and 10 are exercised musically in this
+gate.
 
 The prepared scalar core uses six phase-modulated sine operators with
 per-operator ratio or fixed frequency, level envelope, keyboard scaling,
@@ -695,12 +697,14 @@ table are prepared outside the sample loop. Ordinary graph edges consume the
 current sample's already ordered operator outputs. Each declared feedback edge
 consumes exactly the source operator's previous-sample output, including the
 source-algorithm-4 group feedback edge from operator 4 to operator 6. Tests
-cover malformed graphs, all 32 unique validated connectivity fingerprints,
-self and group feedback, finite recovery, deterministic reset, and an
-allocation-free sample/event path.
+cover malformed graphs, all 32 unique validated source-numbered connectivity
+shapes and fingerprints, self and group feedback, finite recovery,
+deterministic reset, and an allocation-free sample/event path.
 
 The listening inventory intentionally uses only three graphs, not 32 sounds
-and not six synthesis families:
+and not six synthesis families. Source/manual algorithm IDs 1, 5, and 10 map
+to zero-based internal `SixOpPatch::algorithm` indices 0, 4, and 9; generated
+report fields record those internal indices:
 
 - source algorithm 1 and the `bell-strikes` score pair independently authored
   `bell-metal` with `fractured-metal`, at one fixed pair gain of `0.25`;
@@ -710,11 +714,13 @@ and not six synthesis families:
   with `mechanical-stab`, at gain `0.20`.
 
 The presentation is dry dual-mono 48 kHz, 32-bit float audio. There is no
-per-file normalization, effect, compressor, limiter, clipper, filter,
-oversampling, or mastering stage. The maximum peak is `0.247308403`, maximum
-absolute DC is `0.000125243`, maximum adjacent-sample jump is `0.238479972`,
-and all ceiling-contact counts are zero. Pair active-RMS differences are
-`2.806095`, `2.807908`, and `2.059745` dB.
+post-render clipper, per-file normalization, effect, compressor, limiter,
+filter, oversampling, or mastering stage. `SixOpVoice` does contain a built-in
+emergency safety clamp; the retained renders recorded zero contacts. The
+maximum peak is `0.247308403` against the `<= 0.95` bound, maximum absolute DC
+is `0.000125243` against `<= 0.0002`, and maximum adjacent-sample jump is
+`0.238479972` against `<= 0.25`. Pair active-RMS differences are `2.806095`,
+`2.807908`, and `2.059745` dB against the `<= 3` dB bound.
 
 Automated probes at MIDI 36, 60, and 84 establish the following bounded
 engineering evidence:
