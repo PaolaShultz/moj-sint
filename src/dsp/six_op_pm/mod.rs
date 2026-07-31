@@ -315,6 +315,17 @@ impl SixOpVoice {
         note: u8,
         velocity: f32,
     ) -> Result<Self, VoiceError> {
+        let table: SharedSineTable = SineTable::new().into();
+        Self::new_with_sine_table(patch, sample_rate, note, velocity, table)
+    }
+
+    pub(crate) fn new_with_sine_table(
+        patch: SixOpPatch,
+        sample_rate: f32,
+        note: u8,
+        velocity: f32,
+        table: SharedSineTable,
+    ) -> Result<Self, VoiceError> {
         if !sample_rate.is_finite() || sample_rate <= 0.0 {
             return Err(VoiceError::InvalidSampleRate);
         }
@@ -351,7 +362,6 @@ impl SixOpVoice {
         }
 
         let algorithm = PreparedAlgorithm::new(algorithm_spec)?;
-        let table: SharedSineTable = SineTable::new().into();
         let [
             operator_1,
             operator_2,
@@ -390,15 +400,19 @@ impl SixOpVoice {
     #[inline]
     pub fn sample(&mut self) -> f32 {
         let pitch_envelope = self.pitch_envelope.advance();
+        let pitch_envelope_finite = pitch_envelope.is_finite() && pitch_envelope > 0.0;
+        if !pitch_envelope_finite {
+            self.pitch_envelope.reset();
+        }
         let lfo_finite = self.advance_lfo();
         let lfo_multiplier = 1.0 + self.lfo_sine * self.lfo_pitch_depth_ratio;
-        let mut pitch_multiplier = pitch_envelope * lfo_multiplier;
-        let mut non_finite =
-            !lfo_finite || !pitch_multiplier.is_finite() || pitch_multiplier <= 0.0;
-        if non_finite {
-            self.pitch_envelope.reset();
-            pitch_multiplier = 1.0;
-        }
+        let lfo_multiplier_finite = lfo_multiplier.is_finite() && lfo_multiplier > 0.0;
+        let mut non_finite = !pitch_envelope_finite || !lfo_finite || !lfo_multiplier_finite;
+        let pitch_multiplier = if pitch_envelope_finite && lfo_multiplier_finite {
+            pitch_envelope * lfo_multiplier
+        } else {
+            1.0
+        };
 
         let order = *self.algorithm.evaluation_order();
         let feedback = self.algorithm.feedback();
@@ -419,10 +433,9 @@ impl SixOpVoice {
                 non_finite = true;
             }
 
-            let phase_was_finite = self.operators[operator_index].recover_phase_if_non_finite();
-            let output = self.operators[operator_index].sample(phase_modulation, pitch_multiplier);
-            let phase_is_finite = self.operators[operator_index].recover_phase_if_non_finite();
-            if !phase_was_finite || !phase_is_finite || !output.is_finite() {
+            let (output, operator_finite) =
+                self.operators[operator_index].sample_checked(phase_modulation, pitch_multiplier);
+            if !operator_finite {
                 self.outputs[operator_index] = 0.0;
                 non_finite = true;
             } else {
@@ -964,6 +977,83 @@ mod tests {
     }
 
     #[test]
+    fn poisoned_operator_envelope_is_silenced_recovers_and_releases_to_idle() {
+        let mut voice = SixOpVoice::new(patch(9), SAMPLE_RATE, 69, 1.0).unwrap();
+        voice.note_on();
+        render(&mut voice, 2);
+        voice.operators[0].poison_envelope_for_test();
+
+        assert_eq!(voice.sample(), 0.0);
+        assert!(voice.non_finite_seen());
+        let recovered = voice.sample();
+        assert!(recovered.is_finite());
+        assert_ne!(recovered, 0.0);
+
+        voice.note_off();
+        render(&mut voice, 64);
+        assert!(voice.is_idle());
+    }
+
+    #[test]
+    fn lfo_fault_does_not_reset_valid_pitch_envelope_progress() {
+        let mut moving_patch = patch(9);
+        moving_patch.pitch_envelope =
+            PitchEnvelopeSpec::new([0.01; 4], [12.0, -12.0, 6.0, 0.0]).unwrap();
+        moving_patch.lfo = LfoSpec::new(6.7, 5.0).unwrap();
+        let control_patch = moving_patch;
+        let mut faulted = SixOpVoice::new(moving_patch, SAMPLE_RATE, 69, 1.0).unwrap();
+        let mut control = SixOpVoice::new(control_patch, SAMPLE_RATE, 69, 1.0).unwrap();
+        faulted.note_on();
+        control.note_on();
+        for _ in 0..32 {
+            assert_eq!(faulted.sample(), control.sample());
+        }
+
+        faulted.lfo_sine = f32::NAN;
+        assert_eq!(faulted.sample(), 0.0);
+        control.sample();
+        assert_eq!(
+            faulted.pitch_envelope_multiplier(),
+            control.pitch_envelope_multiplier()
+        );
+        let recovered = faulted.sample();
+        control.sample();
+        assert!(recovered.is_finite());
+        assert_ne!(recovered, 0.0);
+        assert_eq!(
+            faulted.pitch_envelope_multiplier(),
+            control.pitch_envelope_multiplier()
+        );
+    }
+
+    #[test]
+    fn multiple_voices_share_a_prebuilt_table_and_sample_without_allocating() {
+        let table: SharedSineTable = SineTable::new().into();
+        let mut voices = [
+            SixOpVoice::new_with_sine_table(patch(0), SAMPLE_RATE, 48, 1.0, table.clone()).unwrap(),
+            SixOpVoice::new_with_sine_table(patch(3), SAMPLE_RATE, 52, 0.9, table.clone()).unwrap(),
+            SixOpVoice::new_with_sine_table(patch(9), SAMPLE_RATE, 55, 0.8, table.clone()).unwrap(),
+            SixOpVoice::new_with_sine_table(patch(31), SAMPLE_RATE, 60, 0.7, table).unwrap(),
+        ];
+        for voice in &mut voices {
+            voice.note_on();
+        }
+
+        assert_no_alloc(|| {
+            for _ in 0..48_000 {
+                for voice in &mut voices {
+                    black_box(voice.sample());
+                }
+            }
+        });
+        assert!(
+            voices
+                .iter()
+                .all(|voice| !voice.non_finite_seen() && voice.clamp_contacts() == 0)
+        );
+    }
+
+    #[test]
     fn sample_path_is_allocation_free_and_contains_no_transcendental_setup() {
         let mut voice = SixOpVoice::new(patch(3), SAMPLE_RATE, 69, 1.0).unwrap();
         voice.note_on();
@@ -973,19 +1063,101 @@ mod tests {
             }
         });
 
-        let source = include_str!("mod.rs");
-        let sample_path = source
-            .split("pub fn sample(&mut self) -> f32")
-            .nth(1)
-            .unwrap()
-            .split("pub fn note_on")
-            .next()
-            .unwrap();
-        for forbidden in [".sin(", ".cos(", "sin_cos(", ".powf(", ".sqrt("] {
-            assert!(
-                !sample_path.contains(forbidden),
-                "sample path contains {forbidden}"
-            );
+        let module_source = include_str!("mod.rs");
+        let algorithm_source = include_str!("algorithm.rs");
+        let operator_source = include_str!("operator.rs");
+        let envelope_source = include_str!("envelope.rs");
+        let sample_functions = [
+            function_body(module_source, "pub fn sample(&mut self) -> f32"),
+            function_body(module_source, "fn advance_lfo(&mut self) -> bool"),
+            function_body(module_source, "pub fn advance(&mut self) -> f32"),
+            function_body(module_source, "fn complete_stage(&mut self)"),
+            function_body(module_source, "fn begin(&mut self, stage: PitchStage"),
+            function_body(algorithm_source, "pub const fn evaluation_order("),
+            function_body(algorithm_source, "pub const fn feedback("),
+            function_body(algorithm_source, "pub fn incoming("),
+            function_body(algorithm_source, "pub const fn is_carrier("),
+            function_body(algorithm_source, "pub const fn output_gain("),
+            function_body(operator_source, "pub fn sample("),
+            function_body(operator_source, "fn sample_checked("),
+            function_body(operator_source, "pub fn lookup("),
+            function_body(operator_source, "fn recover_phase_if_non_finite("),
+            function_body(envelope_source, "pub fn advance(&mut self) -> f32"),
+            function_body(envelope_source, "fn recover_finite_state("),
+            function_body(envelope_source, "fn complete_stage(&mut self)"),
+            function_body(envelope_source, "fn begin(&mut self, stage: Stage"),
+        ];
+        let forbidden = [
+            "Vec",
+            "Box",
+            "Arc",
+            "Rc::",
+            "String",
+            "alloc(",
+            "dealloc(",
+            ".clone(",
+            "drop(",
+            "Mutex",
+            "RwLock",
+            ".lock(",
+            "format!",
+            "format_args!",
+            "write!",
+            "writeln!",
+            "print!",
+            "println!",
+            "eprint!",
+            "eprintln!",
+            "std::fs",
+            "File",
+            "OpenOptions",
+            ".read(",
+            ".write(",
+            "stdin",
+            "stdout",
+            "stderr",
+            "log::",
+            "tracing::",
+            "panic!",
+            ".unwrap(",
+            ".expect(",
+            "process::",
+            "Command",
+            "spawn(",
+            "Instant",
+            "SystemTime",
+            ".sin(",
+            ".cos(",
+            "sin_cos(",
+            ".powf(",
+            ".sqrt(",
+        ];
+        for function in sample_functions {
+            for operation in forbidden {
+                assert!(
+                    !function.contains(operation),
+                    "sample call chain contains {operation} in {function}"
+                );
+            }
         }
+    }
+
+    fn function_body<'a>(source: &'a str, signature: &str) -> &'a str {
+        let signature_start = source.find(signature).unwrap();
+        let body_start = signature_start + source[signature_start..].find('{').unwrap();
+        let mut depth = 0_u32;
+        for (offset, byte) in source.as_bytes()[body_start..].iter().copied().enumerate() {
+            match byte {
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return &source[body_start..=body_start + offset];
+                    }
+                }
+                _ => {}
+            }
+        }
+        panic!("unterminated function body for {signature}");
     }
 }

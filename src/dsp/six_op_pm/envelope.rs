@@ -143,6 +143,38 @@ impl Envelope {
         self.stage = Stage::Idle;
     }
 
+    pub(super) fn recover_finite_state(&mut self) -> bool {
+        if self.current.is_finite() {
+            return true;
+        }
+
+        let maximum_remaining = match self.stage {
+            Stage::Idle | Stage::Hold => 0,
+            Stage::One => self.sample_counts[0],
+            Stage::Two => self.sample_counts[1],
+            Stage::Three => self.sample_counts[2],
+            Stage::Release => self.sample_counts[3],
+        };
+        let reconstructed = self.target - self.step * f64::from(self.remaining);
+        if self.target.is_finite()
+            && (0.0..=1.0).contains(&self.target)
+            && self.step.is_finite()
+            && self.remaining <= maximum_remaining
+            && reconstructed.is_finite()
+            && (0.0..=1.0).contains(&reconstructed)
+        {
+            self.current = reconstructed;
+        } else {
+            self.reset();
+        }
+        false
+    }
+
+    #[cfg(test)]
+    pub(super) fn poison_current_for_test(&mut self) {
+        self.current = f64::NAN;
+    }
+
     fn begin(&mut self, stage: Stage, target: f32, samples: u32) {
         self.stage = stage;
         self.target = f64::from(target);

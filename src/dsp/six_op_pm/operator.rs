@@ -267,6 +267,18 @@ impl PreparedOperator {
 
     #[inline]
     pub fn sample(&mut self, phase_modulation_cycles: f32, pitch_multiplier: f32) -> f32 {
+        self.sample_checked(phase_modulation_cycles, pitch_multiplier)
+            .0
+    }
+
+    #[inline]
+    pub(super) fn sample_checked(
+        &mut self,
+        phase_modulation_cycles: f32,
+        pitch_multiplier: f32,
+    ) -> (f32, bool) {
+        let phase_was_finite = self.recover_phase_if_non_finite();
+        let envelope_was_finite = self.envelope.recover_finite_state();
         let modulation = if phase_modulation_cycles.is_finite() {
             phase_modulation_cycles
         } else {
@@ -281,7 +293,14 @@ impl PreparedOperator {
         let sine = SineTable::lookup(&self.sine_table, self.phase + modulation);
         self.phase = (self.phase + self.increment * pitch_multiplier).rem_euclid(1.0);
         let output = sine * self.envelope.advance() * self.prepared_level;
-        if output.is_finite() { output } else { 0.0 }
+        let phase_is_finite = self.recover_phase_if_non_finite();
+        let envelope_is_finite = self.envelope.recover_finite_state();
+        let finite = phase_was_finite
+            && envelope_was_finite
+            && phase_is_finite
+            && envelope_is_finite
+            && output.is_finite();
+        if finite { (output, true) } else { (0.0, false) }
     }
 
     pub fn note_on(&mut self) {
@@ -329,6 +348,11 @@ impl PreparedOperator {
     #[cfg(test)]
     pub(super) fn poison_phase_for_test(&mut self) {
         self.phase = f32::NAN;
+    }
+
+    #[cfg(test)]
+    pub(super) fn poison_envelope_for_test(&mut self) {
+        self.envelope.poison_current_for_test();
     }
 }
 
