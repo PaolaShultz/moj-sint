@@ -9,6 +9,12 @@ mod tests {
         for spec in CLASSIC_ALGORITHMS {
             let prepared = PreparedAlgorithm::new(spec).unwrap();
             assert_ne!(prepared.carrier_mask(), 0);
+            for edge in spec.edges {
+                assert!(
+                    prepared.position(edge.source + 1).unwrap()
+                        < prepared.position(edge.target + 1).unwrap()
+                );
+            }
             fingerprints.push(spec.fingerprint());
         }
         fingerprints.sort_unstable();
@@ -20,8 +26,8 @@ mod tests {
     fn group_feedback_is_removed_before_topological_sort() {
         let prepared = PreparedAlgorithm::new(CLASSIC_ALGORITHMS[3]).unwrap();
         assert_eq!(prepared.feedback(), Edge::one_based(4, 6));
-        assert!(prepared.position(6) < prepared.position(5));
-        assert!(prepared.position(5) < prepared.position(4));
+        assert!(prepared.position(6).unwrap() < prepared.position(5).unwrap());
+        assert!(prepared.position(5).unwrap() < prepared.position(4).unwrap());
     }
 
     #[test]
@@ -39,11 +45,169 @@ mod tests {
             Err(AlgorithmError::Carrierless)
         );
     }
+
+    #[test]
+    fn duplicate_ordinary_edges_are_rejected() {
+        const DUPLICATE: AlgorithmSpec = AlgorithmSpec::new(
+            101,
+            &[Edge::one_based(2, 1), Edge::one_based(2, 1)],
+            carrier_mask(&[1]),
+            Edge::one_based(6, 6),
+        );
+
+        assert_eq!(
+            PreparedAlgorithm::new(DUPLICATE),
+            Err(AlgorithmError::DuplicateEdge)
+        );
+    }
+
+    #[test]
+    fn ordinary_edge_cannot_repeat_declared_feedback_edge() {
+        const FEEDBACK_OVERLAP: AlgorithmSpec = AlgorithmSpec::new(
+            102,
+            &[Edge::one_based(2, 1)],
+            carrier_mask(&[1]),
+            Edge::one_based(2, 1),
+        );
+
+        assert_eq!(
+            PreparedAlgorithm::new(FEEDBACK_OVERLAP),
+            Err(AlgorithmError::DuplicateEdge)
+        );
+    }
+
+    #[test]
+    fn one_based_edges_preserve_invalid_indices_for_validation() {
+        const ZERO_SOURCE: AlgorithmSpec = AlgorithmSpec::new(
+            103,
+            &[Edge::one_based(0, 1)],
+            carrier_mask(&[1]),
+            Edge::one_based(6, 6),
+        );
+        const SEVEN_SOURCE: AlgorithmSpec = AlgorithmSpec::new(
+            104,
+            &[Edge::one_based(7, 1)],
+            carrier_mask(&[1]),
+            Edge::one_based(6, 6),
+        );
+        const ZERO_TARGET: AlgorithmSpec = AlgorithmSpec::new(
+            105,
+            &[Edge::one_based(1, 0)],
+            carrier_mask(&[1]),
+            Edge::one_based(6, 6),
+        );
+        const SEVEN_TARGET: AlgorithmSpec = AlgorithmSpec::new(
+            106,
+            &[Edge::one_based(1, 7)],
+            carrier_mask(&[1]),
+            Edge::one_based(6, 6),
+        );
+
+        for spec in [ZERO_SOURCE, SEVEN_SOURCE, ZERO_TARGET, SEVEN_TARGET] {
+            assert_eq!(
+                PreparedAlgorithm::new(spec),
+                Err(AlgorithmError::InvalidOperator)
+            );
+        }
+    }
+
+    #[test]
+    fn carrier_masks_preserve_invalid_operators_for_validation() {
+        const ZERO_CARRIER: AlgorithmSpec =
+            AlgorithmSpec::new(107, &[], carrier_mask(&[0]), Edge::one_based(6, 6));
+        const SEVEN_CARRIER: AlgorithmSpec =
+            AlgorithmSpec::new(108, &[], carrier_mask(&[7]), Edge::one_based(6, 6));
+        const INVALID_MASK: AlgorithmSpec =
+            AlgorithmSpec::new(109, &[], u8::MAX, Edge::one_based(6, 6));
+
+        for spec in [ZERO_CARRIER, SEVEN_CARRIER, INVALID_MASK] {
+            assert_eq!(
+                PreparedAlgorithm::new(spec),
+                Err(AlgorithmError::InvalidOperator)
+            );
+        }
+    }
+
+    #[test]
+    fn accessors_are_checked_and_return_exact_incoming_sources() {
+        let prepared = PreparedAlgorithm::new(CLASSIC_ALGORITHMS[11]).unwrap();
+
+        assert_eq!(prepared.incoming(3).unwrap(), &[3, 4, 5]);
+        assert_eq!(prepared.is_carrier(1), Some(true));
+        assert_eq!(prepared.is_carrier(2), Some(false));
+        assert_eq!(prepared.position(0), None);
+        assert_eq!(prepared.position(7), None);
+        assert_eq!(prepared.incoming(0), None);
+        assert_eq!(prepared.incoming(7), None);
+        assert_eq!(prepared.is_carrier(0), None);
+        assert_eq!(prepared.is_carrier(7), None);
+    }
+
+    #[test]
+    fn fingerprints_ignore_ordinary_edge_order() {
+        const FORWARD: AlgorithmSpec = AlgorithmSpec::new(
+            110,
+            &[Edge::one_based(3, 2), Edge::one_based(2, 1)],
+            carrier_mask(&[1]),
+            Edge::one_based(6, 6),
+        );
+        const REVERSED: AlgorithmSpec = AlgorithmSpec::new(
+            111,
+            &[Edge::one_based(2, 1), Edge::one_based(3, 2)],
+            carrier_mask(&[1]),
+            Edge::one_based(6, 6),
+        );
+
+        assert_eq!(FORWARD.fingerprint(), REVERSED.fingerprint());
+    }
+
+    #[test]
+    fn fingerprint_is_safe_and_canonical_for_malformed_edges() {
+        const FIRST: AlgorithmSpec = AlgorithmSpec::new(
+            112,
+            &[
+                Edge {
+                    source: u8::MAX,
+                    target: 0,
+                },
+                Edge {
+                    source: 0,
+                    target: u8::MAX,
+                },
+            ],
+            u8::MAX,
+            Edge {
+                source: u8::MAX,
+                target: u8::MAX,
+            },
+        );
+        const REVERSED: AlgorithmSpec = AlgorithmSpec::new(
+            113,
+            &[
+                Edge {
+                    source: 0,
+                    target: u8::MAX,
+                },
+                Edge {
+                    source: u8::MAX,
+                    target: 0,
+                },
+            ],
+            u8::MAX,
+            Edge {
+                source: u8::MAX,
+                target: u8::MAX,
+            },
+        );
+
+        assert_eq!(FIRST.fingerprint(), REVERSED.fingerprint());
+    }
 }
 use thiserror::Error;
 
 pub const OPERATOR_COUNT: usize = 6;
 const VALID_CARRIER_BITS: u8 = (1 << OPERATOR_COUNT) - 1;
+const INVALID_CARRIER_BIT: u8 = 1 << OPERATOR_COUNT;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Edge {
@@ -54,8 +218,8 @@ pub struct Edge {
 impl Edge {
     pub const fn one_based(source: u8, target: u8) -> Self {
         Self {
-            source: source - 1,
-            target: target - 1,
+            source: source.wrapping_sub(1),
+            target: target.wrapping_sub(1),
         }
     }
 }
@@ -64,7 +228,12 @@ pub const fn carrier_mask(operators: &[u8]) -> u8 {
     let mut mask = 0;
     let mut index = 0;
     while index < operators.len() {
-        mask |= 1 << (operators[index] - 1);
+        let operator = operators[index];
+        if operator > 0 && operator <= OPERATOR_COUNT as u8 {
+            mask |= 1 << (operator - 1);
+        } else {
+            mask |= INVALID_CARRIER_BIT;
+        }
         index += 1;
     }
     mask
@@ -89,20 +258,25 @@ impl AlgorithmSpec {
     }
 
     pub fn fingerprint(self) -> u64 {
-        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
-        hash = hash_byte(hash, self.carriers);
-        hash = hash_byte(hash, self.feedback.source);
-        hash = hash_byte(hash, self.feedback.target);
+        let mut adjacency = 0_u64;
+        let mut malformed_edge = false;
         for edge in self.edges {
-            hash = hash_byte(hash, edge.source);
-            hash = hash_byte(hash, edge.target);
+            if usize::from(edge.source) < OPERATOR_COUNT
+                && usize::from(edge.target) < OPERATOR_COUNT
+            {
+                let bit = usize::from(edge.source) * OPERATOR_COUNT + usize::from(edge.target);
+                adjacency |= 1_u64 << bit;
+            } else {
+                malformed_edge = true;
+            }
         }
-        hash
-    }
-}
 
-fn hash_byte(hash: u64, byte: u8) -> u64 {
-    (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+        adjacency
+            | (u64::from(self.carriers) << 36)
+            | (u64::from(self.feedback.source) << 44)
+            | (u64::from(self.feedback.target) << 52)
+            | (u64::from(malformed_edge) << 60)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
@@ -143,10 +317,8 @@ impl PreparedAlgorithm {
 
         for (index, edge) in spec.edges.iter().copied().enumerate() {
             validate_edge(edge)?;
-            for prior in &spec.edges[..index] {
-                if edge == *prior {
-                    return Err(AlgorithmError::DuplicateEdge);
-                }
+            if edge == spec.feedback || spec.edges[..index].contains(&edge) {
+                return Err(AlgorithmError::DuplicateEdge);
             }
 
             let target = usize::from(edge.target);
@@ -158,10 +330,10 @@ impl PreparedAlgorithm {
 
         let mut order = [0; OPERATOR_COUNT];
         let mut selected = [false; OPERATOR_COUNT];
-        for position in 0..OPERATOR_COUNT {
+        for order_slot in &mut order {
             let mut next = None;
-            for operator in 0..OPERATOR_COUNT {
-                if !selected[operator] && indegree[operator] == 0 {
+            for (operator, was_selected) in selected.iter().enumerate() {
+                if !was_selected && indegree[operator] == 0 {
                     next = Some(operator);
                     break;
                 }
@@ -171,7 +343,7 @@ impl PreparedAlgorithm {
             };
 
             selected[operator] = true;
-            order[position] = operator as u8;
+            *order_slot = operator as u8;
             for edge in spec.edges {
                 if usize::from(edge.source) == operator {
                     indegree[usize::from(edge.target)] -= 1;
@@ -198,34 +370,42 @@ impl PreparedAlgorithm {
         self.feedback
     }
 
-    pub fn position(&self, operator: u8) -> usize {
-        let operator = operator - 1;
+    pub fn position(&self, operator: u8) -> Option<usize> {
+        let operator = u8::try_from(one_based_index(operator)?).ok()?;
         let mut position = 0;
         while position < OPERATOR_COUNT {
             if self.order[position] == operator {
-                return position;
+                return Some(position);
             }
             position += 1;
         }
-        unreachable!("prepared algorithms contain all operators")
+        None
     }
 
     pub const fn evaluation_order(&self) -> &[u8; OPERATOR_COUNT] {
         &self.order
     }
 
-    pub fn incoming(&self, operator: u8) -> &[u8] {
-        let operator = usize::from(operator - 1);
-        &self.incoming[operator][..usize::from(self.incoming_count[operator])]
+    pub fn incoming(&self, operator: u8) -> Option<&[u8]> {
+        let operator = one_based_index(operator)?;
+        Some(&self.incoming[operator][..usize::from(self.incoming_count[operator])])
     }
 
-    pub const fn is_carrier(&self, operator: u8) -> bool {
-        self.carriers & (1 << (operator - 1)) != 0
+    pub const fn is_carrier(&self, operator: u8) -> Option<bool> {
+        if operator == 0 || operator > OPERATOR_COUNT as u8 {
+            return None;
+        }
+        Some(self.carriers & (1 << (operator - 1)) != 0)
     }
 
     pub const fn output_gain(&self) -> f32 {
         self.output_gain
     }
+}
+
+fn one_based_index(operator: u8) -> Option<usize> {
+    let index = usize::from(operator.checked_sub(1)?);
+    (index < OPERATOR_COUNT).then_some(index)
 }
 
 fn validate_edge(edge: Edge) -> Result<(), AlgorithmError> {
