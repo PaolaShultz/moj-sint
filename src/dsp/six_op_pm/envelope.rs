@@ -81,11 +81,11 @@ impl Envelope {
             .enumerate()
         {
             let exact = f64::from(seconds) * f64::from(sample_rate);
-            if !exact.is_finite() || exact < 1.0 || exact >= f64::from(u32::MAX) {
+            if !exact.is_finite() || exact < 1.0 || exact > f64::from(u32::MAX) {
                 return Err(EnvelopeError::SampleCountOutOfRange { stage });
             }
             let rounded = exact.round();
-            if rounded < 1.0 || rounded >= f64::from(u32::MAX) {
+            if rounded < 1.0 || rounded > f64::from(u32::MAX) {
                 return Err(EnvelopeError::SampleCountOutOfRange { stage });
             }
             *sample_count = rounded as u32;
@@ -256,5 +256,14 @@ mod tests {
         assert!(Envelope::new(unrepresentable, f32::MAX).is_err());
         let zero_sample_count = EnvelopeSpec::new([f32::MIN_POSITIVE; 4], [1.0; 4]).unwrap();
         assert!(Envelope::new(zero_sample_count, 48_000.0).is_err());
+    }
+
+    #[test]
+    fn maximum_representable_sample_count_is_accepted() {
+        let spec = EnvelopeSpec::new([65_535.0; 4], [1.0, 0.8, 0.5, 0.1]).unwrap();
+        let envelope = Envelope::new(spec, 65_537.0).unwrap();
+
+        assert_eq!(envelope.level(), 0.1);
+        assert!(envelope.is_idle());
     }
 }
