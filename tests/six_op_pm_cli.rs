@@ -196,7 +196,14 @@ fn six_operator_lab_rejects_unsafe_destinations_without_touching_cwd() {
     let current = tempfile::tempdir().unwrap();
     fs::write(current.path().join("caller-sentinel.txt"), b"caller bytes").unwrap();
 
-    for destination in ["", ".", "..", "nested/.", "nested/..", "/"] {
+    for (destination, expected_error) in [
+        ("", "destination must have a safe final component"),
+        (".", "destination must have a safe final component"),
+        ("..", "destination must not contain parent traversal"),
+        ("nested/.", "destination must have a safe final component"),
+        ("nested/..", "destination must not contain parent traversal"),
+        ("/", "destination must have a safe final component"),
+    ] {
         let result = Command::new(env!("CARGO_BIN_EXE_six-op-pm-lab"))
             .current_dir(current.path())
             .arg("render")
@@ -205,11 +212,23 @@ fn six_operator_lab_rejects_unsafe_destinations_without_touching_cwd() {
             .unwrap();
         assert!(!result.status.success(), "{destination:?}: {result:?}");
         assert!(
-            String::from_utf8_lossy(&result.stderr)
-                .contains("destination must have a safe final component"),
+            String::from_utf8_lossy(&result.stderr).contains(expected_error),
             "{destination:?}: {result:?}"
         );
     }
+    let parent_traversal = current.path().join("detour").join("..").join("gate");
+    let result = Command::new(env!("CARGO_BIN_EXE_six-op-pm-lab"))
+        .arg("render")
+        .arg(&parent_traversal)
+        .output()
+        .unwrap();
+    assert!(!result.status.success(), "{result:?}");
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("must not contain parent traversal"),
+        "{result:?}"
+    );
+    assert!(!current.path().join("detour").exists());
+    assert!(!current.path().join("gate").exists());
     assert_eq!(
         file_names(current.path()),
         BTreeSet::from(["caller-sentinel.txt".to_owned()])

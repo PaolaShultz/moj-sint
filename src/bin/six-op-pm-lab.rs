@@ -9,8 +9,8 @@ use std::fmt::Write as _;
 use std::fs::{self, DirBuilder};
 use std::io::{ErrorKind, Write as _};
 use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::{DirBuilderExt, MetadataExt};
-use std::path::{Path, PathBuf};
+use std::os::unix::fs::DirBuilderExt;
+use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -59,7 +59,7 @@ fn render_gate(output_directory: &Path) -> Result<()> {
     let elapsed = started.elapsed();
     let workstation_cost = workstation_cost(elapsed);
 
-    let mut created_parents = CreatedParentDirectories::create_for(output_directory)?;
+    create_missing_parent_directories(output_directory)?;
     let staging = StagingDirectory::create(output_directory)?;
     for (patch, rendered) in ListeningPatch::ALL.into_iter().zip(&renders) {
         write_wav(
@@ -74,7 +74,6 @@ fn render_gate(output_directory: &Path) -> Result<()> {
         workstation_cost,
     )?;
     staging.publish(output_directory)?;
-    created_parents.retain();
     println!(
         "wrote six-operator PM listening gate to {}",
         output_directory.display()
@@ -82,103 +81,88 @@ fn render_gate(output_directory: &Path) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
-struct OwnedDirectory {
-    path: PathBuf,
-    device: u64,
-    inode: u64,
+fn create_missing_parent_directories(destination: &Path) -> Result<()> {
+    ensure_safe_destination(destination)?;
+    let parent = destination_parent(destination);
+    ensure_no_symlink_components(parent)?;
+    let mut missing = Vec::new();
+    let mut cursor = parent.to_path_buf();
+    loop {
+        match real_directory_presence(&cursor)? {
+            DirectoryPresence::Present => break,
+            DirectoryPresence::Missing => missing.push(cursor.clone()),
+        }
+        let next = cursor
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        ensure!(
+            next != cursor,
+            "destination has no creatable parent directory"
+        );
+        cursor = next.to_path_buf();
+    }
+
+    for path in missing.into_iter().rev() {
+        ensure_no_symlink_components(destination_parent(&path))?;
+        let mut builder = DirBuilder::new();
+        builder.mode(0o700);
+        match builder.create(&path) {
+            Ok(()) => ensure!(
+                real_directory_presence(&path)? == DirectoryPresence::Present,
+                "new parent is not a real directory"
+            ),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => ensure!(
+                real_directory_presence(&path)? == DirectoryPresence::Present,
+                "destination parent appeared but is not a real directory"
+            ),
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("create parent directory {}", path.display()));
+            }
+        }
+    }
+    Ok(())
 }
 
-struct CreatedParentDirectories {
-    directories: Vec<OwnedDirectory>,
-    retained: bool,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DirectoryPresence {
+    Missing,
+    Present,
 }
 
-impl CreatedParentDirectories {
-    fn create_for(destination: &Path) -> Result<Self> {
-        ensure_safe_destination(destination)?;
-        let parent = destination_parent(destination);
-        let mut missing = Vec::new();
-        let mut cursor = parent.to_path_buf();
-        loop {
-            match fs::metadata(&cursor) {
-                Ok(metadata) => {
-                    ensure!(
-                        metadata.is_dir(),
-                        "destination parent exists and is not a directory"
-                    );
+fn real_directory_presence(path: &Path) -> Result<DirectoryPresence> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            ensure!(
+                metadata.file_type().is_dir(),
+                "destination parent must be a real directory, not a symlink or file: {}",
+                path.display()
+            );
+            Ok(DirectoryPresence::Present)
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(DirectoryPresence::Missing),
+        Err(error) => Err(error).with_context(|| format!("inspect directory {}", path.display())),
+    }
+}
+
+fn ensure_no_symlink_components(path: &Path) -> Result<()> {
+    let mut prefix = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir | Component::CurDir => {
+                prefix.push(component.as_os_str());
+            }
+            Component::ParentDir => bail!("destination must not contain parent traversal"),
+            Component::Normal(_) => {
+                prefix.push(component.as_os_str());
+                if real_directory_presence(&prefix)? == DirectoryPresence::Missing {
                     break;
                 }
-                Err(error) if error.kind() == ErrorKind::NotFound => missing.push(cursor.clone()),
-                Err(error) => {
-                    return Err(error)
-                        .with_context(|| format!("inspect parent directory {}", cursor.display()));
-                }
-            }
-            let next = cursor
-                .parent()
-                .filter(|path| !path.as_os_str().is_empty())
-                .unwrap_or_else(|| Path::new("."));
-            ensure!(
-                next != cursor,
-                "destination has no creatable parent directory"
-            );
-            cursor = next.to_path_buf();
-        }
-
-        let mut created = Self {
-            directories: Vec::with_capacity(missing.len()),
-            retained: false,
-        };
-        for path in missing.into_iter().rev() {
-            let mut builder = DirBuilder::new();
-            builder.mode(0o755);
-            match builder.create(&path) {
-                Ok(()) => {
-                    let metadata = fs::symlink_metadata(&path).with_context(|| {
-                        format!("inspect newly created parent {}", path.display())
-                    })?;
-                    ensure!(metadata.is_dir(), "new parent is not a directory");
-                    created.directories.push(OwnedDirectory {
-                        path,
-                        device: metadata.dev(),
-                        inode: metadata.ino(),
-                    });
-                }
-                Err(error) if error.kind() == ErrorKind::AlreadyExists => {
-                    ensure!(
-                        fs::metadata(&path).is_ok_and(|metadata| metadata.is_dir()),
-                        "destination parent appeared but is not a directory"
-                    );
-                }
-                Err(error) => {
-                    return Err(error)
-                        .with_context(|| format!("create parent directory {}", path.display()));
-                }
-            }
-        }
-        Ok(created)
-    }
-
-    fn retain(&mut self) {
-        self.retained = true;
-    }
-}
-
-impl Drop for CreatedParentDirectories {
-    fn drop(&mut self) {
-        if self.retained {
-            return;
-        }
-        for owned in self.directories.iter().rev() {
-            let still_owned = fs::symlink_metadata(&owned.path).is_ok_and(|metadata| {
-                metadata.is_dir() && metadata.dev() == owned.device && metadata.ino() == owned.inode
-            });
-            if still_owned {
-                let _ = fs::remove_dir(&owned.path);
             }
         }
     }
+    Ok(())
 }
 
 fn destination_parent(destination: &Path) -> &Path {
@@ -190,18 +174,25 @@ fn destination_parent(destination: &Path) -> &Path {
 
 fn ensure_destination_is_empty(path: &Path) -> Result<()> {
     ensure_safe_destination(path)?;
-    if !path.exists() {
-        return Ok(());
+    match real_directory_presence(path)? {
+        DirectoryPresence::Missing => Ok(()),
+        DirectoryPresence::Present => {
+            ensure!(
+                fs::read_dir(path)?.next().is_none(),
+                "destination exists and is not empty"
+            );
+            Ok(())
+        }
     }
-    ensure!(path.is_dir(), "destination exists and is not a directory");
-    ensure!(
-        fs::read_dir(path)?.next().is_none(),
-        "destination exists and is not empty"
-    );
-    Ok(())
 }
 
 fn ensure_safe_destination(path: &Path) -> Result<()> {
+    ensure!(
+        !path
+            .components()
+            .any(|component| component == Component::ParentDir),
+        "destination must not contain parent traversal"
+    );
     let bytes = path.as_os_str().as_bytes();
     let bytes = bytes
         .iter()
@@ -227,9 +218,10 @@ impl StagingDirectory {
     fn create(destination: &Path) -> Result<Self> {
         ensure_safe_destination(destination)?;
         let parent = destination_parent(destination);
+        ensure_no_symlink_components(parent)?;
         ensure!(
-            parent.is_dir(),
-            "destination parent does not exist or is not a directory"
+            real_directory_presence(parent)? == DirectoryPresence::Present,
+            "destination parent does not exist or is not a real directory"
         );
         let destination_name = destination
             .file_name()
@@ -656,24 +648,39 @@ const fn stage_slug(stage: SpectralStage) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
-    fn parent_guard_removes_only_owned_empty_directories() {
+    fn parent_creation_preserves_created_directories() {
         let root = tempfile::tempdir().unwrap();
         let missing = root.path().join("missing");
         let nested = missing.join("nested");
         let output = nested.join("output");
 
-        {
-            let _parents = CreatedParentDirectories::create_for(&output).unwrap();
-            assert!(nested.is_dir());
-        }
-        assert!(!missing.exists());
+        create_missing_parent_directories(&output).unwrap();
+        assert!(nested.is_dir());
+        assert_eq!(
+            fs::symlink_metadata(&nested).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
 
-        {
-            let _parents = CreatedParentDirectories::create_for(&output).unwrap();
-            fs::write(nested.join("caller-owned.txt"), b"keep").unwrap();
-        }
+        fs::write(nested.join("caller-owned.txt"), b"keep").unwrap();
         assert_eq!(fs::read(nested.join("caller-owned.txt")).unwrap(), b"keep");
+    }
+
+    #[test]
+    fn parent_creation_rejects_symlink_to_directory_without_outside_writes() {
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let link = root.path().join("redirect");
+        std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+        let output = link.join("nested").join("output");
+
+        let error = match create_missing_parent_directories(&output) {
+            Ok(()) => panic!("symlink parent was accepted"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("real directory"), "{error:#}");
+        assert!(!outside.path().join("nested").exists());
     }
 }
