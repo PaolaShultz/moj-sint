@@ -21,4 +21,5 @@ pub mod native_bench;
 pub mod offline;
 pub mod preset;
 pub mod research;
+pub mod six_op_pm;
 pub mod struck_object;
