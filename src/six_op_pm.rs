@@ -3,6 +3,7 @@
 
 use thiserror::Error;
 
+use crate::dsp::six_op_pm::algorithm::CLASSIC_ALGORITHMS;
 use crate::dsp::six_op_pm::operator::SharedSineTable;
 use crate::dsp::six_op_pm::{
     EnvelopeSpec, FrequencyMode, KeyboardScaling, LfoSpec, OperatorSpec, PitchEnvelopeSpec,
@@ -303,17 +304,16 @@ impl ListeningPatch {
             2 => ScalingKind::LowBoost,
             _ => unreachable!("listening pair is fixed"),
         };
-        let carriers = match algorithm {
-            0 => [true, false, true, false, false, false],
-            4 => [true, false, true, false, true, false],
-            9 => [true, false, false, false, false, false],
-            _ => unreachable!("listening algorithms are fixed"),
-        };
+        let carrier_mask = CLASSIC_ALGORITHMS
+            .get(algorithm)
+            .expect("listening algorithm is present in the validated catalog")
+            .carriers;
 
         SixOpPatch {
             algorithm,
             operators: std::array::from_fn(|index| {
-                checked_operator(operators[index], scaling, carriers[index])
+                let carrier = carrier_mask & (1 << index) != 0;
+                checked_operator(operators[index], scaling, carrier)
             }),
             pitch_envelope: PitchEnvelopeSpec::new(pitch_seconds, pitch_semitones)
                 .expect("authored listening pitch envelope is valid"),
@@ -516,6 +516,8 @@ pub enum RenderError {
     InvalidSampleRate,
     #[error("render frame count is not representable")]
     FrameCountOutOfRange,
+    #[error("score timeline collapses or falls outside the scaled render")]
+    InvalidScaledTimeline,
     #[error("score has more events than the fixed renderer can prepare")]
     TooManyEvents,
     #[error("score has more note-ons than the fixed renderer can prepare")]
@@ -534,29 +536,36 @@ pub enum RenderError {
 struct PreparedEvent {
     sample: usize,
     action: ScoreAction,
+    note_token: u8,
     voice_resource: Option<usize>,
 }
 
 #[derive(Debug)]
 struct ResearchVoice {
     note: u8,
+    note_token: u8,
     sequence: u64,
     released: bool,
     non_finite_reported: bool,
     clamp_contacts_seen: u64,
+    #[cfg(test)]
+    non_finite_fault_for_test: bool,
     voice: SixOpVoice,
 }
 
 impl ResearchVoice {
-    fn new(note: u8, sequence: u64, mut voice: SixOpVoice) -> Self {
+    fn new(note: u8, note_token: u8, sequence: u64, mut voice: SixOpVoice) -> Self {
         voice.reset();
         voice.note_on();
         Self {
             note,
+            note_token,
             sequence,
             released: false,
             non_finite_reported: false,
             clamp_contacts_seen: 0,
+            #[cfg(test)]
+            non_finite_fault_for_test: false,
             voice,
         }
     }
@@ -566,11 +575,15 @@ impl ResearchVoice {
         self.released = false;
         self.non_finite_reported = false;
         self.clamp_contacts_seen = 0;
+        #[cfg(test)]
+        {
+            self.non_finite_fault_for_test = false;
+        }
     }
 }
 
 #[derive(Debug)]
-pub struct ResearchEnsemble {
+struct ResearchEnsemble {
     active: [Option<ResearchVoice>; 4],
     next_sequence: u64,
     diagnostics: RenderDiagnostics,
@@ -585,10 +598,10 @@ impl ResearchEnsemble {
         }
     }
 
-    fn note_on(&mut self, note: u8, voice: SixOpVoice) {
+    fn note_on(&mut self, note: u8, note_token: u8, voice: SixOpVoice) {
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
-        let research_voice = ResearchVoice::new(note, sequence, voice);
+        let research_voice = ResearchVoice::new(note, note_token, sequence, voice);
         let slot = self
             .active
             .iter()
@@ -605,6 +618,7 @@ impl ResearchEnsemble {
         if let Some(mut stolen) = self.active[slot].take() {
             self.diagnostics.voice_steals = self.diagnostics.voice_steals.saturating_add(1);
             self.diagnostics.last_stolen_note = Some(stolen.note);
+            retain_voice_diagnostics(&mut self.diagnostics, &mut stolen);
             stolen.reset();
         }
         self.active[slot] = Some(research_voice);
@@ -612,14 +626,15 @@ impl ResearchEnsemble {
         self.diagnostics.maximum_active_voices = self.diagnostics.maximum_active_voices.max(count);
     }
 
-    fn note_off(&mut self, note: u8) {
+    fn note_off(&mut self, note_token: u8) {
         let target = self
             .active
             .iter()
             .enumerate()
             .filter_map(|(index, voice)| {
                 let voice = voice.as_ref()?;
-                (voice.note == note && !voice.released).then_some((index, voice.sequence))
+                (voice.note_token == note_token && !voice.released)
+                    .then_some((index, voice.sequence))
             })
             .min_by_key(|(_, sequence)| *sequence)
             .map(|(index, _)| index);
@@ -640,17 +655,7 @@ impl ResearchEnsemble {
             let mut became_idle = false;
             if let Some(active) = &mut self.active[index] {
                 sum += active.voice.sample();
-                if active.voice.non_finite_seen() && !active.non_finite_reported {
-                    self.diagnostics.non_finite_voices =
-                        self.diagnostics.non_finite_voices.saturating_add(1);
-                    active.non_finite_reported = true;
-                }
-                let contacts = active.voice.clamp_contacts();
-                self.diagnostics.clamp_contacts = self
-                    .diagnostics
-                    .clamp_contacts
-                    .saturating_add(contacts.saturating_sub(active.clamp_contacts_seen));
-                active.clamp_contacts_seen = contacts;
+                retain_voice_diagnostics(&mut self.diagnostics, active);
                 became_idle = active.voice.is_idle();
             }
             if became_idle {
@@ -665,6 +670,21 @@ impl ResearchEnsemble {
     const fn diagnostics(&self) -> RenderDiagnostics {
         self.diagnostics
     }
+}
+
+fn retain_voice_diagnostics(diagnostics: &mut RenderDiagnostics, active: &mut ResearchVoice) {
+    let non_finite_seen = active.voice.non_finite_seen();
+    #[cfg(test)]
+    let non_finite_seen = non_finite_seen || active.non_finite_fault_for_test;
+    if non_finite_seen && !active.non_finite_reported {
+        diagnostics.non_finite_voices = diagnostics.non_finite_voices.saturating_add(1);
+        active.non_finite_reported = true;
+    }
+    let contacts = active.voice.clamp_contacts();
+    diagnostics.clamp_contacts = diagnostics
+        .clamp_contacts
+        .saturating_add(contacts.saturating_sub(active.clamp_contacts_seen));
+    active.clamp_contacts_seen = contacts;
 }
 
 #[derive(Debug)]
@@ -695,14 +715,36 @@ impl PreparedRender {
             return Err(RenderError::TooManyNoteOns);
         }
 
+        let frame_count = scale_reference_sample(score.duration_samples_48k(), sample_rate)?;
+        if frame_count == 0 {
+            return Err(RenderError::InvalidScaledTimeline);
+        }
+
         let master_sine_table: SharedSineTable = SineTable::new().into();
         let mut events = std::array::from_fn(|_| None);
         let mut voices = std::array::from_fn(|_| None);
         let mut voice_index = 0;
+        let mut pending_tokens = [[0_u8; MAX_PREPARED_VOICES]; 128];
+        let mut pending_counts = [0_u8; 128];
+        let mut previous_reference_sample = 0;
+        let mut previous_scaled_sample = 0;
         let patch = patch_id.patch();
         for (index, event) in score.events().iter().copied().enumerate() {
-            let resource = match event.action {
+            let scaled_sample = scale_reference_sample(event.sample, sample_rate)?;
+            if scaled_sample >= frame_count
+                || (index != 0
+                    && event.sample > previous_reference_sample
+                    && scaled_sample <= previous_scaled_sample)
+            {
+                return Err(RenderError::InvalidScaledTimeline);
+            }
+            previous_reference_sample = event.sample;
+            previous_scaled_sample = scaled_sample;
+
+            let (note_token, resource) = match event.action {
                 ScoreAction::On { note, velocity } => {
+                    let note_token =
+                        u8::try_from(voice_index).map_err(|_| RenderError::TooManyNoteOns)?;
                     voices[voice_index] = Some(SixOpVoice::new_with_sine_table(
                         patch,
                         sample_rate as f32,
@@ -712,17 +754,30 @@ impl PreparedRender {
                     )?);
                     let resource = voice_index;
                     voice_index += 1;
-                    Some(resource)
+                    let count = usize::from(pending_counts[usize::from(note)]);
+                    pending_tokens[usize::from(note)][count] = note_token;
+                    pending_counts[usize::from(note)] += 1;
+                    (note_token, Some(resource))
                 }
-                ScoreAction::Off { .. } => None,
+                ScoreAction::Off { note } => {
+                    let note_index = usize::from(note);
+                    let count = usize::from(pending_counts[note_index]);
+                    if count == 0 {
+                        return Err(RenderError::MissingPreparedVoice);
+                    }
+                    let note_token = pending_tokens[note_index][0];
+                    pending_tokens[note_index].copy_within(1..count, 0);
+                    pending_counts[note_index] -= 1;
+                    (note_token, None)
+                }
             };
             events[index] = Some(PreparedEvent {
-                sample: scale_reference_sample(event.sample, sample_rate)?,
+                sample: scaled_sample,
                 action: event.action,
+                note_token,
                 voice_resource: resource,
             });
         }
-        let frame_count = scale_reference_sample(score.duration_samples_48k(), sample_rate)?;
         Ok(Self {
             _master_sine_table: master_sine_table,
             events,
@@ -767,9 +822,9 @@ impl PreparedRender {
                         let voice = self.voices[resource]
                             .take()
                             .ok_or(RenderError::MissingPreparedVoice)?;
-                        self.ensemble.note_on(note, voice);
+                        self.ensemble.note_on(note, event.note_token, voice);
                     }
-                    ScoreAction::Off { note } => self.ensemble.note_off(note),
+                    ScoreAction::Off { .. } => self.ensemble.note_off(event.note_token),
                 }
                 event_index += 1;
             }
@@ -822,6 +877,8 @@ fn render_score(
 }
 
 fn fnv1a_sample_hash(samples: &[f32]) -> u64 {
+    // The sine table is generated with target/runtime f32 math. This hash is
+    // same-build/target replay evidence, not a universal cross-target golden.
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     for sample in samples {
         hash ^= u64::from(sample.to_bits());
@@ -878,6 +935,66 @@ mod tests {
         ScoreEvent::off(20, 63),
         ScoreEvent::off(20, 64),
     ];
+    const OVERLAPPING_NOTE_STEAL_EVENTS: [ScoreEvent; 10] = [
+        ScoreEvent::on(0, 60, 100),
+        ScoreEvent::on(0, 60, 110),
+        ScoreEvent::on(0, 61, 100),
+        ScoreEvent::on(0, 62, 100),
+        ScoreEvent::off(10, 61),
+        ScoreEvent::on(10, 63, 100),
+        ScoreEvent::off(20, 60),
+        ScoreEvent::off(30, 60),
+        ScoreEvent::off(40, 62),
+        ScoreEvent::off(40, 63),
+    ];
+
+    fn dispatch_event_for_test(prepared: &mut PreparedRender, index: usize) {
+        let event = prepared.events[index].unwrap();
+        match event.action {
+            ScoreAction::On { note, .. } => {
+                let voice = prepared.voices[event.voice_resource.unwrap()]
+                    .take()
+                    .unwrap();
+                prepared.ensemble.note_on(note, event.note_token, voice);
+            }
+            ScoreAction::Off { .. } => prepared.ensemble.note_off(event.note_token),
+        }
+    }
+
+    fn prepared_test_voice(patch: ListeningPatch, note: u8) -> SixOpVoice {
+        let table: SharedSineTable = SineTable::new().into();
+        SixOpVoice::new_with_sine_table(
+            patch.patch(),
+            REFERENCE_SAMPLE_RATE as f32,
+            note,
+            1.0,
+            table,
+        )
+        .unwrap()
+    }
+
+    fn clamp_reporting_idle_voice(note: u8) -> SixOpVoice {
+        let mut patch = ListeningPatch::MechanicalStab.patch();
+        patch.output_gain = 4.0;
+        let table: SharedSineTable = SineTable::new().into();
+        let mut voice =
+            SixOpVoice::new_with_sine_table(patch, REFERENCE_SAMPLE_RATE as f32, note, 1.0, table)
+                .unwrap();
+        voice.note_on();
+        for _ in 0..2_000 {
+            voice.sample();
+        }
+        voice.note_off();
+        for _ in 0..10_000 {
+            voice.sample();
+            if voice.is_idle() {
+                break;
+            }
+        }
+        assert!(voice.is_idle());
+        assert!(voice.clamp_contacts() > 0);
+        voice
+    }
 
     #[test]
     fn gate_has_three_topology_pairs_and_six_files() {
@@ -1183,43 +1300,20 @@ mod tests {
 
     #[test]
     fn keyboard_scaling_follows_actual_carrier_and_modulator_roles() {
-        let bright = KeyboardScaling::new(72, 0.0, -1.5).unwrap();
-        let low_boost = KeyboardScaling::new(48, 1.0, 0.0).unwrap();
-        let flat_bright = KeyboardScaling::new(72, 0.0, 0.0).unwrap();
-        let flat_low = KeyboardScaling::new(48, 0.0, 0.0).unwrap();
-
-        for id in [ListeningPatch::BellMetal, ListeningPatch::FracturedMetal] {
-            let scaling = id.patch().operators.map(|operator| operator.scaling);
-            assert_eq!(
-                scaling,
-                [flat_bright, bright, flat_bright, bright, bright, bright]
-            );
-        }
-        for id in [
-            ListeningPatch::ElectricPianoMallet,
-            ListeningPatch::GlassWood,
-        ] {
-            let scaling = id.patch().operators.map(|operator| operator.scaling);
-            assert_eq!(
-                scaling,
-                [
-                    flat_bright,
-                    bright,
-                    flat_bright,
-                    bright,
-                    flat_bright,
-                    bright
-                ]
-            );
-        }
-        for id in [ListeningPatch::BrassBass, ListeningPatch::MechanicalStab] {
-            let scaling = id.patch().operators.map(|operator| operator.scaling);
-            assert_eq!(
-                scaling,
-                [
-                    flat_low, low_boost, low_boost, low_boost, low_boost, low_boost
-                ]
-            );
+        for id in ListeningPatch::ALL {
+            let patch = id.patch();
+            let graph = CLASSIC_ALGORITHMS[patch.algorithm];
+            for (index, operator) in patch.operators.into_iter().enumerate() {
+                let carrier = graph.carriers & (1 << index) != 0;
+                let expected = match (id.pair(), carrier) {
+                    (0 | 1, true) => KeyboardScaling::new(72, 0.0, 0.0).unwrap(),
+                    (0 | 1, false) => KeyboardScaling::new(72, 0.0, -1.5).unwrap(),
+                    (2, true) => KeyboardScaling::new(48, 0.0, 0.0).unwrap(),
+                    (2, false) => KeyboardScaling::new(48, 1.0, 0.0).unwrap(),
+                    _ => unreachable!("listening pair inventory is fixed"),
+                };
+                assert_eq!(operator.scaling, expected, "{id:?} operator {index}");
+            }
         }
     }
 
@@ -1298,22 +1392,12 @@ mod tests {
 
     #[test]
     fn renderer_is_exact_dry_dual_mono_finite_and_deterministic() {
-        let expected_hashes = [
-            0x0251_31fd_f0e3_c95f,
-            0xdb51_4eaa_af13_0803,
-            0x5c21_e17d_b907_cc53,
-            0x1b27_1045_0346_45eb,
-            0x5197_d586_98ed_c4e3,
-            0x6916_6bbb_9bcf_bcc9,
-        ];
-        let actual_hashes =
-            ListeningPatch::ALL.map(|id| render(id, REFERENCE_SAMPLE_RATE).unwrap().sample_hash);
-        assert_eq!(actual_hashes, expected_hashes);
-
-        for (id, expected_hash) in ListeningPatch::ALL.into_iter().zip(expected_hashes) {
+        for id in ListeningPatch::ALL {
             let first = render(id, REFERENCE_SAMPLE_RATE).unwrap();
             let second = render(id, REFERENCE_SAMPLE_RATE).unwrap();
             assert_eq!(first, second, "{id:?}");
+            assert_eq!(first.sample_hash, second.sample_hash, "{id:?}");
+            assert_ne!(first.sample_hash, 0, "{id:?}");
             assert_eq!(first.format.sample_rate, REFERENCE_SAMPLE_RATE);
             assert_eq!(first.format.channels, 2);
             assert_eq!(first.format.bits_per_sample, 32);
@@ -1336,7 +1420,6 @@ mod tests {
             );
             assert_eq!(first.diagnostics.non_finite_voices, 0, "{id:?}");
             assert_eq!(first.diagnostics.clamp_contacts, 0, "{id:?}");
-            assert_eq!(first.sample_hash, expected_hash, "{id:?}");
         }
     }
 
@@ -1380,6 +1463,42 @@ mod tests {
     }
 
     #[test]
+    fn stolen_same_note_token_consumes_its_own_off_without_releasing_the_survivor() {
+        let score = Score::new(2_000, &OVERLAPPING_NOTE_STEAL_EVENTS).unwrap();
+        let mut prepared =
+            PreparedRender::new(ListeningPatch::BellMetal, REFERENCE_SAMPLE_RATE, score).unwrap();
+
+        for index in 0..=6 {
+            dispatch_event_for_test(&mut prepared, index);
+        }
+        let surviving_b = prepared
+            .ensemble
+            .active
+            .iter()
+            .flatten()
+            .find(|voice| voice.sequence == 1)
+            .unwrap();
+        assert_eq!(surviving_b.note, 60);
+        assert!(
+            !surviving_b.released,
+            "the first Off60 belongs to stolen token A"
+        );
+
+        dispatch_event_for_test(&mut prepared, 7);
+        let surviving_b = prepared
+            .ensemble
+            .active
+            .iter()
+            .flatten()
+            .find(|voice| voice.sequence == 1)
+            .unwrap();
+        assert!(
+            surviving_b.released,
+            "the second Off60 must release token B"
+        );
+    }
+
+    #[test]
     fn complete_prepared_event_frame_loop_is_allocation_free() {
         let score = Score::new(2_000, &SYNTHETIC_STEAL_EVENTS).unwrap();
         let mut prepared =
@@ -1390,6 +1509,65 @@ mod tests {
         assert_eq!(prepared.diagnostics().maximum_active_voices, 4);
         assert_eq!(prepared.diagnostics().voice_steals, 1);
         assert_eq!(prepared.diagnostics().last_stolen_note, Some(60));
+    }
+
+    #[test]
+    fn pending_fault_diagnostics_survive_normal_voice_retirement() {
+        let voice = clamp_reporting_idle_voice(36);
+        let contacts = voice.clamp_contacts();
+        let mut ensemble = ResearchEnsemble::new();
+        ensemble.active[0] = Some(ResearchVoice {
+            note: 36,
+            note_token: 0,
+            sequence: 0,
+            released: true,
+            non_finite_reported: false,
+            clamp_contacts_seen: 0,
+            non_finite_fault_for_test: true,
+            voice,
+        });
+
+        ensemble.sample();
+
+        assert!(ensemble.active[0].is_none());
+        assert_eq!(ensemble.diagnostics().non_finite_voices, 1);
+        assert_eq!(ensemble.diagnostics().clamp_contacts, contacts);
+    }
+
+    #[test]
+    fn pending_fault_diagnostics_survive_oldest_voice_stealing() {
+        let voice = clamp_reporting_idle_voice(36);
+        let contacts = voice.clamp_contacts();
+        let mut ensemble = ResearchEnsemble::new();
+        ensemble.active[0] = Some(ResearchVoice {
+            note: 36,
+            note_token: 0,
+            sequence: 0,
+            released: true,
+            non_finite_reported: false,
+            clamp_contacts_seen: 0,
+            non_finite_fault_for_test: true,
+            voice,
+        });
+        for index in 1..4 {
+            ensemble.active[index] = Some(ResearchVoice::new(
+                36 + index as u8,
+                index as u8,
+                index as u64,
+                prepared_test_voice(ListeningPatch::MechanicalStab, 36 + index as u8),
+            ));
+        }
+        ensemble.next_sequence = 4;
+
+        ensemble.note_on(
+            40,
+            4,
+            prepared_test_voice(ListeningPatch::MechanicalStab, 40),
+        );
+
+        assert_eq!(ensemble.diagnostics().last_stolen_note, Some(36));
+        assert_eq!(ensemble.diagnostics().non_finite_voices, 1);
+        assert_eq!(ensemble.diagnostics().clamp_contacts, contacts);
     }
 
     #[test]
@@ -1409,5 +1587,39 @@ mod tests {
         let high_rate = render(ListeningPatch::BrassBass, 96_000).unwrap();
         assert_eq!(high_rate.samples.len(), 364_800 * 2);
         assert_eq!(high_rate.format.sample_rate, 96_000);
+    }
+
+    #[test]
+    fn scaled_timeline_is_valid_at_minimum_and_exact_eight_times_rates() {
+        let minimum = render(ListeningPatch::BellMetal, MIN_SAMPLE_RATE).unwrap();
+        assert_eq!(minimum.samples.len(), 38_400 * 2);
+        let eight_times = render(ListeningPatch::BrassBass, 384_000).unwrap();
+        assert_eq!(eight_times.samples.len(), 1_459_200 * 2);
+    }
+
+    #[test]
+    fn scaled_timeline_rejects_zero_duration_and_event_at_scaled_end() {
+        const ZERO_DURATION_AFTER_SCALE: [ScoreEvent; 2] =
+            [ScoreEvent::on(0, 60, 100), ScoreEvent::off(1, 60)];
+        const EVENT_AT_SCALED_END: [ScoreEvent; 2] =
+            [ScoreEvent::on(0, 60, 100), ScoreEvent::off(3, 60)];
+        const COLLAPSED_EVENTS: [ScoreEvent; 2] =
+            [ScoreEvent::on(0, 60, 100), ScoreEvent::off(1, 60)];
+        let zero_duration = Score::new(2, &ZERO_DURATION_AFTER_SCALE).unwrap();
+        let event_at_end = Score::new(4, &EVENT_AT_SCALED_END).unwrap();
+        let collapsed = Score::new(100, &COLLAPSED_EVENTS).unwrap();
+
+        assert_eq!(
+            render_score(ListeningPatch::BellMetal, MIN_SAMPLE_RATE, zero_duration),
+            Err(RenderError::InvalidScaledTimeline)
+        );
+        assert_eq!(
+            render_score(ListeningPatch::BellMetal, MIN_SAMPLE_RATE, event_at_end),
+            Err(RenderError::InvalidScaledTimeline)
+        );
+        assert_eq!(
+            render_score(ListeningPatch::BellMetal, MIN_SAMPLE_RATE, collapsed),
+            Err(RenderError::InvalidScaledTimeline)
+        );
     }
 }
