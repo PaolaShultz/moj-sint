@@ -29,8 +29,13 @@ const DETERMINISTIC_REPORTS: [&str; 8] = [
 fn six_operator_lab_writes_the_exact_deterministic_listening_gate() {
     let first = tempfile::tempdir().unwrap();
     let second_parent = tempfile::tempdir().unwrap();
-    let second = second_parent.path().join("new-listening-gate");
+    let second = second_parent
+        .path()
+        .join("missing")
+        .join("nested")
+        .join("new-listening-gate");
     run_lab(first.path()).assert_success();
+    assert!(!second_parent.path().join("missing").exists());
     assert!(!second.exists());
     run_lab(&second).assert_success();
 

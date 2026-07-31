@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 use std::fs::{self, DirBuilder};
 use std::io::{ErrorKind, Write as _};
 use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::DirBuilderExt;
+use std::os::unix::fs::{DirBuilderExt, MetadataExt};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -59,6 +59,7 @@ fn render_gate(output_directory: &Path) -> Result<()> {
     let elapsed = started.elapsed();
     let workstation_cost = workstation_cost(elapsed);
 
+    let mut created_parents = CreatedParentDirectories::create_for(output_directory)?;
     let staging = StagingDirectory::create(output_directory)?;
     for (patch, rendered) in ListeningPatch::ALL.into_iter().zip(&renders) {
         write_wav(
@@ -73,11 +74,118 @@ fn render_gate(output_directory: &Path) -> Result<()> {
         workstation_cost,
     )?;
     staging.publish(output_directory)?;
+    created_parents.retain();
     println!(
         "wrote six-operator PM listening gate to {}",
         output_directory.display()
     );
     Ok(())
+}
+
+#[derive(Debug)]
+struct OwnedDirectory {
+    path: PathBuf,
+    device: u64,
+    inode: u64,
+}
+
+struct CreatedParentDirectories {
+    directories: Vec<OwnedDirectory>,
+    retained: bool,
+}
+
+impl CreatedParentDirectories {
+    fn create_for(destination: &Path) -> Result<Self> {
+        ensure_safe_destination(destination)?;
+        let parent = destination_parent(destination);
+        let mut missing = Vec::new();
+        let mut cursor = parent.to_path_buf();
+        loop {
+            match fs::metadata(&cursor) {
+                Ok(metadata) => {
+                    ensure!(
+                        metadata.is_dir(),
+                        "destination parent exists and is not a directory"
+                    );
+                    break;
+                }
+                Err(error) if error.kind() == ErrorKind::NotFound => missing.push(cursor.clone()),
+                Err(error) => {
+                    return Err(error)
+                        .with_context(|| format!("inspect parent directory {}", cursor.display()));
+                }
+            }
+            let next = cursor
+                .parent()
+                .filter(|path| !path.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."));
+            ensure!(
+                next != cursor,
+                "destination has no creatable parent directory"
+            );
+            cursor = next.to_path_buf();
+        }
+
+        let mut created = Self {
+            directories: Vec::with_capacity(missing.len()),
+            retained: false,
+        };
+        for path in missing.into_iter().rev() {
+            let mut builder = DirBuilder::new();
+            builder.mode(0o755);
+            match builder.create(&path) {
+                Ok(()) => {
+                    let metadata = fs::symlink_metadata(&path).with_context(|| {
+                        format!("inspect newly created parent {}", path.display())
+                    })?;
+                    ensure!(metadata.is_dir(), "new parent is not a directory");
+                    created.directories.push(OwnedDirectory {
+                        path,
+                        device: metadata.dev(),
+                        inode: metadata.ino(),
+                    });
+                }
+                Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+                    ensure!(
+                        fs::metadata(&path).is_ok_and(|metadata| metadata.is_dir()),
+                        "destination parent appeared but is not a directory"
+                    );
+                }
+                Err(error) => {
+                    return Err(error)
+                        .with_context(|| format!("create parent directory {}", path.display()));
+                }
+            }
+        }
+        Ok(created)
+    }
+
+    fn retain(&mut self) {
+        self.retained = true;
+    }
+}
+
+impl Drop for CreatedParentDirectories {
+    fn drop(&mut self) {
+        if self.retained {
+            return;
+        }
+        for owned in self.directories.iter().rev() {
+            let still_owned = fs::symlink_metadata(&owned.path).is_ok_and(|metadata| {
+                metadata.is_dir() && metadata.dev() == owned.device && metadata.ino() == owned.inode
+            });
+            if still_owned {
+                let _ = fs::remove_dir(&owned.path);
+            }
+        }
+    }
+}
+
+fn destination_parent(destination: &Path) -> &Path {
+    destination
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
 }
 
 fn ensure_destination_is_empty(path: &Path) -> Result<()> {
@@ -118,10 +226,7 @@ struct StagingDirectory {
 impl StagingDirectory {
     fn create(destination: &Path) -> Result<Self> {
         ensure_safe_destination(destination)?;
-        let parent = destination
-            .parent()
-            .filter(|path| !path.as_os_str().is_empty())
-            .unwrap_or_else(|| Path::new("."));
+        let parent = destination_parent(destination);
         ensure!(
             parent.is_dir(),
             "destination parent does not exist or is not a directory"
@@ -545,5 +650,30 @@ const fn stage_slug(stage: SpectralStage) -> &'static str {
         SpectralStage::Attack => "attack",
         SpectralStage::Sustain => "sustain",
         SpectralStage::Release => "release",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parent_guard_removes_only_owned_empty_directories() {
+        let root = tempfile::tempdir().unwrap();
+        let missing = root.path().join("missing");
+        let nested = missing.join("nested");
+        let output = nested.join("output");
+
+        {
+            let _parents = CreatedParentDirectories::create_for(&output).unwrap();
+            assert!(nested.is_dir());
+        }
+        assert!(!missing.exists());
+
+        {
+            let _parents = CreatedParentDirectories::create_for(&output).unwrap();
+            fs::write(nested.join("caller-owned.txt"), b"keep").unwrap();
+        }
+        assert_eq!(fs::read(nested.join("caller-owned.txt")).unwrap(), b"keep");
     }
 }
