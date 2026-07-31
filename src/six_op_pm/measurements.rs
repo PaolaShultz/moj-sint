@@ -275,53 +275,51 @@ pub fn measure_listening_gate() -> Result<GateEvidence, MeasurementError> {
 
 pub fn engineering_sweep() -> Result<Vec<SweepRow>, MeasurementError> {
     let sine_table: SharedSineTable = SineTable::new().into();
-    let mut rows = Vec::with_capacity(18);
+    let mut rows = Vec::with_capacity(162);
     for (patch_id, ratio_kind) in [
         (ListeningPatch::ElectricPianoMallet, RatioKind::Rational),
         (ListeningPatch::FracturedMetal, RatioKind::Inharmonic),
     ] {
-        for (note_index, note) in NOTES.into_iter().enumerate() {
-            for (stage_index, stage) in [
-                SpectralStage::Attack,
-                SpectralStage::Sustain,
-                SpectralStage::Release,
-            ]
-            .into_iter()
-            .enumerate()
-            {
-                let modulation =
-                    [SweepLevel::Low, SweepLevel::Medium, SweepLevel::High][note_index];
-                let feedback = [SweepLevel::Low, SweepLevel::Medium, SweepLevel::High][stage_index];
-                let mut patch = patch_id.patch();
-                apply_modulation_level(&mut patch, modulation);
-                patch.feedback = match feedback {
-                    SweepLevel::Low => 0.0,
-                    SweepLevel::Medium => patch_id.patch().feedback,
-                    SweepLevel::High => 1.0,
-                };
-                let probe = render_probe(
-                    patch,
-                    SAMPLE_RATE as f32,
-                    note,
-                    ProbeStage::from(stage),
-                    2_048,
-                    sine_table.clone(),
-                )?;
-                let peak = probe
-                    .samples
-                    .iter()
-                    .map(|sample| f64::from(sample.abs()))
-                    .fold(0.0, f64::max);
-                rows.push(SweepRow {
-                    patch: patch_id,
-                    note,
-                    ratio_kind,
-                    modulation,
-                    feedback,
-                    stage,
-                    peak,
-                    finite: probe.finite && peak.is_finite(),
-                });
+        for note in NOTES {
+            for modulation in [SweepLevel::Low, SweepLevel::Medium, SweepLevel::High] {
+                for feedback in [SweepLevel::Low, SweepLevel::Medium, SweepLevel::High] {
+                    for stage in [
+                        SpectralStage::Attack,
+                        SpectralStage::Sustain,
+                        SpectralStage::Release,
+                    ] {
+                        let mut patch = patch_id.patch();
+                        apply_modulation_level(&mut patch, modulation);
+                        patch.feedback = match feedback {
+                            SweepLevel::Low => 0.0,
+                            SweepLevel::Medium => patch_id.patch().feedback,
+                            SweepLevel::High => 1.0,
+                        };
+                        let probe = render_probe(
+                            patch,
+                            SAMPLE_RATE as f32,
+                            note,
+                            ProbeStage::from(stage),
+                            2_048,
+                            sine_table.clone(),
+                        )?;
+                        let peak = probe
+                            .samples
+                            .iter()
+                            .map(|sample| f64::from(sample.abs()))
+                            .fold(0.0, f64::max);
+                        rows.push(SweepRow {
+                            patch: patch_id,
+                            note,
+                            ratio_kind,
+                            modulation,
+                            feedback,
+                            stage,
+                            peak,
+                            finite: probe.finite && peak.is_finite(),
+                        });
+                    }
+                }
             }
         }
     }
@@ -796,26 +794,35 @@ mod tests {
     #[test]
     fn engineering_sweep_covers_required_corners_with_finite_bounded_renders() {
         let rows = engineering_sweep().unwrap();
-        assert!(rows.iter().any(|row| row.note == 36));
-        assert!(rows.iter().any(|row| row.note == 60));
-        assert!(rows.iter().any(|row| row.note == 84));
-        assert!(rows.iter().any(|row| row.ratio_kind == RatioKind::Rational));
-        assert!(
-            rows.iter()
-                .any(|row| row.ratio_kind == RatioKind::Inharmonic)
-        );
-        for level in [SweepLevel::Low, SweepLevel::Medium, SweepLevel::High] {
-            assert!(rows.iter().any(|row| row.modulation == level));
-        }
-        for feedback in [SweepLevel::Low, SweepLevel::Medium, SweepLevel::High] {
-            assert!(rows.iter().any(|row| row.feedback == feedback));
-        }
-        for stage in [
-            SpectralStage::Attack,
-            SpectralStage::Sustain,
-            SpectralStage::Release,
+        assert_eq!(rows.len(), 2 * 3 * 3 * 3 * 3);
+        for (patch, ratio_kind) in [
+            (ListeningPatch::ElectricPianoMallet, RatioKind::Rational),
+            (ListeningPatch::FracturedMetal, RatioKind::Inharmonic),
         ] {
-            assert!(rows.iter().any(|row| row.stage == stage));
+            for note in [36, 60, 84] {
+                for modulation in [SweepLevel::Low, SweepLevel::Medium, SweepLevel::High] {
+                    for feedback in [SweepLevel::Low, SweepLevel::Medium, SweepLevel::High] {
+                        for stage in [
+                            SpectralStage::Attack,
+                            SpectralStage::Sustain,
+                            SpectralStage::Release,
+                        ] {
+                            assert_eq!(
+                                rows.iter()
+                                    .filter(|row| row.patch == patch
+                                        && row.ratio_kind == ratio_kind
+                                        && row.note == note
+                                        && row.modulation == modulation
+                                        && row.feedback == feedback
+                                        && row.stage == stage)
+                                    .count(),
+                                1,
+                                "missing/duplicate: {patch:?} {ratio_kind:?} note={note} modulation={modulation:?} feedback={feedback:?} stage={stage:?}"
+                            );
+                        }
+                    }
+                }
+            }
         }
         assert!(rows.iter().all(|row| row.finite && row.peak <= 1.0));
     }

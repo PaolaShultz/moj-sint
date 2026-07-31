@@ -261,7 +261,7 @@ fn amplitude_db(amplitude: f64) -> f64 {
     20.0 * amplitude.max(1.0e-12).log10()
 }
 
-pub(crate) fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
+pub fn fitted_residual_db(target: &[f32], reference: &[f32]) -> f64 {
     if target.is_empty()
         || target.len() != reference.len()
         || target
