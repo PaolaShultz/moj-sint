@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-07-30, Europe/Zagreb.
+Last updated: 2026-07-31, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -98,20 +98,27 @@ must not be presented as the musical-variation listening gate.
 
 At this checkpoint:
 
-- Version 0.2.1 adds seven honest live starting presets to the 0.2.0
+- Version 0.2.2 separates the single Moj Sint host from its synthesis model.
+  Strict preset schema 4 adds `model = "model_d"`; schemas 1–3 migrate to that
+  model in memory. `Engine` voices dispatch through a fixed model enum, leaving
+  a bounded insertion point for a later accepted model without splitting the
+  JACK/ALSA host or weakening its real-time contract.
+
+- Version 0.2.1 added seven honest live starting presets to the 0.2.0
   live-host/control boundary. The production `Engine` uses the authored Model D
-  bass, lead, or filter-articulation patch selected by strict schema 3, and
-  SHR-DAW 0.4.5 discovers all seven as its fourth backend.
+  bass, lead, or filter-articulation patch selected by schema 4's explicit
+  `model_d` identity, and SHR-DAW 0.4.7 discovers all seven as its fourth backend.
 - `moj-sint --client-name NAME --preset FILE` implements the owned live
   process: dynamic JACK with `JACK_NO_START_SERVER`, exactly `out_l`/`out_r`,
   one ALSA Sequencer `input`, fixed SPSC timing handoff, overflow counters,
   panic, and SIGINT/SIGTERM/JACK-shutdown cleanup. Connected JACK and physical
   acceptance remain intentionally untested.
-- The stable schema is version 3 with one explicit `bass`, `lead`, or
-  `filter_articulation` patch and exactly twelve CC 20–31 controls:
+- The stable schema is version 4 with explicit `model = "model_d"` and one
+  `bass`, `lead`, or `filter_articulation` patch plus exactly twelve CC 20–31 controls:
   `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`, `SPACE`,
-  and ADSR. Strict version-2 migration selects bass; version-1 migration also
-  discards only its provisional `WIDTH` and redundant envelope table.
+  and ADSR. Schema 3 and older migrate to Model D; strict version-2 migration
+  selects bass, and version-1 migration also discards only its provisional
+  `WIDTH` and redundant envelope table.
 - The factory catalog contains Full Bass, Full Lead, Full Filter Articulation,
   Matched Idealized, Matched Linear Mixer, Matched Linear Ladder, and Matched
   No Drift or Feedback. Each preserves the corresponding audition coordinates
@@ -861,8 +868,8 @@ Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
 `docs/superpowers/specs/2026-07-29-model-d-character-design.md` before changing
 files.
 
-Continue from the implemented Moj Sint 0.2.1 live Model D host and SHR-DAW
-0.4.5 integration. Seven live factory starting points preserve the exact
+Continue from the implemented Moj Sint 0.2.2 live Model D host and SHR-DAW
+0.4.7 integration. Seven live factory starting points preserve the exact
 authored Model D audition patch/diagnostic coordinates. The user has not
 rejected any modeled mechanism and wants to audition every start through the
 full control surface before deciding.

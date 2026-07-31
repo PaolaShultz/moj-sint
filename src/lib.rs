@@ -22,3 +22,4 @@ pub mod offline;
 pub mod preset;
 pub mod research;
 pub mod struck_object;
+mod synthesis_model;
