@@ -5,8 +5,8 @@ use crate::dsp::{
     oscillator::{OscillatorMethod, OscillatorMethod::IntegratedWavetable},
 };
 use crate::envelope::{Adsr, AdsrConfig};
-use crate::model_d::voice::{ModelDDiagnostics, ModelDPatch, ModelDVoice};
-use crate::preset::{MacroValues, ModelDPatchId, Preset};
+use crate::preset::{MacroValues, ModelDPatchId, Preset, SynthesisModelId};
+use crate::synthesis_model::VoiceModel;
 use thiserror::Error;
 
 const SMOOTH_SECONDS: f32 = 0.010;
@@ -58,7 +58,7 @@ pub enum EngineError {
 struct Voice {
     note: u8,
     age: u64,
-    model: ModelDVoice,
+    model: VoiceModel,
     envelope: Adsr,
     macros: [Smoother; 12],
 }
@@ -67,21 +67,10 @@ impl Voice {
     fn new(
         sample_rate: f32,
         values: MacroValues,
+        model_id: SynthesisModelId,
         patch_id: ModelDPatchId,
     ) -> Result<Self, EngineError> {
-        let mut patch = match patch_id {
-            ModelDPatchId::Bass => ModelDPatch::bass(),
-            ModelDPatchId::Lead => ModelDPatch::lead(),
-            ModelDPatchId::FilterArticulation => ModelDPatch::filter_articulation(),
-        };
-        // The public ADSR owns loudness and release. Keep the Model D loudness
-        // contour transparent so it cannot truncate the public envelope.
-        patch.loudness_contour.attack_seconds = 0.001;
-        patch.loudness_contour.decay_seconds = 0.001;
-        patch.loudness_contour.sustain_level = 1.0;
-        patch.output_gain = 1.0;
-        let model = ModelDVoice::new(sample_rate, patch, ModelDDiagnostics::full())
-            .map_err(|_| EngineError::InvalidSampleRate)?;
+        let model = VoiceModel::new(sample_rate, model_id, patch_id)?;
         let initial = MacroId::ALL.map(|id| values.get(id).get());
         let macros = initial.map(|value| {
             Smoother::new(value, sample_rate, SMOOTH_SECONDS)
@@ -116,9 +105,9 @@ impl Voice {
     #[inline]
     fn next(&mut self) -> f32 {
         let values = self.macros.each_mut().map(Smoother::advance);
-        self.model.set_live_controls(
+        self.model.set_live_controls([
             values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7],
-        );
+        ]);
         self.envelope.set_config(envelope_config(
             values[8], values[9], values[10], values[11],
         ));
@@ -176,6 +165,7 @@ impl Engine {
             voices.push(Voice::new(
                 sample_rate,
                 preset.macros,
+                preset.model,
                 preset.model_d_patch,
             )?);
         }
