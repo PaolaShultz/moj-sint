@@ -1,7 +1,8 @@
-schema_version = 3
+schema_version = 4
 name = "04 Matched Idealized"
 voices = 8
 output_gain = 0.2
+model = "model_d"
 model_d_patch = "bass"
 
 [macros]

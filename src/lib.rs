@@ -23,3 +23,4 @@ pub mod preset;
 pub mod research;
 pub mod six_op_pm;
 pub mod struck_object;
+mod synthesis_model;

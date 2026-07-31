@@ -1,17 +1,19 @@
 # Preset and Control Schema
 
-`.mojsint` is strict TOML. Schema version 3 contains only these top-level
-fields: `schema_version`, `name`, `voices`, `output_gain`, `model_d_patch`, and
-`macros`. Unknown or missing fields fail validation. Presets must be regular
-UTF-8 files, names must be non-empty, voices are 1–64, and gain/macro values
-are finite numbers in `0..=1`. `model_d_patch` is exactly `bass`, `lead`, or
-`filter_articulation`.
+`.mojsint` is strict TOML. Schema version 4 separates the Moj Sint host from
+its synthesis model. It contains only these top-level fields: `schema_version`,
+`name`, `voices`, `output_gain`, `model`, `model_d_patch`, and `macros`.
+Unknown or missing fields fail validation. Presets must be regular UTF-8 files,
+names must be non-empty, voices are 1–64, and gain/macro values are finite
+numbers in `0..=1`. The implemented model is `model_d`; its
+`model_d_patch` is exactly `bass`, `lead`, or `filter_articulation`.
 
 ```toml
-schema_version = 3
+schema_version = 4
 name = "04 Matched Idealized"
 voices = 8
 output_gain = 0.2
+model = "model_d"
 model_d_patch = "bass"
 
 [macros]
@@ -29,10 +31,10 @@ sustain = 0.7
 release = 0.59434659
 ```
 
-Schema versions 1 and 2 remain readable through strict migrations. Version 2
-becomes the bass patch. Version 1 additionally ignores its redundant
+Schema versions 1–3 remain readable through strict migrations and select
+`model_d`. Version 2 becomes the bass patch. Version 1 additionally ignores its redundant
 `envelope` table in favor of the macro ADSR values and discards provisional
-`width`. In-memory identity becomes version 3; new presets must use version 3.
+`width`. In-memory identity becomes version 4; new presets must use version 4.
 
 | CC | Macro | Model D behavior |
 | ---: | --- | --- |

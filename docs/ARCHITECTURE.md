@@ -23,7 +23,12 @@ events. The current production engine writes the same mono mix to both output
 buffers; two JACK ports and two-channel WAV metadata do not yet imply stereo
 sound generation.
 
-The production voice is the circuit-informed Model D path: three independently
+The host/model/instrument boundary is explicit: the `moj-sint` process is the
+engine, each preset selects a `SynthesisModelId`, and the preset is the
+instrument. Each voice dispatches through a fixed `VoiceModel` enum prepared
+before the callback; models do not share DSP state or add runtime allocation.
+
+The production model is the circuit-informed Model D path: three independently
 phased bandlimited VCOs, a continuously variable linear/nonlinear mixer,
 prepared four-times-oversampled ladder, filter contour, output feedback, and a
 separate live ADSR. Historical generic oscillators, character layers, and

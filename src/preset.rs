@@ -2,7 +2,7 @@ use crate::control::{MacroId, Normalized};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub const PRESET_SCHEMA_VERSION: u32 = 3;
+pub const PRESET_SCHEMA_VERSION: u32 = 4;
 pub const MAX_VOICES: usize = 64;
 
 #[derive(Debug, Error)]
@@ -27,6 +27,26 @@ pub enum ModelDPatchId {
     Bass,
     Lead,
     FilterArticulation,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SynthesisModelId {
+    ModelD,
+}
+
+impl SynthesisModelId {
+    pub const fn stable_id(self) -> &'static str {
+        match self {
+            Self::ModelD => "model_d",
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ModelD => "Model D",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -72,6 +92,7 @@ pub struct Preset {
     pub name: String,
     pub voices: usize,
     pub output_gain: f32,
+    pub model: SynthesisModelId,
     pub model_d_patch: ModelDPatchId,
     pub macros: MacroValues,
 }
@@ -86,6 +107,7 @@ impl Preset {
             .ok_or(PresetError::UnsupportedVersion(0))?;
         let preset = match version {
             PRESET_SCHEMA_VERSION => toml::from_str(source)?,
+            3 => VersionThreePreset::parse(source)?.into_current(),
             2 => VersionTwoPreset::parse(source)?.into_current(),
             1 => LegacyPreset::parse(source)?.into_current(),
             unsupported => return Err(PresetError::UnsupportedVersion(unsupported)),
@@ -107,6 +129,39 @@ impl Preset {
             return Err(PresetError::InvalidOutputGain);
         }
         Ok(self)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VersionThreePreset {
+    schema_version: u32,
+    name: String,
+    voices: usize,
+    output_gain: f32,
+    model_d_patch: ModelDPatchId,
+    macros: MacroValues,
+}
+
+impl VersionThreePreset {
+    fn parse(source: &str) -> Result<Self, PresetError> {
+        let preset: Self = toml::from_str(source)?;
+        if preset.schema_version != 3 {
+            return Err(PresetError::UnsupportedVersion(preset.schema_version));
+        }
+        Ok(preset)
+    }
+
+    fn into_current(self) -> Preset {
+        Preset {
+            schema_version: PRESET_SCHEMA_VERSION,
+            name: self.name,
+            voices: self.voices,
+            output_gain: self.output_gain,
+            model: SynthesisModelId::ModelD,
+            model_d_patch: self.model_d_patch,
+            macros: self.macros,
+        }
     }
 }
 
@@ -135,6 +190,7 @@ impl VersionTwoPreset {
             name: self.name,
             voices: self.voices,
             output_gain: self.output_gain,
+            model: SynthesisModelId::ModelD,
             model_d_patch: ModelDPatchId::Bass,
             macros: self.macros,
         }
@@ -211,6 +267,7 @@ impl LegacyPreset {
             name: self.name,
             voices: self.voices,
             output_gain: self.output_gain,
+            model: SynthesisModelId::ModelD,
             model_d_patch: ModelDPatchId::Bass,
             macros: MacroValues {
                 evolve: self.macros.evolve,
@@ -235,10 +292,11 @@ mod tests {
     use super::*;
 
     const VALID: &str = r#"
-schema_version = 3
+schema_version = 4
 name = "Reference Sine"
 voices = 8
 output_gain = 0.2
+model = "model_d"
 model_d_patch = "bass"
 
 [macros]
@@ -257,10 +315,11 @@ release = 0.4
 "#;
 
     #[test]
-    fn parses_complete_version_three_preset() {
+    fn parses_complete_version_four_preset() {
         let preset = Preset::parse(VALID).unwrap();
-        assert_eq!(preset.schema_version, 3);
+        assert_eq!(preset.schema_version, 4);
         assert_eq!(preset.voices, 8);
+        assert_eq!(preset.model, SynthesisModelId::ModelD);
         assert_eq!(preset.model_d_patch, ModelDPatchId::Bass);
         assert_eq!(preset.macros.get(MacroId::Evolve).get(), 0.5);
     }
@@ -269,7 +328,7 @@ release = 0.4
     fn rejects_unknown_fields_and_versions() {
         assert!(Preset::parse(&format!("{VALID}\nunknown = 3")).is_err());
         assert!(
-            Preset::parse(&VALID.replace("schema_version = 3", "schema_version = 99")).is_err()
+            Preset::parse(&VALID.replace("schema_version = 4", "schema_version = 99")).is_err()
         );
         assert!(Preset::parse(&VALID.replace("\"bass\"", "\"unknown\"")).is_err());
     }
@@ -284,7 +343,8 @@ release = 0.4
     #[test]
     fn migrates_strict_version_one_and_discards_only_width() {
         let legacy = VALID
-            .replace("schema_version = 3", "schema_version = 1")
+            .replace("schema_version = 4", "schema_version = 1")
+            .replace("model = \"model_d\"\n", "")
             .replace("model_d_patch = \"bass\"\n", "")
             .replace(
                 "[macros]",
@@ -292,7 +352,8 @@ release = 0.4
             )
             .replace("space = 0.5", "width = 0.9\nspace = 0.5");
         let preset = Preset::parse(&legacy).unwrap();
-        assert_eq!(preset.schema_version, 3);
+        assert_eq!(preset.schema_version, 4);
+        assert_eq!(preset.model, SynthesisModelId::ModelD);
         assert_eq!(preset.model_d_patch, ModelDPatchId::Bass);
         assert_eq!(preset.macros.space.get(), 0.5);
         assert!(Preset::parse(&format!("{legacy}\nunknown = 3")).is_err());
@@ -301,12 +362,26 @@ release = 0.4
     #[test]
     fn migrates_strict_version_two_to_the_bass_patch() {
         let version_two = VALID
-            .replace("schema_version = 3", "schema_version = 2")
+            .replace("schema_version = 4", "schema_version = 2")
+            .replace("model = \"model_d\"\n", "")
             .replace("model_d_patch = \"bass\"\n", "");
         let preset = Preset::parse(&version_two).unwrap();
-        assert_eq!(preset.schema_version, 3);
+        assert_eq!(preset.schema_version, 4);
+        assert_eq!(preset.model, SynthesisModelId::ModelD);
         assert_eq!(preset.model_d_patch, ModelDPatchId::Bass);
         assert!(Preset::parse(&format!("{version_two}\nunknown = 3")).is_err());
+    }
+
+    #[test]
+    fn migrates_strict_version_three_to_model_d() {
+        let version_three = VALID
+            .replace("schema_version = 4", "schema_version = 3")
+            .replace("model = \"model_d\"\n", "");
+        let preset = Preset::parse(&version_three).unwrap();
+        assert_eq!(preset.schema_version, 4);
+        assert_eq!(preset.model, SynthesisModelId::ModelD);
+        assert_eq!(preset.model_d_patch, ModelDPatchId::Bass);
+        assert!(Preset::parse(&format!("{version_three}\nunknown = 3")).is_err());
     }
 
     #[test]
@@ -328,6 +403,11 @@ release = 0.4
         names.sort_unstable();
         names.dedup();
         assert_eq!(names.len(), 7);
+        assert!(
+            presets
+                .iter()
+                .all(|preset| preset.model == SynthesisModelId::ModelD)
+        );
         assert_eq!(presets[0].model_d_patch, ModelDPatchId::Bass);
         assert_eq!(presets[1].model_d_patch, ModelDPatchId::Lead);
         assert_eq!(presets[2].model_d_patch, ModelDPatchId::FilterArticulation);
