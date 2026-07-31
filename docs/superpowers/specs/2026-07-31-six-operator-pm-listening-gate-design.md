@@ -129,13 +129,17 @@ An algorithm is immutable declarative data containing:
 
 - directed modulation edges between the six operators;
 - the carrier set summed to audible output;
-- at most one declared one-sample-delayed self-feedback route;
+- at most one declared one-sample-delayed feedback edge, which may be
+  self-feedback or may close a bounded multi-operator cycle;
 - a topological evaluation order for non-feedback edges; and
 - a fixed output compensation value.
 
-Validation rejects duplicate edges, invalid operator indices, carrierless
-graphs, undeclared cycles, invalid evaluation order, and feedback outside its
-declared bounds. The table may encode all 32 classic routing shapes as
+Validation removes the declared delayed feedback edge before deriving the
+evaluation order, then rejects duplicate edges, invalid operator indices,
+carrierless graphs, any remaining cycle, invalid evaluation order, and
+feedback outside its declared bounds. This represents both ordinary
+self-feedback and the documented classic graph whose delayed edge closes a
+three-operator loop. The table may encode all 32 classic routing shapes as
 connectivity facts, but the project assigns Moj Sint-owned identifiers and does
 not reproduce Yamaha diagrams or UI numbering as product presentation.
 
