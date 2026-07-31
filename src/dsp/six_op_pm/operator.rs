@@ -316,6 +316,20 @@ impl PreparedOperator {
     pub const fn is_idle(&self) -> bool {
         self.envelope.is_idle()
     }
+
+    pub(super) fn recover_phase_if_non_finite(&mut self) -> bool {
+        if self.phase.is_finite() {
+            true
+        } else {
+            self.phase = self.initial_phase;
+            false
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn poison_phase_for_test(&mut self) {
+        self.phase = f32::NAN;
+    }
 }
 
 fn midi_note_hz(note: u8) -> f32 {

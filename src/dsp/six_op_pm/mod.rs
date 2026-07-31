@@ -396,6 +396,7 @@ impl SixOpVoice {
         let mut non_finite =
             !lfo_finite || !pitch_multiplier.is_finite() || pitch_multiplier <= 0.0;
         if non_finite {
+            self.pitch_envelope.reset();
             pitch_multiplier = 1.0;
         }
 
@@ -418,8 +419,10 @@ impl SixOpVoice {
                 non_finite = true;
             }
 
+            let phase_was_finite = self.operators[operator_index].recover_phase_if_non_finite();
             let output = self.operators[operator_index].sample(phase_modulation, pitch_multiplier);
-            if !output.is_finite() || !self.operators[operator_index].phase().is_finite() {
+            let phase_is_finite = self.operators[operator_index].recover_phase_if_non_finite();
+            if !phase_was_finite || !phase_is_finite || !output.is_finite() {
                 self.outputs[operator_index] = 0.0;
                 non_finite = true;
             } else {
@@ -930,6 +933,34 @@ mod tests {
         assert!(voice.non_finite_seen());
         let recovered = voice.sample();
         assert!(recovered.is_finite() && recovered.abs() <= 1.0);
+    }
+
+    #[test]
+    fn poisoned_pitch_envelope_is_silenced_latched_and_recovers_next_sample() {
+        let mut voice = SixOpVoice::new(patch(9), SAMPLE_RATE, 69, 1.0).unwrap();
+        voice.note_on();
+        render(&mut voice, 32);
+        voice.pitch_envelope.current = f64::NAN;
+
+        assert_eq!(voice.sample(), 0.0);
+        assert!(voice.non_finite_seen());
+        let recovered = voice.sample();
+        assert!(recovered.is_finite());
+        assert_ne!(recovered, 0.0);
+    }
+
+    #[test]
+    fn poisoned_operator_phase_is_silenced_latched_and_recovers_next_sample() {
+        let mut voice = SixOpVoice::new(patch(9), SAMPLE_RATE, 69, 1.0).unwrap();
+        voice.note_on();
+        render(&mut voice, 32);
+        voice.operators[0].poison_phase_for_test();
+
+        assert_eq!(voice.sample(), 0.0);
+        assert!(voice.non_finite_seen());
+        let recovered = voice.sample();
+        assert!(recovered.is_finite());
+        assert_ne!(recovered, 0.0);
     }
 
     #[test]
