@@ -3,6 +3,7 @@ pub mod harmonic_selector;
 pub mod hybrid;
 pub mod oscillator;
 pub mod research;
+pub mod six_op_pm;
 
 #[inline]
 pub fn finite_or_zero(value: f32) -> f32 {
