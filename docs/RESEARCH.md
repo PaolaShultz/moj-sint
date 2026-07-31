@@ -650,6 +650,106 @@ isolated ideal oscillator.
   practical, but nonlinear stages, tuning correction, feedback, and
   oversampling are materially more expensive than one table lookup.
 
+### 2026-07-31 clean-room-oriented six-operator PM listening gate
+
+This isolated experiment tests whether a generic six-operator
+phase-modulation machine can support both recognizable calibration categories
+and original Moj Sint developments. It is not a DX7 emulator or compatibility
+project. The source register is deliberately narrow:
+
+- John M. Chowning, “The Synthesis of Complex Audio Spectra by Means of
+  Frequency Modulation,” *Journal of the Audio Engineering Society* 21(7),
+  pp. 526–534, September 1973, published September 1, 1973,
+  [AES publication record](https://secure.aes.org/forum/pubs/journal/?elib=1954).
+  Chowning is the named author and the Audio Engineering Society is the
+  publisher. The paper supplies the public mathematical and perceptual basis;
+  the article remains an AES publication and is not project prose or code.
+- Yamaha Corporation, *DX7 Operating Manual*, official scanned edition,
+  [PDF](https://usa.yamaha.com/files/download/other_assets/9/333979/DX7E1.pdf).
+  It is an official product manual used only for high-level operator,
+  envelope, ratio, feedback, and instrument-organization facts.
+- Yamaha Corporation, *PLG100-DX Owner's Manual*, official English Yamaha
+  publication, algorithm chart pp. 28–29,
+  [PDF](https://usa.yamaha.com/files/download/other_assets/1/320951/PLG100DXE.pdf).
+  Yamaha is the corporate author and publisher; the PDF file metadata records
+  creation in 1999 and its MIDI implementation chart is dated March 20, 1998.
+  The project transcribed only the 32 source-numbered connectivity records,
+  carrier sets, feedback edges, and source numbers needed for validation.
+
+The implementation was independently authored from those cited mathematical
+and functional facts. No expressive manual content, source code, diagrams,
+factory presets, voice data, or SysEx data was reproduced in this recorded
+process, and no third-party emulator implementation was used as source. The
+project makes no affiliation, branding, file-format, SysEx, preset, or
+historical-sound compatibility claim. A separate legal review governs any
+distribution; this research record is not a legal conclusion. The
+fixed-capacity graph structures, DSP, lookup table, envelopes, patches,
+scores, renderer, reports, tests, and documentation were independently
+authored. The 32-entry catalog records source-numbered functional connectivity
+shapes; only source algorithms 1, 5, and 10 are exercised musically in this
+gate.
+
+The prepared scalar core uses six phase-modulated sine operators with
+per-operator ratio or fixed frequency, level envelope, keyboard scaling,
+velocity response, and detune. Pitch-envelope and LFO rotations, phase
+increments, envelope rates, graph order, operator state, and one shared sine
+table are prepared outside the sample loop. Ordinary graph edges consume the
+current sample's already ordered operator outputs. Each declared feedback edge
+consumes exactly the source operator's previous-sample output, including the
+source-algorithm-4 group feedback edge from operator 4 to operator 6. Tests
+cover malformed graphs, all 32 unique validated source-numbered connectivity
+shapes and fingerprints, self and group feedback, finite recovery,
+deterministic reset, and an allocation-free sample/event path.
+
+The listening inventory intentionally uses only three graphs, not 32 sounds
+and not six synthesis families. Source/manual algorithm IDs 1, 5, and 10 map
+to zero-based internal `SixOpPatch::algorithm` indices 0, 4, and 9; generated
+report fields record those internal indices:
+
+- source algorithm 1 and the `bell-strikes` score pair independently authored
+  `bell-metal` with `fractured-metal`, at one fixed pair gain of `0.25`;
+- source algorithm 5 and the `mallet-single-and-chord` score pair
+  `electric-piano-mallet` with `glass-wood`, at gain `0.23`; and
+- source algorithm 10 and the `brass-low-mid-phrase` score pair `brass-bass`
+  with `mechanical-stab`, at gain `0.20`.
+
+The presentation is dry dual-mono 48 kHz, 32-bit float audio. There is no
+post-render clipper, per-file normalization, effect, compressor, limiter,
+filter, oversampling, or mastering stage. `SixOpVoice` does contain a built-in
+emergency safety clamp; the retained renders recorded zero contacts. The
+maximum peak is `0.247308403` against the `<= 0.95` bound, maximum absolute DC
+is `0.000125243` against `<= 0.0002`, and maximum adjacent-sample jump is
+`0.238479972` against `<= 0.25`. Pair active-RMS differences are `2.806095`,
+`2.807908`, and `2.059745` dB against the `<= 3` dB bound.
+
+Automated probes at MIDI 36, 60, and 84 establish the following bounded
+engineering evidence:
+
+- harmonic pitch rows have a worst absolute error of 10 cents; their weakest
+  pitch strength is `-0.568402` dB against the `-12` dB floor, while the two
+  intentionally inharmonic sounds use a conservative nominal-note anchor rule;
+- all 18 independent 48 kHz versus eight-times-rate alias/error rows pass the
+  predeclared `-20/-20/-12` dB floors, with a tightest margin of `16.175919`
+  dB. This fitted residual is deliberately conservative: it includes transfer
+  and phase differences as well as aliasing and is not an alias-only estimate;
+- all 54 attack/sustain/release spectral rows are finite; and
+- all 162 rational/inharmonic, modulation, feedback, register, and stage sweep
+  rows are finite and unclamped.
+
+Three fresh release generations were byte-identical for every deterministic
+file; only the explicitly volatile workstation-cost report differed. The
+scalar workstation render-and-verification pass took approximately
+`1.37–1.42` seconds. This is development-machine, offline cost evidence only:
+it is not callback timing, Raspberry Pi evidence, latency or production
+polyphony evidence, and it says nothing about sound quality.
+
+The production Model D `Engine`, schema, twelve controls, live host, JACK,
+ALSA, and SHR-DAW were not modified. The automated gate is passing, but human
+listening must still decide whether each reference category reads correctly,
+whether its original partner is meaningfully different, and whether any graph
+or patch deserves further research. No graph, patch, or control mapping is
+selected by these measurements.
+
 ### 2026-07-29 Model D character implementation
 
 This isolated experiment tests causal signal-path modeling rather than

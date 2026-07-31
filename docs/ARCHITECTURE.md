@@ -36,6 +36,16 @@ listening labs remain research evidence but are not reached by `Engine`.
 The production render is dual-mono; its two host ports do not claim stereo
 generation.
 
+The clean-room-oriented six-operator PM implementation is another isolated
+research branch. It was independently authored from the cited mathematical
+and functional facts; no expressive manual content, code, diagrams, presets,
+voice data, or SysEx data was reproduced in the recorded process. Separate
+legal review governs distribution. `dsp::six_op_pm` owns the fixed-capacity
+graph and prepared sample state; `six_op_pm` owns only its listening inventory,
+fixed event scheduler, renderer, and measurements. Neither module is reachable
+from `Engine`, preset schemas, production controls, `host`, JACK, ALSA, or
+SHR-DAW.
+
 ## Production control and polyphony contract
 
 SHR-DAW exposes exactly twelve continuous synth controls. Moj Sint implements
@@ -73,6 +83,13 @@ possible product result; eight has no special status and is not required.
   phase selector, and the parallel character layer. Frequency changes prepare
   phase increments, rotations, and note-tracked filter coefficients outside the
   sample loop.
+- `dsp::six_op_pm`: independently authored, fixed-capacity six-operator PM
+  graph preparation and voice state. It validates 32 source-numbered
+  connectivity shapes and carrier masks, prepares graph order, shared sine
+  table, envelopes, operator increments/scaling, pitch envelope, and LFO, then
+  renders through an allocation-free sample path. Declared feedback always
+  uses the source operator's previous-sample output; this includes source
+  algorithm 4's group feedback edge from operator 4 to operator 6.
 - `envelope`: validated, sample-rate-aware ADSR state machine.
 - `preset`: strict, versioned `.mojsint` TOML parsing and validation.
 - `engine`: timestamped note/macro/panic events, fixed voice storage, voice
@@ -96,6 +113,11 @@ possible product result; eight has no special status and is not required.
 - `research`: non-real-time rendering, loudness matching, spectral and spatial
   measurements, conservative high-rate residual comparison, and deterministic
   hashing for the disposable sources.
+- `six_op_pm`: the isolated six-patch listening inventory, fixed four-slot
+  event scheduler, dry dual-mono renderer, and non-real-time `measurements`
+  submodule. The gate uses only source algorithms 1, 5, and 10, one shared
+  score per pair, and fixed pair gains `0.25`, `0.23`, and `0.20`; it does not
+  expose the 32-shape catalog as 32 listening variations.
 - `dsp::hybrid`: three isolated, fixed-state, allocation-free complete voice
   topologies. Each combines multiple source, nonlinear, resonant, register,
   and spatial mechanisms and emits genuine stereo. These voices are not
@@ -132,6 +154,15 @@ channels. Construction prepares phase rotations, filter coefficients, delay
 bounds, and fixed state; every sample path is allocation-free and bounded. The
 binary performs file I/O and timing outside the sample path and is not a live
 host.
+
+The separate `six-op-pm-lab` binary is the only six-operator file-I/O and
+workstation-timing boundary. It validates the complete gate before publishing
+six 48 kHz, 32-bit-float dry dual-mono WAVs plus deterministic reports. It
+refuses an existing non-empty destination and applies no post-render clipper,
+normalization, effects, limiting, filtering, or mastering. `SixOpVoice` retains
+an emergency safety clamp; accepted renders recorded zero contacts. The lab's
+scalar offline timing is not live-callback, Raspberry Pi, latency, polyphony,
+or sound-quality evidence.
 
 The separate `hybrid-sound-lab` binary renders twelve complete-voice files:
 three structurally different families crossed with single-note, held-chord,
@@ -170,6 +201,10 @@ batch with ten one-to-three-mechanism hypotheses. Automated loudness-floor,
 tone/pitch retention, ablation, event, mono, DC, ceiling, residual, and
 determinism checks pass, but none establishes perceived power, distinction, or
 musical value. Digital level is not acoustic SPL.
+The clean-room-oriented six-operator PM gate now passes its finite, level, DC,
+jump, pair-RMS, pitch, spectral, alias/error, sweep, and determinism bounds. It
+still selects no graph, patch, preset, or control mapping: human listening of
+the three exact reference/original pairs is the next research acceptance gate.
 The future typed micro-machine graph is specified in
 `MICRO_MACHINE_ROUTING.md`, but extraction starts only after listening reveals
 which nodes and connections deserve reuse. Selection and mapping of the final
