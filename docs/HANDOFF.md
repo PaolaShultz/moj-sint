@@ -907,30 +907,35 @@ musical usefulness. The next research gate is human listening of the three
 exact pairs in order; retain or integrate nothing unless the user explicitly
 selects it afterward.
 
-The following full-suite verification snapshot predates the final-review
-evidence and publication corrections. It is historical context only; the root
-final run must replace it before a current full-verification claim:
+Final six-operator verification on 2026-07-31 established:
 
-- `cargo fmt --check` and `git diff --check`: exit 0;
-- `cargo test --all-targets --all-features`: 174 library tests and 27
-  integration tests passed with zero failures;
-- `cargo clippy --all-targets --all-features -- -D warnings`: exit 0;
-- `cargo build --release`: exit 0;
-- `cargo audit`: 35 locked dependencies scanned with no vulnerabilities;
-- `cargo deny check`: advisories, bans, licenses, and sources passed, retaining
-  only the accepted `winnow` 0.7/1.0 duplicate warning through `toml`;
-- `cargo check --target aarch64-unknown-linux-gnu --all-targets
-  --all-features`: exit 0, compile evidence only;
-- two fresh release generations matched each other and the installed artifact
-  byte-for-byte for all 16 deterministic files, excluding only
-  `workstation-cost.txt`. The current regenerated deterministic set's sorted
-  filename/SHA-256 manifest hash is
-  `7c06279f09125bd7918bcb83aa81b90fc209272cd6392eed3b928fb24c22280e`;
-- each batch contains exactly 17 files, including exactly seven WAVs; and
-- artifact hygiene found zero tracked artifact files and no staging/backup
-  residue.
+- `cargo fmt --check` and `git diff --check` passed;
+- `cargo test --all-targets --all-features` passed all 301 tests with zero
+  failures in 266.37 seconds;
+- `cargo clippy --all-targets --all-features -- -D warnings` passed with no
+  warnings;
+- `cargo build --release` passed;
+- `cargo audit` scanned 43 dependencies and found no vulnerabilities;
+- all `cargo deny check` categories passed, retaining only the accepted
+  duplicate warning for `winnow` 0.7.15 and 1.0.4;
+- plain `cargo check --target aarch64-unknown-linux-gnu` failed in `alsa-sys`
+  because the target pkg-config/sysroot was absent. Retrying with
+  `PKG_CONFIG_ALLOW_CROSS=1` checked `moj-sint`, but this is Rust compile-only
+  evidence using host pkg-config metadata, not target sysroot, target-link,
+  runtime, callback, or Raspberry Pi evidence;
+- two fresh release renders each contained the exact 15-file inventory and
+  were byte-identical except for `workstation-cost.txt`. All twelve decoded WAV
+  copies were stereo 48 kHz, 32-bit IEEE float, finite, and exact dual-mono;
+  every recomputed FNV sample hash matched `hashes.tsv`;
+- the canonical ignored batch contained the same exact 15-file inventory and
+  matched the fresh deterministic files byte-for-byte, differing only in the
+  volatile workstation-cost report; and
+- no artifact file was tracked, no staging residue remained, and Git status
+  was clean.
 
-Human listening must still decide whether the full path sounds like one
+These results close the automated engineering gate, not the musical one.
+Human listening of the three exact six-operator pairs remains open. Separately,
+Model D listening must still decide whether the full path sounds like one
 coherent instrument, whether three-oscillator movement stays useful rather
 than chorused, whether mixer and ladder nonlinearities add proportionate
 character, and whether the filter retains body under articulation/resonance.
