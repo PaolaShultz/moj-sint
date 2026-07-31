@@ -4,13 +4,19 @@ use moj_sint::six_op_pm::{
     AliasRow, EvidenceStatus, GateEvidence, ListeningPatch, ListeningRole, Render, SpectralRow,
     SpectralStage, measure_listening_gate, render,
 };
+use std::ffi::OsString;
 use std::fmt::Write as _;
-use std::fs;
+use std::fs::{self, DirBuilder};
+use std::io::{ErrorKind, Write as _};
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const SAMPLE_RATE: u32 = 48_000;
+static STAGING_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 fn main() -> ExitCode {
     match parse_command().and_then(|output| render_gate(&output)) {
@@ -32,11 +38,15 @@ fn parse_command() -> Result<PathBuf> {
     {
         bail!("Usage: six-op-pm-lab render <output-directory>");
     }
-    Ok(PathBuf::from(output.expect("output presence was checked")))
+    let output = PathBuf::from(output.expect("output presence was checked"));
+    ensure_safe_destination(&output)?;
+    Ok(output)
 }
 
 fn render_gate(output_directory: &Path) -> Result<()> {
     ensure_destination_is_empty(output_directory)?;
+    println!("verifying six-operator PM listening gate before publication");
+    std::io::stdout().flush()?;
 
     let started = Instant::now();
     let renders = ListeningPatch::ALL
@@ -47,18 +57,22 @@ fn render_gate(output_directory: &Path) -> Result<()> {
     verify_in_memory(&renders, &evidence)?;
     let reports = Reports::new(&renders, &evidence)?;
     let elapsed = started.elapsed();
+    let workstation_cost = workstation_cost(elapsed);
 
-    fs::create_dir_all(output_directory)
-        .with_context(|| format!("create {}", output_directory.display()))?;
+    let staging = StagingDirectory::create(output_directory)?;
     for (patch, rendered) in ListeningPatch::ALL.into_iter().zip(&renders) {
         write_wav(
-            &output_directory.join(patch.filename()),
+            &staging.path().join(patch.filename()),
             &rendered.samples,
             rendered.format.sample_rate,
         )?;
     }
-    reports.write(output_directory)?;
-    write_workstation_cost(output_directory, elapsed)?;
+    reports.write(staging.path())?;
+    fs::write(
+        staging.path().join("workstation-cost.txt"),
+        workstation_cost,
+    )?;
+    staging.publish(output_directory)?;
     println!(
         "wrote six-operator PM listening gate to {}",
         output_directory.display()
@@ -67,6 +81,7 @@ fn render_gate(output_directory: &Path) -> Result<()> {
 }
 
 fn ensure_destination_is_empty(path: &Path) -> Result<()> {
+    ensure_safe_destination(path)?;
     if !path.exists() {
         return Ok(());
     }
@@ -76,6 +91,97 @@ fn ensure_destination_is_empty(path: &Path) -> Result<()> {
         "destination exists and is not empty"
     );
     Ok(())
+}
+
+fn ensure_safe_destination(path: &Path) -> Result<()> {
+    let bytes = path.as_os_str().as_bytes();
+    let bytes = bytes
+        .iter()
+        .rposition(|byte| *byte != b'/')
+        .map_or(&[][..], |last| &bytes[..=last]);
+    let final_component = bytes
+        .iter()
+        .rposition(|byte| *byte == b'/')
+        .map_or(bytes, |separator| &bytes[separator + 1..]);
+    ensure!(
+        !final_component.is_empty() && final_component != b"." && final_component != b"..",
+        "destination must have a safe final component"
+    );
+    Ok(())
+}
+
+struct StagingDirectory {
+    path: PathBuf,
+    published: bool,
+}
+
+impl StagingDirectory {
+    fn create(destination: &Path) -> Result<Self> {
+        ensure_safe_destination(destination)?;
+        let parent = destination
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        ensure!(
+            parent.is_dir(),
+            "destination parent does not exist or is not a directory"
+        );
+        let destination_name = destination
+            .file_name()
+            .context("destination must have a safe final component")?;
+        let sequence = STAGING_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+
+        for attempt in 0..128_u8 {
+            let mut staging_name = OsString::from(".");
+            staging_name.push(destination_name);
+            staging_name.push(format!(
+                ".six-op-pm-stage-{}-{nonce}-{sequence}-{attempt}",
+                std::process::id()
+            ));
+            let path = parent.join(staging_name);
+            let mut builder = DirBuilder::new();
+            builder.mode(0o700);
+            match builder.create(&path) {
+                Ok(()) => {
+                    return Ok(Self {
+                        path,
+                        published: false,
+                    });
+                }
+                Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(error).with_context(|| {
+                        format!("create staging directory beside {}", destination.display())
+                    });
+                }
+            }
+        }
+        bail!("could not create a unique staging directory")
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn publish(mut self, destination: &Path) -> Result<()> {
+        ensure_destination_is_empty(destination)?;
+        fs::rename(&self.path, destination)
+            .with_context(|| format!("publish listening gate to {}", destination.display()))?;
+        self.published = true;
+        Ok(())
+    }
+}
+
+impl Drop for StagingDirectory {
+    fn drop(&mut self) {
+        if !self.published {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
 }
 
 fn verify_in_memory(renders: &[Render], evidence: &GateEvidence) -> Result<()> {
@@ -392,13 +498,11 @@ fn write_wav(path: &Path, samples: &[f32], sample_rate: u32) -> Result<()> {
     Ok(())
 }
 
-fn write_workstation_cost(output: &Path, elapsed: Duration) -> Result<()> {
-    let contents = format!(
+fn workstation_cost(elapsed: Duration) -> String {
+    format!(
         "scope=isolated_scalar_offline_render_and_measurement\nverification_elapsed_seconds={:.6}\nlimitation=volatile workstation development evidence; not callback timing, Raspberry Pi evidence, production latency, polyphony, or sound-quality evidence\n",
         elapsed.as_secs_f64()
-    );
-    fs::write(output.join("workstation-cost.txt"), contents)?;
-    Ok(())
+    )
 }
 
 const fn patch_slug(patch: ListeningPatch) -> &'static str {
