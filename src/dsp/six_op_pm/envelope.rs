@@ -59,9 +59,9 @@ enum Stage {
 pub struct Envelope {
     spec: EnvelopeSpec,
     sample_counts: [u32; STAGE_COUNT],
-    current: f32,
-    target: f32,
-    step: f32,
+    current: f64,
+    target: f64,
+    step: f64,
     remaining: u32,
     stage: Stage,
 }
@@ -91,7 +91,7 @@ impl Envelope {
             *sample_count = rounded as u32;
         }
 
-        let initial = spec.levels[3];
+        let initial = f64::from(spec.levels[3]);
         Ok(Self {
             spec,
             sample_counts,
@@ -123,11 +123,11 @@ impl Envelope {
                 self.complete_stage();
             }
         }
-        self.current * self.current
+        (self.current * self.current) as f32
     }
 
     pub const fn level(&self) -> f32 {
-        self.current
+        self.current as f32
     }
 
     pub const fn is_idle(&self) -> bool {
@@ -135,7 +135,7 @@ impl Envelope {
     }
 
     pub fn reset(&mut self) {
-        let initial = self.spec.levels[3];
+        let initial = f64::from(self.spec.levels[3]);
         self.current = initial;
         self.target = initial;
         self.step = 0.0;
@@ -145,9 +145,9 @@ impl Envelope {
 
     fn begin(&mut self, stage: Stage, target: f32, samples: u32) {
         self.stage = stage;
-        self.target = target;
+        self.target = f64::from(target);
         self.remaining = samples;
-        self.step = (target - self.current) / samples as f32;
+        self.step = (self.target - self.current) / f64::from(samples);
     }
 
     fn complete_stage(&mut self) {
@@ -265,5 +265,23 @@ mod tests {
 
         assert_eq!(envelope.level(), 0.1);
         assert!(envelope.is_idle());
+    }
+
+    #[test]
+    fn long_stage_retains_measurable_linear_progress() {
+        let spec = EnvelopeSpec::new([0.001, 1_000.0, 0.001, 0.001], [1.0, 0.8, 0.5, 0.0]).unwrap();
+        let mut envelope = Envelope::new(spec, 48_000.0).unwrap();
+        envelope.note_on();
+        for _ in 0..48 {
+            envelope.advance();
+        }
+        assert_eq!(envelope.level(), 1.0);
+
+        for _ in 0..1_000 {
+            envelope.advance();
+        }
+        let expected = 1.0 + (0.8 - 1.0) * 1_000.0 / 48_000_000.0;
+        assert!(envelope.level() < 1.0);
+        assert_close(envelope.level(), expected);
     }
 }

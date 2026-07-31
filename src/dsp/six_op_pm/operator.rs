@@ -6,6 +6,7 @@ use super::envelope::{Envelope, EnvelopeError, EnvelopeSpec};
 
 pub const SINE_TABLE_SIZE: usize = 4_096;
 pub type SharedSineTable = Arc<[f32; SINE_TABLE_SIZE]>;
+const MAX_PITCH_MULTIPLIER: f32 = 16.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FrequencyMode {
@@ -162,8 +163,9 @@ impl SineTable {
             return 0.0;
         }
         let position = cycles.rem_euclid(1.0) * SINE_TABLE_SIZE as f32;
-        let index = position as usize;
-        let fraction = position - index as f32;
+        let base_index = position as usize;
+        let index = base_index & (SINE_TABLE_SIZE - 1);
+        let fraction = position - base_index as f32;
         let next = (index + 1) & (SINE_TABLE_SIZE - 1);
         table[index] + (table[next] - table[index]) * fraction
     }
@@ -235,7 +237,12 @@ impl PreparedOperator {
         };
         let frequency_hz = base_frequency * 2.0_f32.powf(spec.detune_cents / 1_200.0);
         let increment = frequency_hz / sample_rate;
-        if !frequency_hz.is_finite() || !increment.is_finite() {
+        if !frequency_hz.is_finite()
+            || frequency_hz <= 0.0
+            || !increment.is_finite()
+            || increment <= 0.0
+            || increment > f32::MAX / MAX_PITCH_MULTIPLIER
+        {
             return Err(OperatorError::InvalidPreparedFrequency);
         }
 
@@ -266,7 +273,7 @@ impl PreparedOperator {
             0.0
         };
         let pitch_multiplier = if pitch_multiplier.is_finite() {
-            pitch_multiplier.clamp(0.0, 16.0)
+            pitch_multiplier.clamp(0.0, MAX_PITCH_MULTIPLIER)
         } else {
             0.0
         };
@@ -557,6 +564,17 @@ mod tests {
     }
 
     #[test]
+    fn interpolated_sine_wraps_tiny_negative_cycles_without_panicking() {
+        let table = SineTable::new();
+        for cycles in [-1.0e-8, -f32::from_bits(1)] {
+            let actual = SineTable::lookup(&table, cycles);
+            assert!(actual.is_finite());
+            assert_close(actual, (cycles * std::f32::consts::TAU).sin(), 1.0e-6);
+            assert_eq!(actual, SineTable::lookup(&table, cycles + 1.0));
+        }
+    }
+
+    #[test]
     fn sampling_is_bounded_resettable_and_allocation_free() {
         let table = SineTable::new();
         let mut operator =
@@ -569,7 +587,11 @@ mod tests {
         operator.note_on();
         assert_no_alloc(|| {
             for index in 0..48_000 {
-                let modulation = (index % 101) as f32 * 0.001 - 0.05;
+                let modulation = match index {
+                    0 => -1.0e-8,
+                    1 => -f32::from_bits(1),
+                    _ => (index % 101) as f32 * 0.001 - 0.05,
+                };
                 let sample = operator.sample(modulation, 1.01);
                 assert!(sample.is_finite() && sample.abs() <= 1.0);
             }
@@ -580,5 +602,62 @@ mod tests {
         assert_eq!(operator.sample(0.125, 1.0), first);
         assert!(operator.sample(f32::NAN, f32::INFINITY).is_finite());
         operator.note_off();
+    }
+
+    #[test]
+    fn zero_phase_increment_is_rejected_before_sampling() {
+        let envelope = EnvelopeSpec::new([f32::MIN_POSITIVE; 4], [1.0, 1.0, 1.0, 0.0]).unwrap();
+        let spec = OperatorSpec::new(
+            FrequencyMode::fixed(f32::MIN_POSITIVE).unwrap(),
+            1.0,
+            envelope,
+            0.0,
+            KeyboardScaling::new(69, 0.0, 0.0).unwrap(),
+            0.0,
+        )
+        .unwrap();
+
+        match PreparedOperator::new(spec, f32::MAX, 69, 1.0, SineTable::new()) {
+            Err(OperatorError::InvalidPreparedFrequency) => {}
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(mut operator) => {
+                operator.note_on();
+                operator.sample(0.0, 16.0);
+                assert!(
+                    operator.phase() > 0.0,
+                    "accepted operator has zero increment"
+                );
+                panic!("zero phase increment was accepted");
+            }
+        }
+    }
+
+    #[test]
+    fn pitch_multiplier_overflow_is_rejected_before_sampling() {
+        let sample_rate = 9.0e-34;
+        let envelope = EnvelopeSpec::new([2.0 / sample_rate; 4], [1.0, 1.0, 1.0, 0.0]).unwrap();
+        let spec = OperatorSpec::new(
+            FrequencyMode::fixed(20_000.0).unwrap(),
+            1.0,
+            envelope,
+            0.0,
+            KeyboardScaling::new(69, 0.0, 0.0).unwrap(),
+            0.0,
+        )
+        .unwrap();
+
+        match PreparedOperator::new(spec, sample_rate, 69, 1.0, SineTable::new()) {
+            Err(OperatorError::InvalidPreparedFrequency) => {}
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(mut operator) => {
+                operator.note_on();
+                operator.sample(0.0, 16.0);
+                assert!(
+                    operator.phase().is_finite(),
+                    "accepted operator overflows at the maximum pitch multiplier"
+                );
+                panic!("overflowing phase increment was accepted");
+            }
+        }
     }
 }
