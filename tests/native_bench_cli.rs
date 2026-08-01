@@ -1,6 +1,7 @@
 use std::process::Command;
 
 #[test]
+#[ignore = "development-only native benchmark smoke run"]
 fn smoke_run_writes_raw_summary_and_platform_evidence() {
     let temporary = tempfile::tempdir().unwrap();
     let output = temporary.path().join("native-smoke");

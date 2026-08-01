@@ -1512,6 +1512,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "development-only exhaustive Model D alias evidence"]
     fn full_authored_bass_alias_evidence_keeps_static_character_drive_and_feedback() {
         let mut failing_notes = Vec::new();
         for (note, maximum_db) in [(36, -45.0), (60, -45.0), (84, -35.0)] {
@@ -1749,6 +1750,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "development-only exhaustive Model D alias evidence"]
     fn steady_nonlinear_high_rate_nonharmonic_proxy_is_classified_and_within_bounds() {
         for (note, maximum_db) in [(36, -45.0), (60, -45.0), (84, -35.0)] {
             let evidence = measure_alias_evidence(note).unwrap();

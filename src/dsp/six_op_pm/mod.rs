@@ -304,6 +304,14 @@ pub struct SixOpVoice {
     lfo_rotation_cosine: f32,
     lfo_pitch_depth_ratio: f32,
     output_gain: f32,
+    live_index_scale: f32,
+    live_ratio_spread: f32,
+    live_feedback_scale: f32,
+    live_decay_color: f32,
+    live_balance: f32,
+    live_key_scale: f32,
+    live_velocity_scale: f32,
+    live_motion_scale: f32,
     non_finite_seen: bool,
     clamp_contacts: u64,
 }
@@ -392,6 +400,14 @@ impl SixOpVoice {
             lfo_rotation_cosine,
             lfo_pitch_depth_ratio,
             output_gain: patch.output_gain,
+            live_index_scale: 1.0,
+            live_ratio_spread: 0.0,
+            live_feedback_scale: 1.0,
+            live_decay_color: 0.0,
+            live_balance: 0.0,
+            live_key_scale: 1.0,
+            live_velocity_scale: 1.0,
+            live_motion_scale: 1.0,
             non_finite_seen: false,
             clamp_contacts: 0,
         })
@@ -409,7 +425,9 @@ impl SixOpVoice {
         let lfo_multiplier_finite = lfo_multiplier.is_finite() && lfo_multiplier > 0.0;
         let mut non_finite = !pitch_envelope_finite || !lfo_finite || !lfo_multiplier_finite;
         let pitch_multiplier = if pitch_envelope_finite && lfo_multiplier_finite {
-            pitch_envelope * lfo_multiplier
+            let envelope_motion = 1.0 + (pitch_envelope - 1.0) * self.live_motion_scale;
+            let lfo_motion = 1.0 + (lfo_multiplier - 1.0) * self.live_motion_scale;
+            envelope_motion * lfo_motion
         } else {
             1.0
         };
@@ -425,20 +443,38 @@ impl SixOpVoice {
                 }
             }
             if operator == feedback.target {
-                phase_modulation +=
-                    self.feedback_sample * self.feedback_amount * MAX_FEEDBACK_CYCLES;
+                phase_modulation += self.feedback_sample
+                    * self.feedback_amount
+                    * self.live_feedback_scale
+                    * MAX_FEEDBACK_CYCLES;
             }
             if !phase_modulation.is_finite() {
                 phase_modulation = 0.0;
                 non_finite = true;
             }
 
-            let (output, operator_finite) =
-                self.operators[operator_index].sample_checked(phase_modulation, pitch_multiplier);
+            let ratio_offsets = [-0.5_f32, 0.75, -0.25, 1.0, -0.75, 0.5];
+            let operator_pitch =
+                pitch_multiplier * (1.0 + self.live_ratio_spread * ratio_offsets[operator_index]);
+            let (mut output, operator_finite) =
+                self.operators[operator_index].sample_checked(phase_modulation, operator_pitch);
             if !operator_finite {
                 self.outputs[operator_index] = 0.0;
                 non_finite = true;
             } else {
+                let carrier = self.algorithm.is_carrier(operator + 1) == Some(true);
+                if carrier {
+                    output *= 1.0 - self.live_balance * 0.30;
+                } else {
+                    let envelope_level = self.operators[operator_index].envelope_level();
+                    let decay_color = (1.0 + self.live_decay_color * (1.0 - envelope_level) * 0.75)
+                        .clamp(0.25, 1.75);
+                    output *= self.live_index_scale
+                        * (1.0 + self.live_balance * 0.50)
+                        * decay_color
+                        * self.live_key_scale
+                        * self.live_velocity_scale;
+                }
                 self.outputs[operator_index] = output;
             }
         }
@@ -478,6 +514,30 @@ impl SixOpVoice {
         self.feedback_sample = 0.0;
         self.lfo_sine = 0.0;
         self.lfo_cosine = 1.0;
+    }
+
+    /// Applies the eight production timbral controls as bounded, continuous
+    /// modifiers around the authored patch. Neutral coordinates reproduce the
+    /// original prepared voice exactly.
+    pub fn set_live_controls(&mut self, values: [f32; 8], note: u8, velocity: f32) {
+        let values = values.map(|value| {
+            if value.is_finite() {
+                value.clamp(0.0, 1.0)
+            } else {
+                0.5
+            }
+        });
+        self.live_index_scale = 0.25 + values[0] * 1.5;
+        self.live_ratio_spread = (values[1] * 2.0 - 1.0) * 0.08;
+        self.live_feedback_scale = values[2] * 2.0;
+        self.live_decay_color = values[3] * 2.0 - 1.0;
+        self.live_balance = values[4] * 2.0 - 1.0;
+        let key_position = (f32::from(note.min(127)) - 60.0) / 60.0;
+        self.live_key_scale = (1.0 + (values[5] * 2.0 - 1.0) * key_position * 0.5).clamp(0.5, 1.5);
+        let velocity_position = velocity.clamp(0.0, 1.0) - 0.5;
+        self.live_velocity_scale =
+            (1.0 + (values[6] * 2.0 - 1.0) * velocity_position).clamp(0.5, 1.5);
+        self.live_motion_scale = values[7] * 2.0;
     }
 
     pub fn note_off(&mut self) {

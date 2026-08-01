@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-07-31, Europe/Zagreb.
+Last updated: 2026-08-01, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -98,39 +98,47 @@ must not be presented as the musical-variation listening gate.
 
 At this checkpoint:
 
-- Version 0.2.2 separates the single Moj Sint host from its synthesis model.
-  Strict preset schema 4 adds `model = "model_d"`; schemas 1–3 migrate to that
-  model in memory. `Engine` voices dispatch through a fixed model enum, leaving
-  a bounded insertion point for a later accepted model without splitting the
-  JACK/ALSA host or weakening its real-time contract.
-
-- Version 0.2.1 added seven honest live starting presets to the 0.2.0
-  live-host/control boundary. The production `Engine` uses the authored Model D
-  bass, lead, or filter-articulation patch selected by schema 4's explicit
-  `model_d` identity, and SHR-DAW 0.4.7 discovers all seven as its fourth backend.
+- The single Moj Sint host now exposes two synthesis models without splitting
+  JACK/ALSA ownership. `Engine` voices dispatch through a fixed model enum:
+  Model D has seven authored starts and Six-Op PM has six. Strict schema 5
+  gives each model its own patch field and exact macro table; schemas 1–4
+  migrate to Model D in memory.
+- The live-host/control boundary still owns one process, one ALSA input, two
+  JACK outputs, bounded event timing, shared voice stealing, one outer ADSR,
+  and the same twelve physical CC positions. The loaded model supplies the
+  first eight control meanings; CC 28–31 remain ADSR.
 - `moj-sint --client-name NAME --preset FILE` implements the owned live
   process: dynamic JACK with `JACK_NO_START_SERVER`, exactly `out_l`/`out_r`,
   one ALSA Sequencer `input`, fixed SPSC timing handoff, overflow counters,
   panic, and SIGINT/SIGTERM/JACK-shutdown cleanup. Connected JACK and physical
   acceptance remain intentionally untested.
-- The stable schema is version 4 with explicit `model = "model_d"` and one
-  `bass`, `lead`, or `filter_articulation` patch plus exactly twelve CC 20–31 controls:
-  `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`, `SPACE`,
-  and ADSR. Schema 3 and older migrate to Model D; strict version-2 migration
-  selects bass, and version-1 migration also discards only its provisional
-  `WIDTH` and redundant envelope table.
-- The factory catalog contains Full Bass, Full Lead, Full Filter Articulation,
+- The stable schema is version 5. Model D uses `model_d_patch` and its original
+  eight timbral macros; Six-Op PM uses `six_op_patch` plus `index`, `ratio`,
+  `feedback`, `operator_decay`, `balance`, `key_scale`, `velocity`, and
+  `motion`. Strict version-2 migration selects Model D bass, and version-1
+  migration also discards only its provisional `WIDTH` and redundant envelope
+  table.
+- The Model D catalog contains Full Bass, Full Lead, Full Filter Articulation,
   Matched Idealized, Matched Linear Mixer, Matched Linear Ladder, and Matched
   No Drift or Feedback. Each preserves the corresponding audition coordinates
-  while retaining all twelve live controls. They are one instrument's starting
-  points, not seven invented sound families or rejection verdicts.
+  while retaining all twelve live controls. The Six-Op PM catalog contains
+  Bell Metal, Fractured Metal, Electric Piano Mallet, Glass Wood, Brass Bass,
+  and Mechanical Stab. These are starts within their models, not separate
+  engines.
+- The 2026-08-01 locked production gate used Rust 1.97.1 on AArch64. Focused
+  schema, live Six-Op, allocation, and 13-start engine tests passed. The full
+  all-target/all-feature normal suite passed 273 tests with zero failures and
+  34 explicitly ignored historical render/research/benchmark tests; the main
+  library harness took 128.74 seconds. Locked check, debug build, and direct
+  validation of all 13 tracked presets passed. No JACK, ALSA, MIDI, audible,
+  or physical-hardware test was run.
 - `WIDTH` was removed solely because this Model D production path is dual-mono
   and contains no width experiment. There is no hidden thirteenth control.
-- The shared project notebook lives at `/home/shome/Documents/knowledge/Moj
-  Sint/`. Tracked docs and live source remain authoritative. After material
-  decisions, update this handoff first, then the concise `01 Current State.md`
-  and `04 Next Actions And Open Questions.md` notes, and run both knowledge
-  validators.
+- The shared project notebook lives at
+  `/home/shome/Documents/knowledge/Moj-Sint/Current.md`. Tracked docs and live
+  source remain authoritative. After material decisions, update this handoff
+  first, then that concise note, validate the notebook, and rebuild the shared
+  index.
 
 - Git state, branch, and artifact existence must be inspected live rather than
   inferred from this handoff.
@@ -162,16 +170,16 @@ At this checkpoint:
   from the intended instrument; no family is selected and none is routed into
   `Engine` or stable macros. The reviewed 15-file batch was deleted under the
   experimental-output policy.
-- The approved clean-room-oriented six-operator PM research gate is
-  implemented and passes its automated acceptance bounds. An independently
-  authored, fixed-capacity core validates 32 source-numbered connectivity
-  records, but the listening gate uses only source algorithms 1, 5, and 10 as
-  three paired reference/original sounds with shared scores and fixed pair
-  gains. No expressive manual content, code, diagrams, factory presets, voice
-  data, or SysEx data was reproduced in this recorded process. It makes no
-  compatibility or historical-emulation claim; separate legal review governs
-  distribution. The gate remains isolated from production `Engine`, schema,
-  twelve controls, host, JACK/ALSA, and SHR-DAW. Human listening is open.
+- The approved clean-room-oriented six-operator PM gate passed its automated
+  acceptance bounds. Its independently authored fixed-capacity core validates
+  32 source-numbered connectivity records; six selected sounds using source
+  algorithms 1, 5, and 10 are now factory starts in the second production
+  model. A bounded live adapter reaches them through the existing `Engine`,
+  host, JACK/ALSA, and SHR-DAW ownership path with model-specific controls.
+  No expressive manual content, code, diagrams, voice data, or SysEx data was
+  reproduced in the recorded process. It makes no compatibility or historical
+  emulation claim; separate legal review governs distribution. Live musical
+  acceptance and native callback headroom remain open.
 - A second isolated gate now implements three complete, structurally different
   hybrid voices with genuine stereo plus single-note, held-chord,
   four-chord-progression, and explicit mono-fold auditions. Automated evidence
@@ -958,54 +966,34 @@ context and should not be copied back into the new prompt:
 Continue Moj Sint in `/home/shome/p/moj-sint`. Confirm the owning repository
 and inspect live Git state before changing files.
 
-Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and
-`docs/superpowers/specs/2026-07-31-six-operator-pm-listening-gate-design.md`
-before changing files.
-
-Continue from the implemented Moj Sint 0.2.2 live Model D host and SHR-DAW
-0.4.7 integration. Seven live factory starting points preserve their authored
-Model D audition patch/diagnostic coordinates. The isolated clean-room-oriented
-six-operator PM gate also passes its automated bounds. The user has now
-authorized promoting its six experimental sounds into a second selectable Moj
-Sint model under the production-integration design and plan in
+Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and the production design and plan
+in
 `docs/superpowers/specs/2026-07-31-six-operator-pm-production-integration-design.md`
 and
 `docs/superpowers/plans/2026-07-31-six-operator-pm-production-integration.md`.
 
-The relative ignored listening path is
-`artifacts/six-operator-pm-listening-gate/`. Check its existence and contents
-live. The CLI refuses an existing non-empty destination; do not overwrite or
-delete a batch merely to regenerate it.
+Continue from the single live Moj Sint engine with two selectable synthesis
+models: Model D has seven factory starts and Six-Op PM has six. Strict schema 5
+owns model-specific patch and macro fields; schemas 1–4 migrate to Model D.
+SHR-DAW presents ENGINE -> MODEL -> PATCH in FT2 ROUTE and uses the loaded
+model's twelve labels in Playback.
 
 Do not touch connected JACK/hardware, add SIMD, claim whole-system Pi
 performance, or expand production polyphony without explicit scope and native
-evidence. Keep the production Model D `Engine`, schema, host, SHR-DAW path,
-and settled 12-control budget unchanged.
+evidence. Keep both models inside the one owned process and settled 12-control
+budget.
 ```
 
 ## Next action
 
-Listen to the six-operator PM gate as three exact pairs: bell/metal then
-fractured metal, electric-piano/mallet then glass/wood, and brass/bass then
-mechanical stab. Start at a low playback level because the float renders are
-dry and not acoustic-level calibrated. Ask only for the musical verdict:
-category recognition, whether each original partner is meaningfully distinct,
-and whether any pair deserves refinement. Automated evidence does not answer
-those questions. Do not select/integrate a graph, alter production Model D or
-the twelve controls, preserve an experimental output, or touch JACK/ALSA and
-SHR-DAW without the subsequent explicit decision.
-
-The relative ignored batch path is
-`artifacts/six-operator-pm-listening-gate/`; inspect its existence and contents
-live. If and only if it is absent or an empty directory, the exact regeneration
-command is:
-
-```bash
-cargo run --release --bin six-op-pm-lab -- render artifacts/six-operator-pm-listening-gate
-```
-
-The CLI refuses a non-empty destination. Do not delete, overwrite, or infer the
-batch state from this handoff.
+Musically test all six Six-Op PM starts through SHR-DAW at a low monitoring
+level, including every timbral control, outer ADSR, note release, voice reuse,
+panic, Model D/Six-Op model switching, and Route Apply/Cancel. Automated tests
+establish bounded deterministic software behavior but do not establish sound
+quality, native callback headroom, or hardware acceptance. The historical
+listening-render and exhaustive research tests are opt-in; they are not part of
+ordinary development unless their own renderer, measurements, or evidence
+changes.
 
 ## Executed foundation checkpoint
 

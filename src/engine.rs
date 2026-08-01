@@ -5,7 +5,7 @@ use crate::dsp::{
     oscillator::{OscillatorMethod, OscillatorMethod::IntegratedWavetable},
 };
 use crate::envelope::{Adsr, AdsrConfig};
-use crate::preset::{MacroValues, ModelDPatchId, Preset, SynthesisModelId};
+use crate::preset::{MacroValues, ModelPatchId, Preset, SynthesisModelId};
 use crate::synthesis_model::VoiceModel;
 use thiserror::Error;
 
@@ -52,6 +52,8 @@ pub enum EngineError {
     EventsOutOfOrder,
     #[error("event sample offset lies outside the output block")]
     EventOutsideBlock,
+    #[error("preset model and patch identities do not match")]
+    InvalidModelPatch,
 }
 
 #[derive(Debug)]
@@ -68,7 +70,7 @@ impl Voice {
         sample_rate: f32,
         values: MacroValues,
         model_id: SynthesisModelId,
-        patch_id: ModelDPatchId,
+        patch_id: ModelPatchId,
     ) -> Result<Self, EngineError> {
         let model = VoiceModel::new(sample_rate, model_id, patch_id)?;
         let initial = MacroId::ALL.map(|id| values.get(id).get());
@@ -166,7 +168,7 @@ impl Engine {
                 sample_rate,
                 preset.macros,
                 preset.model,
-                preset.model_d_patch,
+                preset.model_patch,
             )?);
         }
         Ok(Self {
@@ -242,6 +244,7 @@ impl Engine {
             Event::NoteOn { note, .. } | Event::NoteOff { note } => {
                 for voice in &mut self.voices {
                     if voice.note == note && !voice.envelope.is_idle() {
+                        voice.model.note_off();
                         voice.envelope.note_off();
                     }
                 }
@@ -315,7 +318,7 @@ mod tests {
         left
     }
 
-    fn factory_sources() -> [&'static str; 7] {
+    fn factory_sources() -> [&'static str; 13] {
         [
             include_str!("../presets/01-full-bass.mojsint"),
             include_str!("../presets/02-full-lead.mojsint"),
@@ -324,6 +327,12 @@ mod tests {
             include_str!("../presets/05-matched-linear-mixer.mojsint"),
             include_str!("../presets/06-matched-linear-ladder.mojsint"),
             include_str!("../presets/07-matched-no-drift-or-feedback.mojsint"),
+            include_str!("../presets/08-six-op-bell-metal.mojsint"),
+            include_str!("../presets/09-six-op-fractured-metal.mojsint"),
+            include_str!("../presets/10-six-op-electric-piano-mallet.mojsint"),
+            include_str!("../presets/11-six-op-glass-wood.mojsint"),
+            include_str!("../presets/12-six-op-brass-bass.mojsint"),
+            include_str!("../presets/13-six-op-mechanical-stab.mojsint"),
         ]
     }
 
@@ -376,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn seven_factory_starting_points_are_finite_and_pairwise_distinct() {
+    fn thirteen_factory_starting_points_are_finite_and_pairwise_distinct() {
         let renders = factory_sources().map(|source| {
             let mut preset = Preset::parse(source).unwrap();
             preset.voices = 1;

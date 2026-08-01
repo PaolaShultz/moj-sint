@@ -28,7 +28,7 @@ engine, each preset selects a `SynthesisModelId`, and the preset is the
 instrument. Each voice dispatches through a fixed `VoiceModel` enum prepared
 before the callback; models do not share DSP state or add runtime allocation.
 
-The production model is the circuit-informed Model D path: three independently
+The first production model is the circuit-informed Model D path: three independently
 phased bandlimited VCOs, a continuously variable linear/nonlinear mixer,
 prepared four-times-oversampled ladder, filter contour, output feedback, and a
 separate live ADSR. Historical generic oscillators, character layers, and
@@ -36,25 +36,26 @@ listening labs remain research evidence but are not reached by `Engine`.
 The production render is dual-mono; its two host ports do not claim stereo
 generation.
 
-The clean-room-oriented six-operator PM implementation is another isolated
-research branch. It was independently authored from the cited mathematical
-and functional facts; no expressive manual content, code, diagrams, presets,
-voice data, or SysEx data was reproduced in the recorded process. Separate
-legal review governs distribution. `dsp::six_op_pm` owns the fixed-capacity
-graph and prepared sample state; `six_op_pm` owns only its listening inventory,
-fixed event scheduler, renderer, and measurements. Neither module is reachable
-from `Engine`, preset schemas, production controls, `host`, JACK, ALSA, or
-SHR-DAW.
+The second production model is Six-Op PM. Its six independently authored
+listening patches feed a small `six_op_pm::live` adapter that retains one
+prepared sine table, selects a fixed graph and patch before rendering, and
+exposes the same preallocated `VoiceModel` boundary as Model D. The historical
+lab, scheduler, renderers, and measurement reports remain research tools; they
+are not a parallel live engine. Separate legal review still governs
+distribution of the clean-room-oriented implementation.
 
 ## Production control and polyphony contract
 
-SHR-DAW exposes exactly twelve continuous synth controls. Moj Sint implements
-eight Model D roles—`EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`,
-`DEPTH`, and `SPACE`—plus `ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`.
+SHR-DAW exposes exactly twelve continuous synth controls per model. Model D
+implements `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`,
+and `SPACE`. Six-Op PM implements `INDEX`, `RATIO`, `FEEDBACK`, `OP DECAY`,
+`BALANCE`, `KEY SCALE`, `VELOCITY`, and `MOTION`. Both append `ATTACK`,
+`DECAY`, `SUSTAIN`, and `RELEASE`.
 `WIDTH` was removed because this Model D engine has no supported width
 experiment. There is no hidden page or master-encoder takeover.
 
-The catalog preserves all seven authored Model D audition starting points:
+The catalog preserves all seven authored Model D audition starting points and
+all six accepted Six-Op PM listening starts. Model D contains
 three full bass/lead/filter-articulation patches and four matched bass
 diagnostics. They are selectable states of one modeled instrument, not separate
 synthesis families. The eight timbral controls expose oscillator
@@ -93,8 +94,8 @@ possible product result; eight has no special status and is not required.
 - `envelope`: validated, sample-rate-aware ADSR state machine.
 - `preset`: strict, versioned `.mojsint` TOML parsing and validation.
 - `engine`: timestamped note/macro/panic events, fixed voice storage, voice
-  stealing, 10 ms smoothing for every control, live ADSR, Model D macro
-  mapping, finite guards, and dual-mono block rendering.
+  stealing, 10 ms smoothing for every control, live ADSR, model dispatch,
+  finite guards, and dual-mono block rendering.
 - `host`: dynamic JACK ownership/callback, ALSA Sequencer translation,
   fixed-capacity SPSC handoff, period timing, overflow reporting, and shutdown.
 - `native_bench`: reusable native callback-simulation cases for the exact
@@ -113,11 +114,10 @@ possible product result; eight has no special status and is not required.
 - `research`: non-real-time rendering, loudness matching, spectral and spatial
   measurements, conservative high-rate residual comparison, and deterministic
   hashing for the disposable sources.
-- `six_op_pm`: the isolated six-patch listening inventory, fixed four-slot
-  event scheduler, dry dual-mono renderer, and non-real-time `measurements`
-  submodule. The gate uses only source algorithms 1, 5, and 10, one shared
-  score per pair, and fixed pair gains `0.25`, `0.23`, and `0.20`; it does not
-  expose the 32-shape catalog as 32 listening variations.
+- `six_op_pm`: the six-patch inventory, production `live` adapter, fixed
+  four-slot research scheduler, dry dual-mono renderer, and non-real-time
+  `measurements` submodule. The selected starts use source algorithms 1, 5,
+  and 10; the live adapter does not expose the 32-shape catalog as 32 choices.
 - `dsp::hybrid`: three isolated, fixed-state, allocation-free complete voice
   topologies. Each combines multiple source, nonlinear, resonant, register,
   and spatial mechanisms and emits genuine stereo. These voices are not
@@ -186,9 +186,8 @@ limitations are in `COMPOSITE_MACHINE_RESEARCH.md`.
 
 ## Deliberate deferrals
 
-The provisional macro candidates exist, but the final eight timbral names
-remain open. `SHAPE`/`COLOR` have measured routes whose human listening gate
-remains open. The selector's `EDGE`/`COUPLE` mapping was rejected and retired
+The Model D `SHAPE`/`COLOR` routes still have an open human listening gate.
+The selector's former `EDGE`/`COUPLE` mapping was rejected and retired
 from the engine. The replacement parallel-character mapping also failed human
 listening because it presented the same weak source under small treatments; it
 is not an accepted factory sound or mapping. The completed
@@ -201,14 +200,14 @@ batch with ten one-to-three-mechanism hypotheses. Automated loudness-floor,
 tone/pitch retention, ablation, event, mono, DC, ceiling, residual, and
 determinism checks pass, but none establishes perceived power, distinction, or
 musical value. Digital level is not acoustic SPL.
-The clean-room-oriented six-operator PM gate now passes its finite, level, DC,
-jump, pair-RMS, pitch, spectral, alias/error, sweep, and determinism bounds. It
-still selects no graph, patch, preset, or control mapping: human listening of
-the three exact reference/original pairs is the next research acceptance gate.
+The clean-room-oriented six-operator PM gate passed its finite, level, DC,
+jump, pair-RMS, pitch, spectral, alias/error, sweep, and determinism bounds.
+Its six authored sounds are now selectable production starts under one Six-Op
+PM model with eight bounded timbral controls. Musical acceptance in the live
+SHR/JACK path and native Pi headroom remain open; automated evidence does not
+claim either.
 The future typed micro-machine graph is specified in
 `MICRO_MACHINE_ROUTING.md`, but extraction starts only after listening reveals
-which nodes and connections deserve reuse. Selection and mapping of the final
-eight timbral roles, modulation, full control-usefulness thresholds, live
-JACK/ALSA adapters, factory presets, and Pi profiling each need their own
-measured, test-first milestone. No SIMD or architecture-specific path should
-precede profiling on the Pi.
+which nodes and connections deserve reuse. Full control-usefulness thresholds
+and Pi profiling remain measured future milestones. No SIMD or
+architecture-specific path should precede profiling on the Pi.

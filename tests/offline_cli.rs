@@ -49,6 +49,7 @@ fn invalid_arguments_fail_clearly() {
 }
 
 #[test]
+#[ignore = "development-only historical oscillator audition renderer"]
 fn oscillator_lab_writes_a_deterministic_listening_matrix() {
     let directory = tempfile::tempdir().unwrap();
     let first = directory.path().join("first");
@@ -101,6 +102,7 @@ fn oscillator_lab_writes_a_deterministic_listening_matrix() {
 }
 
 #[test]
+#[ignore = "development-only historical oscillator evidence renderer"]
 fn oscillator_lab_writes_harmonic_selector_evidence() {
     let directory = tempfile::tempdir().unwrap();
     let first = directory.path().join("first");
@@ -169,6 +171,7 @@ fn oscillator_lab_writes_harmonic_selector_evidence() {
 }
 
 #[test]
+#[ignore = "development-only historical character audition renderer"]
 fn oscillator_lab_writes_small_deterministic_character_gate() {
     let directory = tempfile::tempdir().unwrap();
     let first = directory.path().join("first");

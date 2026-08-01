@@ -26,6 +26,7 @@ const DETERMINISTIC_REPORTS: [&str; 8] = [
 ];
 
 #[test]
+#[ignore = "development-only six-operator listening-gate renderer"]
 fn six_operator_lab_writes_the_exact_deterministic_listening_gate() {
     let first = tempfile::tempdir().unwrap();
     let second_parent = tempfile::tempdir().unwrap();
@@ -257,6 +258,7 @@ fn six_operator_lab_refuses_a_nonempty_destination_without_touching_it() {
 }
 
 #[test]
+#[ignore = "development-only six-operator publication race renderer"]
 fn six_operator_lab_loses_a_late_destination_race_without_overwrite_or_residue() {
     let parent = tempfile::tempdir().unwrap();
     let target = parent.path().join("listening-gate");

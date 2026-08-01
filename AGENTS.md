@@ -18,11 +18,9 @@
   allocation checks; oscillator/nonlinear changes need aliasing measurements.
 - The live callback may not allocate/deallocate, lock, perform I/O, log, format,
   panic, spawn, or perform avoidable per-sample transcendental setup.
-- Preserve the settled physical budget of exactly twelve continuous controls:
-  eight evidence-selected timbral roles plus ADSR. The current thirteen-ID
-  code/schema is provisional; do not invent another button, mode, or
-  master-encoder takeover to retain all nine timbral candidates. Drop the least
-  useful candidate only after automated sweeps and human listening.
+- Preserve the settled physical budget of exactly twelve continuous controls
+  per synthesis model: eight model-specific timbral roles plus ADSR. Do not
+  invent another button, mode, or master-encoder takeover.
 - Follow SHR-DAW's actual live-control path. Permission to apply a value on the
   next note is an implementation option, not a product constraint; defer a
   parameter only when its safe implementation genuinely requires it.
@@ -31,8 +29,14 @@
   support it.
 - Treat scalar Rust as the baseline. Add x86_64/AArch64 specialization only
   behind measured compile-time gates.
-- Run `cargo fmt --check`, all-target tests, Clippy with warnings denied, release
-  build, audit/deny checks, and deterministic render comparison before handoff.
+- Run `cargo fmt --check`, the normal all-target test suite, Clippy with warnings
+  denied, release build, audit/deny checks, and the production deterministic
+  render comparison before a release handoff. Historical research/audition
+  renderers, exhaustive evidence matrices, and native benchmark smoke runs are
+  development-only ignored tests; run them with `cargo test --all-targets
+  --all-features -- --ignored` only when their own code, evidence, or protected
+  assumption changes, or when the user explicitly requests them. The agent
+  owns this classification and test selection.
 - Do not start/restart JACK, connect hardware, modify SHR-DAW, or make Pi
   performance/latency/polyphony/sound-quality claims without explicit scope and
   native evidence.

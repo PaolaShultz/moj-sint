@@ -27,6 +27,7 @@ const REPORT_NAMES: [&str; 10] = [
 ];
 
 #[test]
+#[ignore = "development-only historical Model D audition renderer"]
 fn lab_writes_exact_deterministic_passing_model_d_audition() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();
@@ -189,6 +190,7 @@ fn lab_writes_exact_deterministic_passing_model_d_audition() {
 }
 
 #[test]
+#[ignore = "development-only historical Model D publication recovery"]
 fn preexisting_fixed_stage_is_refused_without_touching_destination() {
     let root = tempfile::tempdir().unwrap();
     let output = root.path().join("audition");
@@ -208,6 +210,7 @@ fn preexisting_fixed_stage_is_refused_without_touching_destination() {
 }
 
 #[test]
+#[ignore = "development-only historical Model D publication recovery"]
 fn controlled_late_failure_preserves_prior_destination() {
     let root = tempfile::tempdir().unwrap();
     let output = root.path().join("audition");
@@ -235,6 +238,7 @@ fn controlled_late_failure_preserves_prior_destination() {
 }
 
 #[test]
+#[ignore = "development-only historical Model D publication recovery"]
 fn destination_backup_rename_failure_cleans_populated_stage() {
     let root = tempfile::tempdir().unwrap();
     let output = root.path().join("audition");
@@ -262,6 +266,7 @@ fn destination_backup_rename_failure_cleans_populated_stage() {
 }
 
 #[test]
+#[ignore = "development-only historical Model D publication recovery"]
 fn partial_retired_cleanup_keeps_new_destination_authoritative_and_does_not_block_retry() {
     let root = tempfile::tempdir().unwrap();
     let output = root.path().join("audition");

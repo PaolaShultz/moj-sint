@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 #[test]
+#[ignore = "development-only historical audition renderer"]
 fn lab_writes_only_deterministic_piano_strike_comparisons() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();

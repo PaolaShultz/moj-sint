@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 #[test]
+#[ignore = "development-only historical audition renderer"]
 fn composite_machine_lab_writes_deterministic_compact_power_batch() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();

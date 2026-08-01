@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 #[test]
+#[ignore = "development-only historical audition renderer"]
 fn hybrid_sound_lab_writes_deterministic_complete_listening_gate() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();

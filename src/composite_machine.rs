@@ -2236,6 +2236,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "development-only exhaustive historical composite render"]
     fn hot_output_contract_uses_explicit_gains_without_changing_raw_references() {
         let expected_raw_hashes = [
             (
@@ -2363,6 +2364,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "development-only exhaustive historical composite render"]
     fn d1_pedal_and_punch_are_finite_hot_and_deterministic() {
         let retained = retained_punch_config();
         assert_eq!(

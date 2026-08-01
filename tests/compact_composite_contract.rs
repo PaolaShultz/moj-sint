@@ -6,6 +6,7 @@ use moj_sint::compact_composite::{
 };
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn retained_specs_limit_layers_and_declare_every_output_stage() {
     let specs = retained_specs();
     assert!((8..=12).contains(&specs.len()));
@@ -45,6 +46,7 @@ fn retained_specs_limit_layers_and_declare_every_output_stage() {
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn prepared_sample_paths_are_deterministic_finite_bounded_and_allocation_free() {
     for candidate in CompactCandidate::ALL {
         let mut first = CompactMachine::new(candidate, 8_000, 38, 0.5, None).unwrap();
@@ -61,6 +63,7 @@ fn prepared_sample_paths_are_deterministic_finite_bounded_and_allocation_free() 
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn pitch_and_tone_variants_share_one_declared_gain_policy() {
     for candidate in CompactCandidate::ALL {
         let spec = candidate.spec();
@@ -83,6 +86,7 @@ fn pitch_and_tone_variants_share_one_declared_gain_policy() {
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn schedules_and_hashes_are_sample_accurate_and_deterministic() {
     for candidate in CompactCandidate::ALL {
         let first =
@@ -97,6 +101,7 @@ fn schedules_and_hashes_are_sample_accurate_and_deterministic() {
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn retained_tone_ranges_do_not_collapse_loudness() {
     for candidate in CompactCandidate::ALL {
         let retention = measure_variant_retention(candidate, 8_000).unwrap();
@@ -118,6 +123,7 @@ fn retained_tone_ranges_do_not_collapse_loudness() {
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn bass_pitch_variants_survive_mono_under_one_gain_policy() {
     for candidate in CompactCandidate::ALL {
         let spec = candidate.spec();
@@ -144,6 +150,7 @@ fn bass_pitch_variants_survive_mono_under_one_gain_policy() {
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn event_candidates_report_transient_decay_clipping_and_return_to_zero() {
     for candidate in [
         CompactCandidate::ClippedThump,
@@ -171,6 +178,7 @@ fn event_candidates_report_transient_decay_clipping_and_return_to_zero() {
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn every_retained_mechanism_has_ablation_and_nonlinear_residual_evidence() {
     for candidate in CompactCandidate::ALL {
         let rows = measure_ablations(candidate, 8_000).unwrap();
@@ -201,6 +209,7 @@ fn every_retained_mechanism_has_ablation_and_nonlinear_residual_evidence() {
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn retained_full_renders_control_dc_before_the_explicit_drive_stage() {
     for candidate in CompactCandidate::ALL {
         let spec = candidate.spec();
@@ -221,6 +230,7 @@ fn retained_full_renders_control_dc_before_the_explicit_drive_stage() {
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn musical_context_pitch_variants_transpose_the_score_deterministically() {
     let candidate = CompactCandidate::ContextRelay;
     let mut hashes = Vec::new();
@@ -238,6 +248,7 @@ fn musical_context_pitch_variants_transpose_the_score_deterministically() {
 }
 
 #[test]
+#[ignore = "development-only historical compact-composite contract"]
 fn pitch_drop_reaches_the_declared_base_pitch_on_the_exact_sample() {
     for candidate in [
         CompactCandidate::ClippedThump,

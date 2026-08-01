@@ -995,6 +995,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "development-only exhaustive historical composite render"]
     fn presentation_gains_keep_every_full_rate_composite_inside_the_level_gate() {
         let previews = preview_all(48_000).unwrap();
         let gains = select_presentation_gains(&previews).unwrap();

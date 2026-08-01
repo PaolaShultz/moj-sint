@@ -3,6 +3,7 @@
 
 use thiserror::Error;
 
+pub mod live;
 pub mod measurements;
 pub use measurements::{
     AliasRow, EvidenceStatus, GateEvidence, MeasurementError, PairRmsComparison, PatchEvidence,

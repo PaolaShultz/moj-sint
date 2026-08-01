@@ -2,7 +2,7 @@ use crate::control::{MacroId, Normalized};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub const PRESET_SCHEMA_VERSION: u32 = 4;
+pub const PRESET_SCHEMA_VERSION: u32 = 5;
 pub const MAX_VOICES: usize = 64;
 
 #[derive(Debug, Error)]
@@ -17,6 +17,8 @@ pub enum PresetError {
     InvalidVoiceCount,
     #[error("output gain must be finite and between 0 and 1")]
     InvalidOutputGain,
+    #[error("schema-5 preset requires a known model")]
+    InvalidModel,
     #[error("version-1 envelope must contain finite positive times and a sustain in 0..=1")]
     InvalidLegacyEnvelope,
 }
@@ -31,20 +33,51 @@ pub enum ModelDPatchId {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum SixOpPatchId {
+    BellMetal,
+    FracturedMetal,
+    ElectricPianoMallet,
+    GlassWood,
+    BrassBass,
+    MechanicalStab,
+}
+
+impl SixOpPatchId {
+    pub const ALL: [Self; 6] = [
+        Self::BellMetal,
+        Self::FracturedMetal,
+        Self::ElectricPianoMallet,
+        Self::GlassWood,
+        Self::BrassBass,
+        Self::MechanicalStab,
+    ];
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModelPatchId {
+    ModelD(ModelDPatchId),
+    SixOpPm(SixOpPatchId),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SynthesisModelId {
     ModelD,
+    SixOpPm,
 }
 
 impl SynthesisModelId {
     pub const fn stable_id(self) -> &'static str {
         match self {
             Self::ModelD => "model_d",
+            Self::SixOpPm => "six_op_pm",
         }
     }
 
     pub const fn label(self) -> &'static str {
         match self {
             Self::ModelD => "Model D",
+            Self::SixOpPm => "Six-Op PM",
         }
     }
 }
@@ -85,15 +118,14 @@ impl MacroValues {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Preset {
     pub schema_version: u32,
     pub name: String,
     pub voices: usize,
     pub output_gain: f32,
     pub model: SynthesisModelId,
-    pub model_d_patch: ModelDPatchId,
+    pub model_patch: ModelPatchId,
     pub macros: MacroValues,
 }
 
@@ -106,7 +138,8 @@ impl Preset {
             .and_then(|version| u32::try_from(version).ok())
             .ok_or(PresetError::UnsupportedVersion(0))?;
         let preset = match version {
-            PRESET_SCHEMA_VERSION => toml::from_str(source)?,
+            PRESET_SCHEMA_VERSION => VersionFivePreset::parse(source)?,
+            4 => VersionFourPreset::parse(source)?.into_current(),
             3 => VersionThreePreset::parse(source)?.into_current(),
             2 => VersionTwoPreset::parse(source)?.into_current(),
             1 => LegacyPreset::parse(source)?.into_current(),
@@ -129,6 +162,149 @@ impl Preset {
             return Err(PresetError::InvalidOutputGain);
         }
         Ok(self)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VersionFiveModelDPreset {
+    schema_version: u32,
+    name: String,
+    voices: usize,
+    output_gain: f32,
+    model: SynthesisModelId,
+    model_d_patch: ModelDPatchId,
+    macros: MacroValues,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SixOpMacroValues {
+    index: Normalized,
+    ratio: Normalized,
+    feedback: Normalized,
+    operator_decay: Normalized,
+    balance: Normalized,
+    key_scale: Normalized,
+    velocity: Normalized,
+    motion: Normalized,
+    attack: Normalized,
+    decay: Normalized,
+    sustain: Normalized,
+    release: Normalized,
+}
+
+impl From<SixOpMacroValues> for MacroValues {
+    fn from(values: SixOpMacroValues) -> Self {
+        Self {
+            evolve: values.index,
+            shape: values.ratio,
+            color: values.feedback,
+            edge: values.operator_decay,
+            couple: values.balance,
+            motion: values.key_scale,
+            depth: values.velocity,
+            space: values.motion,
+            attack: values.attack,
+            decay: values.decay,
+            sustain: values.sustain,
+            release: values.release,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VersionFiveSixOpPreset {
+    schema_version: u32,
+    name: String,
+    voices: usize,
+    output_gain: f32,
+    model: SynthesisModelId,
+    six_op_patch: SixOpPatchId,
+    macros: SixOpMacroValues,
+}
+
+struct VersionFivePreset;
+
+impl VersionFivePreset {
+    fn parse(source: &str) -> Result<Preset, PresetError> {
+        let value: toml::Value = toml::from_str(source)?;
+        let model = value
+            .get("model")
+            .and_then(toml::Value::as_str)
+            .ok_or(PresetError::InvalidModel)?;
+        match model {
+            "model_d" => {
+                let preset: VersionFiveModelDPreset = toml::from_str(source)?;
+                if preset.schema_version != PRESET_SCHEMA_VERSION
+                    || preset.model != SynthesisModelId::ModelD
+                {
+                    return Err(PresetError::UnsupportedVersion(preset.schema_version));
+                }
+                Ok(Preset {
+                    schema_version: PRESET_SCHEMA_VERSION,
+                    name: preset.name,
+                    voices: preset.voices,
+                    output_gain: preset.output_gain,
+                    model: preset.model,
+                    model_patch: ModelPatchId::ModelD(preset.model_d_patch),
+                    macros: preset.macros,
+                })
+            }
+            "six_op_pm" => {
+                let preset: VersionFiveSixOpPreset = toml::from_str(source)?;
+                if preset.schema_version != PRESET_SCHEMA_VERSION
+                    || preset.model != SynthesisModelId::SixOpPm
+                {
+                    return Err(PresetError::UnsupportedVersion(preset.schema_version));
+                }
+                Ok(Preset {
+                    schema_version: PRESET_SCHEMA_VERSION,
+                    name: preset.name,
+                    voices: preset.voices,
+                    output_gain: preset.output_gain,
+                    model: preset.model,
+                    model_patch: ModelPatchId::SixOpPm(preset.six_op_patch),
+                    macros: preset.macros.into(),
+                })
+            }
+            _ => Err(PresetError::InvalidModel),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VersionFourPreset {
+    schema_version: u32,
+    name: String,
+    voices: usize,
+    output_gain: f32,
+    model: SynthesisModelId,
+    model_d_patch: ModelDPatchId,
+    macros: MacroValues,
+}
+
+impl VersionFourPreset {
+    fn parse(source: &str) -> Result<Self, PresetError> {
+        let preset: Self = toml::from_str(source)?;
+        if preset.schema_version != 4 || preset.model != SynthesisModelId::ModelD {
+            return Err(PresetError::UnsupportedVersion(preset.schema_version));
+        }
+        Ok(preset)
+    }
+
+    fn into_current(self) -> Preset {
+        Preset {
+            schema_version: PRESET_SCHEMA_VERSION,
+            name: self.name,
+            voices: self.voices,
+            output_gain: self.output_gain,
+            model: SynthesisModelId::ModelD,
+            model_patch: ModelPatchId::ModelD(self.model_d_patch),
+            macros: self.macros,
+        }
     }
 }
 
@@ -159,7 +335,7 @@ impl VersionThreePreset {
             voices: self.voices,
             output_gain: self.output_gain,
             model: SynthesisModelId::ModelD,
-            model_d_patch: self.model_d_patch,
+            model_patch: ModelPatchId::ModelD(self.model_d_patch),
             macros: self.macros,
         }
     }
@@ -191,7 +367,7 @@ impl VersionTwoPreset {
             voices: self.voices,
             output_gain: self.output_gain,
             model: SynthesisModelId::ModelD,
-            model_d_patch: ModelDPatchId::Bass,
+            model_patch: ModelPatchId::ModelD(ModelDPatchId::Bass),
             macros: self.macros,
         }
     }
@@ -268,7 +444,7 @@ impl LegacyPreset {
             voices: self.voices,
             output_gain: self.output_gain,
             model: SynthesisModelId::ModelD,
-            model_d_patch: ModelDPatchId::Bass,
+            model_patch: ModelPatchId::ModelD(ModelDPatchId::Bass),
             macros: MacroValues {
                 evolve: self.macros.evolve,
                 shape: self.macros.shape,
@@ -317,10 +493,13 @@ release = 0.4
     #[test]
     fn parses_complete_version_four_preset() {
         let preset = Preset::parse(VALID).unwrap();
-        assert_eq!(preset.schema_version, 4);
+        assert_eq!(preset.schema_version, 5);
         assert_eq!(preset.voices, 8);
         assert_eq!(preset.model, SynthesisModelId::ModelD);
-        assert_eq!(preset.model_d_patch, ModelDPatchId::Bass);
+        assert_eq!(
+            preset.model_patch,
+            ModelPatchId::ModelD(ModelDPatchId::Bass)
+        );
         assert_eq!(preset.macros.get(MacroId::Evolve).get(), 0.5);
     }
 
@@ -352,9 +531,12 @@ release = 0.4
             )
             .replace("space = 0.5", "width = 0.9\nspace = 0.5");
         let preset = Preset::parse(&legacy).unwrap();
-        assert_eq!(preset.schema_version, 4);
+        assert_eq!(preset.schema_version, 5);
         assert_eq!(preset.model, SynthesisModelId::ModelD);
-        assert_eq!(preset.model_d_patch, ModelDPatchId::Bass);
+        assert_eq!(
+            preset.model_patch,
+            ModelPatchId::ModelD(ModelDPatchId::Bass)
+        );
         assert_eq!(preset.macros.space.get(), 0.5);
         assert!(Preset::parse(&format!("{legacy}\nunknown = 3")).is_err());
     }
@@ -366,9 +548,12 @@ release = 0.4
             .replace("model = \"model_d\"\n", "")
             .replace("model_d_patch = \"bass\"\n", "");
         let preset = Preset::parse(&version_two).unwrap();
-        assert_eq!(preset.schema_version, 4);
+        assert_eq!(preset.schema_version, 5);
         assert_eq!(preset.model, SynthesisModelId::ModelD);
-        assert_eq!(preset.model_d_patch, ModelDPatchId::Bass);
+        assert_eq!(
+            preset.model_patch,
+            ModelPatchId::ModelD(ModelDPatchId::Bass)
+        );
         assert!(Preset::parse(&format!("{version_two}\nunknown = 3")).is_err());
     }
 
@@ -378,14 +563,17 @@ release = 0.4
             .replace("schema_version = 4", "schema_version = 3")
             .replace("model = \"model_d\"\n", "");
         let preset = Preset::parse(&version_three).unwrap();
-        assert_eq!(preset.schema_version, 4);
+        assert_eq!(preset.schema_version, 5);
         assert_eq!(preset.model, SynthesisModelId::ModelD);
-        assert_eq!(preset.model_d_patch, ModelDPatchId::Bass);
+        assert_eq!(
+            preset.model_patch,
+            ModelPatchId::ModelD(ModelDPatchId::Bass)
+        );
         assert!(Preset::parse(&format!("{version_three}\nunknown = 3")).is_err());
     }
 
     #[test]
-    fn seven_factory_presets_are_strict_and_cover_three_authored_patches() {
+    fn factory_presets_are_strict_and_cover_both_models() {
         let sources = [
             include_str!("../presets/01-full-bass.mojsint"),
             include_str!("../presets/02-full-lead.mojsint"),
@@ -394,6 +582,12 @@ release = 0.4
             include_str!("../presets/05-matched-linear-mixer.mojsint"),
             include_str!("../presets/06-matched-linear-ladder.mojsint"),
             include_str!("../presets/07-matched-no-drift-or-feedback.mojsint"),
+            include_str!("../presets/08-six-op-bell-metal.mojsint"),
+            include_str!("../presets/09-six-op-fractured-metal.mojsint"),
+            include_str!("../presets/10-six-op-electric-piano-mallet.mojsint"),
+            include_str!("../presets/11-six-op-glass-wood.mojsint"),
+            include_str!("../presets/12-six-op-brass-bass.mojsint"),
+            include_str!("../presets/13-six-op-mechanical-stab.mojsint"),
         ];
         let presets = sources.map(|source| Preset::parse(source).unwrap());
         let mut names = presets
@@ -402,14 +596,46 @@ release = 0.4
             .collect::<Vec<_>>();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 7);
+        assert_eq!(names.len(), 13);
         assert!(
-            presets
+            presets[..7]
                 .iter()
                 .all(|preset| preset.model == SynthesisModelId::ModelD)
         );
-        assert_eq!(presets[0].model_d_patch, ModelDPatchId::Bass);
-        assert_eq!(presets[1].model_d_patch, ModelDPatchId::Lead);
-        assert_eq!(presets[2].model_d_patch, ModelDPatchId::FilterArticulation);
+        assert!(
+            presets[7..]
+                .iter()
+                .all(|preset| preset.model == SynthesisModelId::SixOpPm)
+        );
+        assert_eq!(
+            presets[0].model_patch,
+            ModelPatchId::ModelD(ModelDPatchId::Bass)
+        );
+        assert_eq!(
+            presets[1].model_patch,
+            ModelPatchId::ModelD(ModelDPatchId::Lead)
+        );
+        assert_eq!(
+            presets[2].model_patch,
+            ModelPatchId::ModelD(ModelDPatchId::FilterArticulation)
+        );
+        for (preset, patch) in presets[7..].iter().zip(SixOpPatchId::ALL) {
+            assert_eq!(preset.model_patch, ModelPatchId::SixOpPm(patch));
+        }
+    }
+
+    #[test]
+    fn parses_strict_version_five_six_op_preset_and_rejects_mixed_fields() {
+        let valid = include_str!("../presets/08-six-op-bell-metal.mojsint");
+        let preset = Preset::parse(valid).unwrap();
+        assert_eq!(preset.schema_version, 5);
+        assert_eq!(preset.model, SynthesisModelId::SixOpPm);
+        assert_eq!(
+            preset.model_patch,
+            ModelPatchId::SixOpPm(SixOpPatchId::BellMetal)
+        );
+        assert_eq!(preset.macros.get(MacroId::Evolve).get(), 0.5);
+        assert!(Preset::parse(&format!("{valid}\nmodel_d_patch = \"bass\"")).is_err());
+        assert!(Preset::parse(&valid.replace("six_op_patch", "model_d_patch")).is_err());
     }
 }
