@@ -39,7 +39,10 @@ release = 0.25
 Schema versions 1–4 remain readable through strict migrations and always
 select Model D. Version 4 already carries `model = "model_d"`; versions 1–3
 gain that identity during migration. In-memory identity becomes version 5.
-New presets must use version 5.
+New presets must use version 5. The library's `Preset::to_toml` serializer
+always writes that strict current schema: migrated Model D sounds retain the
+matching `model_d_patch` and macro names, while Six-Op PM retains
+`six_op_patch` and its exact model-specific macro vocabulary.
 
 The physical positions stay CC 20–31. Their meaning comes from the loaded
 model:

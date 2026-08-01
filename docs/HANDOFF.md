@@ -118,6 +118,17 @@ At this checkpoint:
   `motion`. Strict version-2 migration selects Model D bass, and version-1
   migration also discards only its provisional `WIDTH` and redundant envelope
   table.
+- `Preset::to_toml` is the public strict writer for user-preset publication.
+  It validates model/patch identity, always emits schema 5, preserves voices,
+  output gain, and the exact model-specific patch, and writes only that model's
+  twelve macro names. Parsing the result yields the same in-memory preset.
+- SHR-DAW Playback now uses Overwrite/Save New/Cancel for live synthv1 and Moj
+  Sint sounds. Moj user sounds are private numbered files split beneath Model D
+  and Six-Op PM directories, appear immediately in Presets and FT2 ROUTE, and
+  become the new RESET baseline without restarting Moj Sint. Factory, public,
+  unsupported, malformed, oversized, and symlink-backed sources remain
+  non-overwritable; failed publication preserves the live session and prior
+  file.
 - The Model D catalog contains Full Bass, Full Lead, Full Filter Articulation,
   Matched Idealized, Matched Linear Mixer, Matched Linear Ladder, and Matched
   No Drift or Feedback. Each preserves the corresponding audition coordinates
@@ -125,13 +136,15 @@ At this checkpoint:
   Bell Metal, Fractured Metal, Electric Piano Mallet, Glass Wood, Brass Bass,
   and Mechanical Stab. These are starts within their models, not separate
   engines.
-- The 2026-08-01 locked production gate used Rust 1.97.1 on AArch64. Focused
-  schema, live Six-Op, allocation, and 13-start engine tests passed. The full
-  all-target/all-feature normal suite passed 273 tests with zero failures and
-  34 explicitly ignored historical render/research/benchmark tests; the main
-  library harness took 128.74 seconds. Locked check, debug build, and direct
-  validation of all 13 tracked presets passed. No JACK, ALSA, MIDI, audible,
-  or physical-hardware test was run.
+- The final 2026-08-01 locked production gate used Rust 1.97.1 on AArch64. The
+  full all-target/all-feature normal suite passed 276 tests with zero failures
+  across 27 harnesses; 34 historical render, research, publication, and native
+  benchmark tests remained ignored. The main library harness took 129.67
+  seconds. Formatting, locked check, fresh debug build, strict serializer
+  regressions, and direct integration coverage passed. The repository-local
+  SHR configuration selects this checkout's fresh debug host without reading
+  private user sounds. No JACK, ALSA, MIDI, playback, audible, or
+  physical-hardware test was run.
 - `WIDTH` was removed solely because this Model D production path is dual-mono
   and contains no width experiment. There is no hidden thirteenth control.
 - The shared project notebook lives at
