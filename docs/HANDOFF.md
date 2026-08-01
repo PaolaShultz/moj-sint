@@ -241,6 +241,33 @@ At this checkpoint:
   three-VCO, nonlinear mixer, four-stage nonlinear ladder, dual-contour, VCA,
   and output-feedback path. It is now the production `Engine`; all its modeled
   mechanisms remain open for user evaluation through the complete controls.
+- A 2026-08-01 native Player audition exposed note-count-dependent distortion:
+  Model D failed audibly at two held notes and Six-Op PM at four. Inspection
+  found that SHR was launching this checkout's unoptimized
+  `target/debug/moj-sint`. A focused factory-chord render remained finite and
+  below full scale, while the native callback smoke measured one production
+  Model D voice at 20.609% mean / 21.700% maximum of a 48 kHz, 64-frame period
+  in debug versus 2.967% mean / 3.949% maximum in release. The concurrently
+  running four-slot Six-Op debug host used about 36% of one CPU in a short
+  observation at the live 128-frame JACK period. This supports callback
+  starvation/xruns, not mix clipping, as the defect. SHR now launches the
+  fresh `target/release/moj-sint`, and the user confirmed that the reported
+  two-note Model D and four-note Six-Op artifacts are gone. The connected path
+  therefore has direct user acceptance for this defect only; broader control,
+  routing, polyphony, and sound acceptance remain open.
+- SHR's source repair makes Moj Sint the first visible engine and
+  renders its stable factory identities compactly without changing preset or
+  Project route IDs: for example, `01 M-D Full Bass` and
+  `08 6-OP Bell Metal`, with no duplicate list/model number or bracketed model
+  sentence. On native AArch64 Rust 1.97.1, the focused Moj/order/screenshot
+  regressions and complete normal SHR suite passed, with 912 tests passed and
+  12 historical/development tests intentionally ignored. Locked check, debug
+  and release builds, formatting, dependency audit, and regeneration plus exact
+  comparison of all 142 deterministic screenshots also passed. Warning-denied
+  Clippy still finds 38 pre-existing repository-wide lints outside this repair;
+  `cargo deny` has no repository policy file and therefore rejects all licenses
+  under its default configuration. Live visual confirmation remains open until
+  the user next relaunches SHR.
 - SHR-DAW was rechecked read-only at main commit
   `8b7d0d7c17c582292ac06a915ca1fe750d77bc40` using a temporary clone.
 
