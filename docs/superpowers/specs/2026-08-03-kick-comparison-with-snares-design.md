@@ -139,7 +139,8 @@ Non-WAV evidence files are:
   maximum adjacent-sample jump, and remaining headroom for every WAV;
 - `source-metrics.tsv`: isolated kick and common-snare measurements used to
   explain each controlled mix;
-- `hashes.tsv`: SHA-256 for every deterministic file except workstation timing;
+- `hashes.tsv`: SHA-256 for every deterministic file except itself and
+  workstation timing;
 - `generation-summary.tsv`: source revisions, package manifest hashes, sample
   rate, encoding, and pass/fail gates; and
 - `workstation-cost.txt`: explicitly nondeterministic elapsed generation time.
