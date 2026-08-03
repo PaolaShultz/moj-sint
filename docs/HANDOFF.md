@@ -1868,3 +1868,53 @@ Fresh feature-worktree verification:
 - both knowledge validators pass; and
 - two final release generations and the retained batch match byte-for-byte
   except the declared volatile `workstation-cost.txt`.
+
+## Five-kick and snare comparison gate
+
+The cross-engine listening batch was completed on 2026-08-03. It compares the
+two Moj Sint candidates with the three restored SHR Drums factory kits: Big
+Rock (Muldjord), Experimental Noise (Muldjord), and Electronic House. The gate
+contains exactly 15 stereo 48 kHz float32 WAVs: five raw solos, five four-bar
+124 BPM patterns using the same Electronic House snare, three native old-kit
+kick/snare patterns, one raw-level kick reel, and one peak-matched kick reel.
+The raw reel exposes delivered level; the attenuation-only matched reel makes
+timbre and envelope easier to compare. No EQ, dynamics, saturation, clipping,
+limiting, normalization, reverb, or delay was added.
+
+The raw solo measurements are:
+
+| Kick | Peak | RMS | Crest |
+| --- | ---: | ---: | ---: |
+| House Impact | -2.805 dBFS | -22.426 dBFS | 19.621 dB |
+| Long Pressure | -5.079 dBFS | -21.355 dBFS | 16.276 dB |
+| Big Rock (Muldjord) | -10.743 dBFS | -32.405 dBFS | 21.662 dB |
+| Experimental Noise (Muldjord) | -15.337 dBFS | -35.502 dBFS | 20.165 dB |
+| Electronic House | -8.446 dBFS | -26.261 dBFS | 17.815 dB |
+
+The closest presentation to the digital ceiling is House Impact with the
+common snare at -0.293 dBFS; it has no ceiling contact or clipped sample. This
+is useful level evidence, not an endorsement of that balance.
+
+The renderer used the real `shr-drums` package loader and engine for the old
+kits. MIDI velocity is 110, kick is note 36, snare is note 38, and common-snare
+files linearly sum the exact Electronic House snare-only render with each
+kick-only render. Native files instead render each old kit's kick and snare in
+one engine. The source packages are read from SHR-DAW's engine-owned `kits/`
+directory; none is copied into a user preset directory or Moj Sint.
+
+Big Rock's bus filter produced a deterministic subnormal tail of approximately
+`1.72e-43` after meaningful sound ended. The renderer therefore defines a
+terminal-silence floor of `1e-12` (-240 dBFS), replaces only subsequent
+subnormal residue with exact zero, and retains at least 250 ms of exact terminal
+silence. It does not gate audible program material.
+
+Verification established exactly 15 WAVs and seven reports, valid headers,
+finite samples, peaks below 0 dBFS, 250 ms exact-zero endings, valid SHA-256
+records, and byte-identical independent generations except the explicitly
+volatile workstation timing report. The normal Moj Sint test suite passed after
+the local merge. The batch is ignored and disposable at
+`artifacts/kick-comparison-with-snares/`; its temporary renderer, build output,
+second-generation output, worktree, and Trash entry were removed. The
+canonical design is
+`docs/superpowers/specs/2026-08-03-kick-comparison-with-snares-design.md`.
+No kick, balance, or integration direction is accepted until the user listens.
