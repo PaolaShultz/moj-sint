@@ -1962,6 +1962,17 @@ renderer, its raw WAVs, build output, obsolete solo helper, and prior solo batch
 were permanently removed after the three final files passed basic format
 checks.
 
+The owner then rejected the Experimental Noise snare as a cowbell-like,
+agricultural sound rather than a distorted metallic industrial snare.
+Inspection found a 298 Hz pitched body with a 700 ms decay, the same acoustic
+snare samples as Big Rock, and a metallic layer. SHR-DAW now replaces only that
+note-38 voice with a short, noise-dominant authored model using hard-clipped
+body, noise, and master stages plus brief inharmonic modes; the six unreferenced
+snare WAVs were removed from that kit. The current Experimental Noise rhythm
+was regenerated through the existing SHR Drums engine with the same eight-hit
+score and external processing, then the complete five-file comparison was
+replayed. Human acceptance of the replacement remains open.
+
 The user explicitly authorized soundcard playback. A private reusable
 allocation-free C JACK WAV player now preloads float WAVs, uses
 `JACK_NO_START_SERVER`, creates only `shr-wav-review:out_l/out_r`, connects
@@ -1972,5 +1983,5 @@ left no ports. Do not run unknown JACK example clients to discover their CLI.
 Use `user/bin/play-current-rhythms`, which played the five current files through
 the configured AudioBox in House Impact, Long Pressure, Big Rock, Experimental
 Noise, Electronic House order and disconnected cleanly. No JACK lifecycle,
-persistent route, MIDI, recording, factory package, or production source
-changed.
+persistent route, MIDI, or recording changed. The Experimental Noise source
+repair is the sole factory-package change from this playback work.
