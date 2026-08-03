@@ -6,6 +6,7 @@ rust-version = "1.85"
 publish = false
 description = "Headless real-time synthesizer core for SHR-DAW"
 repository = "https://github.com/PaolaShultz/moj-sint"
+license = "MIT"
 
 [lib]
 name = "moj_sint"

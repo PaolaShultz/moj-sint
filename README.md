@@ -62,3 +62,6 @@ See [architecture](docs/ARCHITECTURE.md), the
 The cleared public installation boundary and dependency licence review are in
 [THIRD_PARTY.md](THIRD_PARTY.md). Only the files named by
 `presets/cleared-presets.txt` are factory-installable.
+
+Moj Sint source and its project-authored factory presets are available under
+the [MIT License](LICENSE).
