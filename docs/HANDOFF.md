@@ -1945,16 +1945,16 @@ solo folder and its support files were permanently deleted rather than
 retained as another batch.
 
 The only current audition is now
-`artifacts/RHYTHMS - CURRENT ONLY/`. It contains exactly three simply named
-WAVs plus `Effects.txt`: `Big Rock - Rhythm - Processed.wav`, `Experimental
-Noise - Rhythm - Processed.wav`, and `Electronic House - Rhythm -
-Processed.wav`. Each file uses one fresh instance of its named SHR Drums kit
-and schedules eight literal alternating quarter-note hits at 124 BPM and
-velocity 127: kick note 36, snare note 38, repeated four times. No file mixes
-kits. Moj Sint is excluded because it has no same-kit snare; no substitute was
-invented.
+`artifacts/RHYTHMS - CURRENT ONLY/`. It contains exactly five simply named WAVs
+plus `Effects.txt`: House Impact, Long Pressure, Big Rock, Experimental Noise,
+and Electronic House, each named `<sound> - Rhythm - Processed.wav`. Every file
+schedules eight literal alternating quarter-note hits at 124 BPM and velocity
+127: kick, snare, repeated four times. Big Rock, Experimental Noise, and
+Electronic House use one fresh instance of their own SHR Drums kit. At the
+user's explicit request, House Impact and Long Pressure use their named Moj
+Sint kick with the Electronic House snare; no other sources are mixed.
 
-All three files receive the same external presentation after the kit's own bus:
+All five files receive the same external presentation after the source bus:
 4:1 compression at -18 dBFS with 4 ms attack, 120 ms release, and 3 ms
 lookahead; one restrained short-room return at -10 dB wet gain; and fixed -1
 dBFS peak normalization. They are stereo 48 kHz float32. The temporary rhythm
@@ -1969,7 +1969,8 @@ them to `system:playback_1/2`, and closes cleanly after playback. The first
 attempt to discover an installed player accidentally ran `jack_simple_client`'s
 built-in approximately 1 kHz test oscillator; it was stopped immediately and
 left no ports. Do not run unknown JACK example clients to discover their CLI.
-Use `user/bin/play-current-rhythms`, which played the three current files
-through the configured AudioBox in Big Rock, Experimental Noise, Electronic
-House order and disconnected cleanly. No JACK lifecycle, persistent route,
-MIDI, recording, factory package, or production source changed.
+Use `user/bin/play-current-rhythms`, which played the five current files through
+the configured AudioBox in House Impact, Long Pressure, Big Rock, Experimental
+Noise, Electronic House order and disconnected cleanly. No JACK lifecycle,
+persistent route, MIDI, recording, factory package, or production source
+changed.
