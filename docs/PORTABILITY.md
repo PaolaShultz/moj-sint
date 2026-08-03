@@ -44,7 +44,8 @@ specifications are not performance evidence:
 
 ## Dependencies
 
-Current foundation: Rust stable, rustfmt, and Clippy, all user-local through
+Current foundation: the exact Rust 1.97.1 toolchain selected by
+`rust-toolchain.toml`, with rustfmt and Clippy installed user-locally through
 rustup. Building the ALSA adapter requires:
 
 ```sh
@@ -56,7 +57,7 @@ JACK headers are not required because the host loads `libjack.so.0` dynamically.
 JACK/PipeWire services and hardware remain outside installation scope; the host
 will fail rather than start or reconfigure a server.
 
-Install the validated binary and all seven public factory presets for SHR-DAW
-with the commands in the repository README. The binary belongs in the user's
+Install the validated binary and all 13 allowlisted public factory presets for
+SHR-DAW with the commands in the repository README. The binary belongs in the user's
 Cargo `bin` directory; `.mojsint` files belong under the configured data root,
 never under ignored repository `artifacts/`.

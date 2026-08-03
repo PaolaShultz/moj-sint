@@ -37,7 +37,9 @@ or other JACK ports.
 ```sh
 cargo install --path . --locked
 install -d "$HOME/.local/share/moj-sint/presets"
-install -m644 presets/*.mojsint "$HOME/.local/share/moj-sint/presets/"
+while IFS= read -r preset; do
+  install -m644 "presets/$preset" "$HOME/.local/share/moj-sint/presets/"
+done < presets/cleared-presets.txt
 ```
 
 SHR-DAW's default configuration includes that user preset root. Presets added
@@ -56,3 +58,7 @@ See [architecture](docs/ARCHITECTURE.md), the
 [live-host contract](docs/HOST_CONTRACT.md), the
 [preset/control schema](docs/PRESET_SCHEMA.md), and
 [portability notes](docs/PORTABILITY.md).
+
+The cleared public installation boundary and dependency licence review are in
+[THIRD_PARTY.md](THIRD_PARTY.md). Only the files named by
+`presets/cleared-presets.txt` are factory-installable.

@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-08-03, Europe/Zagreb.
+Last updated: 2026-08-04, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -97,6 +97,13 @@ must not be presented as the musical-variation listening gate.
 ## Current workspace state
 
 At this checkpoint:
+
+- Version 0.2.3 makes the public install boundary reproducible without changing
+  synthesis or host behavior. `rust-toolchain.toml` now pins exact Rust 1.97.1,
+  `presets/cleared-presets.txt` names the 13 project-authored factory starts,
+  and `THIRD_PARTY.md` records their MIT/public boundary plus the locked
+  dependency licence review. Whole-system installation is owned by SHR-DAW;
+  ignored experiments and private user presets remain outside that path.
 
 - The single Moj Sint host now exposes two synthesis models without splitting
   JACK/ALSA ownership. `Engine` voices dispatch through a fixed model enum:

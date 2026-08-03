@@ -1,0 +1,13 @@
+01-full-bass.mojsint
+02-full-lead.mojsint
+03-full-filter-articulation.mojsint
+reference.mojsint
+05-matched-linear-mixer.mojsint
+06-matched-linear-ladder.mojsint
+07-matched-no-drift-or-feedback.mojsint
+08-six-op-bell-metal.mojsint
+09-six-op-fractured-metal.mojsint
+10-six-op-electric-piano-mallet.mojsint
+11-six-op-glass-wood.mojsint
+12-six-op-brass-bass.mojsint
+13-six-op-mechanical-stab.mojsint

@@ -4,6 +4,10 @@ use crate::preset::{ModelDPatchId, ModelPatchId, SynthesisModelId};
 use crate::six_op_pm::live::LiveSixOpVoice;
 
 #[derive(Debug)]
+// Both voice families stay fully preallocated so note creation and the audio
+// callback never allocate. Boxing the larger family would weaken that owned
+// real-time storage contract merely to make the enum smaller.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum VoiceModel {
     ModelD(ModelDVoice),
     SixOpPm(LiveSixOpVoice),
