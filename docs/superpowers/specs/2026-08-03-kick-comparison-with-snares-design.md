@@ -98,6 +98,12 @@ still active at three seconds, the solo duration expands for every source to
 the shortest common duration that includes the complete longest tail plus
 250 ms of verified silence.
 
+SHR Drums' kit-bus IIR can retain nonzero subnormal arithmetic after every
+voice is inactive. Terminal-silence detection therefore treats absolute sample
+values below `1e-12` (-240 dBFS) as finished, replaces only that inaudible
+residue with exact zero, and retains at least 250 ms of digital silence. This
+rule does not alter authored gain or any sample at or above the declared floor.
+
 Pattern files contain four bars of 4/4 at 124 BPM. Kicks trigger on every
 quarter note. Snares trigger on beats 2 and 4. A two-second tail follows the
 last bar; the renderer may lengthen that common tail if any engine remains
@@ -172,6 +178,8 @@ Before handoff, generation must prove:
 - all WAVs are 48 kHz stereo float32 and contain only finite samples;
 - exact solo and pattern frame-count groups match;
 - all raw files remain below 0 dBFS without ceiling contact;
+- every file ends in at least 250 ms of exact digital silence after the
+  declared -240 dBFS terminal-silence floor;
 - the matched reel's five segment peaks agree within 0.01 dB;
 - two fresh generations are byte-identical except `workstation-cost.txt`;
 - the final directory has exactly the declared inventory and is ignored by

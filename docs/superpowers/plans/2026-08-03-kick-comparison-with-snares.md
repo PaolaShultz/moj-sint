@@ -211,6 +211,12 @@ for solos and four bars plus two seconds for patterns. Extend every member of a
 group together if the longest source has not produced 250 ms of terminal
 digital silence.
 
+Because the SHR Drums kit-bus IIR retains subnormal arithmetic indefinitely,
+define terminal silence as both channels below absolute `1e-12` (-240 dBFS).
+After the last sample at or above that floor, replace only the residual tail
+with exact zero and retain at least 12,000 zero frames. Record the floor in the
+README and generation summary.
+
 Load the two Moj Sint solo and repeated files named by their existing artifact
 manifest. Move a solo's first nonzero sample to frame 12,000 without changing
 its samples. Preserve repeated samples at frame zero and zero-pad them to the
