@@ -43,10 +43,7 @@ impl LongPressure {
                 };
                 let impact_envelope =
                     excitation * (-1000.0_f64.ln() * time / IMPACT_DECAY_SECONDS).exp();
-                let body_rise = 1.0 - (-1000.0_f64.ln() * time / COUPLING_SECONDS).exp();
-                let body_envelope = f64::from(config.modifier_amount)
-                    * body_rise
-                    * (-1000.0_f64.ln() * time / BODY_DECAY_SECONDS).exp();
+                let body_envelope = f64::from(config.modifier_amount) * body_envelope_at(time);
                 let impact_phase =
                     swept_phase(time, IMPACT_START_HZ, IMPACT_END_HZ, IMPACT_SWEEP_SECONDS);
                 let body_phase = swept_phase(time, BODY_START_HZ, BODY_END_HZ, BODY_SWEEP_SECONDS);
@@ -86,6 +83,11 @@ fn swept_phase(time: f64, start_hz: f64, end_hz: f64, sweep_seconds: f64) -> f64
     PHASE_OFFSET_CYCLES + end_hz * time + (start_hz - end_hz) * (1.0 - (-rate * time).exp()) / rate
 }
 
+fn body_envelope_at(time: f64) -> f64 {
+    let rise = 1.0 - (-1000.0_f64.ln() * time / COUPLING_SECONDS).exp();
+    rise * (-1000.0_f64.ln() * time / BODY_DECAY_SECONDS).exp()
+}
+
 #[cfg(test)]
 fn modal_radius(decay_seconds: f64, sample_rate: u32) -> f64 {
     (-1000.0_f64.ln() / (decay_seconds * f64::from(sample_rate))).exp()
@@ -102,6 +104,17 @@ mod tests {
         for decay in [IMPACT_DECAY_SECONDS, BODY_DECAY_SECONDS] {
             assert!(modal_radius(decay, 48_000) < 1.0);
         }
+    }
+
+    #[test]
+    fn body_energy_envelope_decreases_after_the_impact_window() {
+        let mut previous = body_envelope_at(0.140);
+        for frame in 6_721..=72_000 {
+            let current = body_envelope_at(frame as f64 / 48_000.0);
+            assert!(current <= previous);
+            previous = current;
+        }
+        assert!(body_envelope_at(BODY_DECAY_SECONDS) <= 1.000_001e-3);
     }
 
     #[test]

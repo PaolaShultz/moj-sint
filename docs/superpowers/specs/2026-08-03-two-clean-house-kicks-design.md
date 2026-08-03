@@ -73,6 +73,10 @@ retrigger behavior rather than concatenating independent WAVs.
 
 Each voice has one static, declared output gain. The solo and repeated renders
 use that same gain. There is no per-file normalization or hidden ceiling stage.
+The retained experiment prepares its analytic trajectory and a linear 5 Hz DC
+blocker outside the sample path; trigger and sampling only reset/read an index.
+That precomputed representation is an audition implementation, not a settled
+production memory architecture.
 
 ## Voice 1: House Impact
 
@@ -129,19 +133,20 @@ line to occupy the spaces between and beneath repeated kicks.
 ```text
 note trigger
   -> 1 ms finite raised-cosine excitation
-  -> short-lived impact resonator
-       -> envelope-controlled center frequency and coupling
-       -> linear energy transfer
-  -> low body resonator
+  -> short-lived analytic impact mode
+       -> envelope-controlled center frequency and coupling contour
+  -> analytic low body mode
        -> slow pitch sigh and damped decay
   -> linear weighted sum
   -> static output gain
 ```
 
-The impact resonator is the modifying oscillator: its envelope-controlled state
-feeds the body resonator rather than appearing as an independently layered
-tone. The coupled system remains linear and time-varying. It contains no
-feedback nonlinearity, rail model, clipper, saturator, or post-drive branch.
+The impact-mode envelope is the modifier: it controls the causal rise into the
+body mode rather than creating a third, separately presented click layer. The
+retained implementation evaluates both damped swept modes in closed form after
+a recursive two-pole prototype failed the sample-rate-consistency gate. The
+system remains linear and time-varying. It contains no feedback nonlinearity,
+rail model, clipper, saturator, or post-drive branch.
 
 ### Starting coordinate and bounded tuning
 

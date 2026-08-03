@@ -137,12 +137,12 @@ fn write_metrics(
     let mut file = writer(output, "metrics.tsv")?;
     writeln!(
         file,
-        "topology\tsample_peak_dbfs\ttrue_peak_dbfs\trms_dbfs\tabsolute_dc\tmaximum_jump\tceiling_contacts\tfinite\thigh_rate_residual_db\tonset_ablation_db\tbody_ablation_db"
+        "topology\tsample_peak_dbfs\ttrue_peak_dbfs\trms_dbfs\tabsolute_dc\tmaximum_jump\tceiling_contacts\tfinite\ttail_is_zero\thigh_rate_residual_db\tonset_ablation_db\tbody_ablation_db"
     )?;
     for evidence in [house, pressure] {
         writeln!(
             file,
-            "{:?}\t{:.6}\t{:.6}\t{:.6}\t{:.9}\t{:.9}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}",
+            "{:?}\t{:.6}\t{:.6}\t{:.6}\t{:.9}\t{:.9}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}",
             evidence.topology,
             evidence.metrics.sample_peak_dbfs,
             evidence.metrics.true_peak_dbfs,
@@ -151,6 +151,7 @@ fn write_metrics(
             evidence.metrics.maximum_jump,
             evidence.metrics.ceiling_contacts,
             evidence.metrics.finite,
+            evidence.metrics.tail_is_zero,
             evidence.high_rate_residual_db,
             evidence.onset_ablation_db,
             evidence.body_ablation_db

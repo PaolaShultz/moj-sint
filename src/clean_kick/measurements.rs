@@ -10,6 +10,7 @@ pub struct KickMetrics {
     pub maximum_jump: f64,
     pub ceiling_contacts: u64,
     pub finite: bool,
+    pub tail_is_zero: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -18,6 +19,7 @@ pub enum KickRejection {
     Level,
     TruePeak,
     CeilingContact,
+    Tail,
     Dc,
     Jump,
     CausalAblation,
@@ -47,6 +49,9 @@ impl KickEvidence {
         }
         if self.metrics.ceiling_contacts != 0 {
             reasons.push(KickRejection::CeilingContact);
+        }
+        if !self.metrics.tail_is_zero {
+            reasons.push(KickRejection::Tail);
         }
         if self.metrics.absolute_dc >= 1.0e-5 {
             reasons.push(KickRejection::Dc);
@@ -133,6 +138,9 @@ fn measure(samples: &[f32]) -> KickMetrics {
             .filter(|sample| sample.abs() >= 0.999)
             .count() as u64,
         finite,
+        tail_is_zero: samples[samples.len().saturating_sub(256)..]
+            .iter()
+            .all(|&sample| sample == 0.0),
     }
 }
 

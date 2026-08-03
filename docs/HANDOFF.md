@@ -1799,29 +1799,72 @@ Fresh feature-worktree verification:
 - artifact hygiene confirmed one ignored directory, exactly one passing WAV,
   and no rejected or prior-batch output.
 
-## Two clean house-kick design checkpoint
+## Two clean house-kick listening gate
 
-Approved for written design on 2026-08-03 and awaiting spec review before
-implementation:
+The approved isolated experiment was implemented on 2026-08-03 as two
+structurally separate one-shot voices, not two positions in one graph:
 
-- build two separate offline kick voices rather than one morphing compromise;
-- make **House Impact** a tight 200-400 ms phase-modulated carrier whose shape
-  envelope drives pitch and modifier depth;
-- make **Long Pressure** a 500-900 ms linearly coupled two-resonator body whose
-  envelope transfers energy from an impact mode into a low mode;
-- obtain weight from envelope motion, phase, and controlled resonance, with no
-  noise layer, clipping, saturation, waveshaping, limiter, compressor, or
-  automatic normalization;
-- render exactly two solo WAVs and one 124 BPM four-on-the-floor presentation
-  for each topology under `artifacts/two-clean-house-kicks/`;
-- require finite, deterministic, allocation-free output, zero clipped samples,
-  -1 dBTP headroom, DC/jump/decay/retrigger checks, causal ablations, and an 8x
-  high-rate comparison; and
-- keep production `Engine`, models, presets, twelve controls, JACK, ALSA,
-  SHR-DAW, and factory catalogs unchanged until human listening and an explicit
-  later integration decision.
+- **House Impact** is direct phase modulation with an analytically integrated
+  156 -> 52 Hz carrier, a 2:1 modifier, a 45 ms index envelope, and a 320 ms
+  -60 dB amplitude envelope. Fixed-order selection retained the first passing
+  index at 1.2 radians and static output gain 0.8.
+- **Long Pressure** is an analytic two-mode damped system: a 112 -> 76 Hz impact
+  mode with 115 ms decay shapes the rise of a 58 -> 48 Hz body mode with a
+  280 ms pitch sigh and 760 ms decay. Fixed-order selection retained coupling
+  0.5 and static output gain 1.5. A recursive two-pole prototype was rejected
+  because its 48 kHz/8x residual was approximately -1 to -2.5 dB; the retained
+  analytic realization preserves the distinct modal hypothesis without that
+  rate dependence.
+
+Both trajectories are prepared outside the sample path and replayed by index;
+trigger and sampling allocate nothing. A linear 5 Hz DC blocker is applied
+during preparation. There is no noise layer, clipper, limiter, compressor,
+saturation, waveshaper, or normalizer. This precomputed experimental
+realization is not a production memory/voice architecture decision.
+
+The selected solo evidence at 48 kHz is:
+
+| Voice | sample/8x peak | RMS | absolute DC | max jump | 8x residual | onset ablation | late body |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| House Impact | -2.805/-2.805 dB | -22.470 dBFS | 0.000000033 | 0.020852 | -89.935 dB | -4.796 dB residual/full in 100-800 Hz | -0.000314 dB change |
+| Long Pressure | -5.079/-5.079 dB | -21.384 dBFS | 0.000000017 | 0.010848 | -88.953 dB | -0.181 dB residual/full in 70-250 Hz | -39.765 dBFS at 44-54 Hz |
+
+Both have zero ceiling contacts, finite output, exact zero padding, and pass
+124 BPM quarter-note plus 248 BPM eighth-note-equivalent retrigger checks with
+maximum jumps below 0.10. The 8x values use an independently generated 384 kHz
+render, windowed-sinc reduction, bounded alignment, and fitted gain. These are
+engineering checks, not claims that either kick sounds massive, gut-ripping,
+clean, or house-ready.
+
+The ignored batch `artifacts/two-clean-house-kicks/` contains exactly four
+48 kHz, two-channel float32 WAVs: two padded solos and two four-bar 124 BPM
+quarter-note presentations. Two fresh release generations match byte-for-byte
+apart from `workstation-cost.txt`. Interleaved-sample FNV-1a hashes are
+`566b9ea1e2efdd59`, `dfec5d603b23d8b9`, `52d2311f9106b8c5`, and
+`2e46b7cbd0e80485` in filename order.
 
 The canonical design is
-`docs/superpowers/specs/2026-08-03-two-clean-house-kicks-design.md`. Generated
-audio and reports remain disposable unless the user explicitly selects a
-specific result for preservation.
+`docs/superpowers/specs/2026-08-03-two-clean-house-kicks-design.md`. Production
+`Engine`, models, presets, twelve controls, JACK, ALSA, SHR-DAW, and factory
+catalogs remain unchanged. The generated batch is disposable, and no voice is
+accepted or selected for integration until the user listens.
+
+Fresh feature-worktree verification:
+
+- `cargo fmt --check`, `cargo build --release`, and `git diff --check` exit 0;
+- `cargo test --all-targets --all-features` exits 0: 266 library tests passed,
+  five declared development-only library tests remained ignored, the current
+  clean-kick CLI/contract tests passed, and historical audition/benchmark tests
+  retained their documented ignored classification;
+- the exact `cargo clippy --all-targets --all-features -- -D warnings` command
+  is blocked by the pre-existing `clippy::large-enum-variant` warning on
+  `VoiceModel` in `src/synthesis_model.rs`; the same command fails identically
+  on unchanged `main`. Re-running with only that baseline lint allowed passes,
+  so this experiment introduces no additional Clippy warning. The unrelated
+  production enum was not changed to conceal the baseline failure;
+- `cargo audit` scanned 43 locked dependencies with no vulnerability failure;
+- `cargo deny check` passes advisories, bans, licenses, and sources, retaining
+  only the accepted `winnow` 0.7/1.0 duplicate warning inside `toml`;
+- both knowledge validators pass; and
+- two final release generations and the retained batch match byte-for-byte
+  except the declared volatile `workstation-cost.txt`.

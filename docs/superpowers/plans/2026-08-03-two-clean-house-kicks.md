@@ -25,7 +25,7 @@
 
 **Files:** Create `src/clean_kick/mod.rs`, `src/clean_kick/house.rs`, and `tests/clean_kick_contract.rs`; modify `src/lib.rs`.
 
-- [ ] **Step 1: Write the failing public contract**
+- [x] **Step 1: Write the failing public contract**
 
 ```rust
 use assert_no_alloc::assert_no_alloc;
@@ -48,12 +48,12 @@ fn house_impact_is_deterministic_finite_and_allocation_free() {
 }
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run `cargo test --test clean_kick_contract house_impact_is_deterministic_finite_and_allocation_free`.
 Expected: missing module and public types.
 
-- [ ] **Step 3: Implement the public boundary and source**
+- [x] **Step 3: Implement the public boundary and source**
 
 ```rust
 pub const SAMPLE_RATE: u32 = 48_000;
@@ -80,13 +80,13 @@ geometric 156 -> 52 Hz motion over 55 ms, 2:1 modifier, 0.9-radian index
 decaying over 45 ms, 1 ms zero-start attack, 320 ms -60 dB decay, static gain,
 and no nonlinear or ceiling stage. Triggering resets fixed state only.
 
-- [ ] **Step 4: Run GREEN and add unit contracts**
+- [x] **Step 4: Run GREEN and add unit contracts**
 
 Run the focused test and `cargo test clean_kick::house::tests --lib`. Prove
 pitch settlement, monotonic contours, bounded phase, maximum jump `< 0.10`,
 exact eventual silence, and allocation-free trigger/sample/retrigger.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib.rs src/clean_kick tests/clean_kick_contract.rs
@@ -97,7 +97,7 @@ git commit -m "Add clean House Impact kick source"
 
 **Files:** Create `src/clean_kick/pressure.rs`; modify `src/clean_kick/mod.rs` and `tests/clean_kick_contract.rs`.
 
-- [ ] **Step 1: Add the failing distinct/stable contract**
+- [x] **Step 1: Add the failing distinct/stable contract**
 
 ```rust
 #[test]
@@ -119,11 +119,11 @@ fn long_pressure_is_distinct_stable_and_allocation_free() {
 }
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run the focused test. Expected: Long Pressure is absent or silent.
 
-- [ ] **Step 3: Implement two prepared linear resonators**
+- [x] **Step 3: Implement two prepared linear resonators**
 
 ```rust
 #[derive(Clone, Copy, Default)]
@@ -145,13 +145,13 @@ raised-cosine excitation, impact 112 -> 76 Hz/115 ms decay, body 58 -> 48 Hz
 over 280 ms/760 ms decay, and 100 ms linear impact-to-body coupling. Apply one
 static gain and clear only inactive state below `1e-8`.
 
-- [ ] **Step 4: Run GREEN and stability contracts**
+- [x] **Step 4: Run GREEN and stability contracts**
 
 Run `cargo test clean_kick::pressure::tests --lib` and the focused integration
 test. Prove pole radii `< 1`, finite state, decreasing post-excitation energy,
 44-54 Hz settlement by 350 ms, exact silence, and allocation-free retrigger.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/clean_kick tests/clean_kick_contract.rs
@@ -162,7 +162,7 @@ git commit -m "Add clean Long Pressure kick source"
 
 **Files:** Create `src/clean_kick/measurements.rs`; modify `src/clean_kick/mod.rs` and `tests/clean_kick_contract.rs`.
 
-- [ ] **Step 1: Add failing evidence coverage**
+- [x] **Step 1: Add failing evidence coverage**
 
 ```rust
 #[test]
@@ -181,11 +181,11 @@ fn selected_voices_pass_every_engineering_gate() {
 }
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run the focused test. Expected: render and evidence APIs are absent.
 
-- [ ] **Step 3: Implement metrics and fixed-order rejection**
+- [x] **Step 3: Implement metrics and fixed-order rejection**
 
 Add exact render/metrics/evidence types and rejection variants for finiteness,
 sample/true peak, ceiling contact, DC, jump, decay/tail, pitch settlement,
@@ -193,7 +193,7 @@ resonator stability/energy, ablation, and high-rate residual. Independently
 render 8x and use the existing windowed-sinc/alignment method; require residual
 `<= -60 dB` relative to active reference RMS.
 
-- [ ] **Step 4: Implement causal selection**
+- [x] **Step 4: Implement causal selection**
 
 Select House candidates in ascending modifier-index order and Pressure
 candidates in ascending coupling order. House mute requires >= 6 dB first-80-ms
@@ -201,7 +201,7 @@ candidates in ascending coupling order. House mute requires >= 6 dB first-80-ms
 >= 4 dB first-140-ms 70-250 Hz difference and retained 44-54 Hz late energy.
 Sweeps never become listening files.
 
-- [ ] **Step 5: Run and commit**
+- [x] **Step 5: Run and commit**
 
 ```bash
 cargo test clean_kick --lib
@@ -217,7 +217,7 @@ Expected: all normal tests pass; historical ignored renderers remain ignored.
 
 **Files:** Create `src/bin/clean-kick-lab.rs` and `tests/clean_kick_cli.rs`; modify `src/clean_kick/mod.rs`.
 
-- [ ] **Step 1: Add failing CLI inventory coverage**
+- [x] **Step 1: Add failing CLI inventory coverage**
 
 ```rust
 #[test]
@@ -234,11 +234,11 @@ fn lab_writes_four_deterministic_clean_kick_wavs() {
 }
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run `cargo test --test clean_kick_cli`. Expected: binary absent.
 
-- [ ] **Step 3: Implement scheduling, WAVs, and reports**
+- [x] **Step 3: Implement scheduling, WAVs, and reports**
 
 Add `render_repeated(config, 48_000, 124, 4)` with quarter-note triggers in
 one persistent voice. CLI modes `render`/`render-test` evaluate both voices
@@ -246,7 +246,7 @@ before writing 32-bit float, 48 kHz dual-mono WAVs. Write exactly README,
 settings/metrics/hashes/generation-summary/workstation-cost reports and four
 WAVs. README names every forbidden processor and leaves musical value open.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 ```bash
 cargo test --test clean_kick_cli
@@ -261,19 +261,19 @@ Expected: two temporary generations match except workstation timing.
 
 **Files:** Modify `docs/HANDOFF.md`, `docs/RESEARCH.md`, both Moj Sint knowledge notes, and this plan.
 
-- [ ] **Step 1: Generate two fresh release batches**
+- [x] **Step 1: Generate two fresh release batches**
 
 Use two `mktemp -d` destinations and compare every file except
 `workstation-cost.txt`. Then replace only `artifacts/two-clean-house-kicks/`
 and render there; preserve all other artifact directories.
 
-- [ ] **Step 2: Record measured evidence**
+- [x] **Step 2: Record measured evidence**
 
 Document selected coordinates, levels, DC/jump/decay, ablations, high-rate
 residuals, inventory/hash, tests, and open listening questions. Do not infer
 massive, clean-sounding, house-ready, or accepted from metrics.
 
-- [ ] **Step 3: Run final verification**
+- [x] **Step 3: Run final verification**
 
 ```bash
 cargo fmt --check
@@ -289,7 +289,13 @@ git diff --check
 
 Expected: all pass. Historical ignored renderers remain ignored.
 
-- [ ] **Step 4: Verify boundaries and finish**
+Result: every gate passed except the exact Clippy command, which reports the
+pre-existing `clippy::large-enum-variant` warning on `VoiceModel` identically
+on unchanged `main`. Clippy passes with only that baseline lint allowed; the
+kick branch does not change the production enum. `docs/HANDOFF.md` records the
+exception rather than claiming an all-green run.
+
+- [x] **Step 4: Verify boundaries and finish**
 
 Confirm no production engine/model/preset/host file changed, no artifact is
 tracked, exactly four WAVs and declared reports exist, final release generation

@@ -51,6 +51,7 @@ fn selected_voices_pass_every_engineering_gate() {
         assert!((-6.0..=-1.0).contains(&evidence.metrics.sample_peak_dbfs));
         assert!(evidence.metrics.true_peak_dbfs <= -1.0);
         assert_eq!(evidence.metrics.ceiling_contacts, 0);
+        assert!(evidence.metrics.tail_is_zero);
         assert!(evidence.metrics.absolute_dc < 1.0e-5);
         assert!(evidence.metrics.maximum_jump < 0.10);
         assert!(evidence.high_rate_residual_db <= -60.0);

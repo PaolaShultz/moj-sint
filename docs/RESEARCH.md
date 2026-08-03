@@ -1394,6 +1394,52 @@ elsewhere, and no Raspberry Pi, callback, latency, polyphony, headphone,
 speaker, mono-listening, or sound-quality claim follows from this workstation
 evidence.
 
+## 2026-08-03 clean house-kick research
+
+The isolated two-voice kick gate uses the TR-808 literature only for durable
+mechanism-level observations: a brief excitation and frequency jump can feed a
+longer resonant body, while envelope timing and retrigger behavior establish
+more of the identity than a distortion stage. It does not clone the circuit.
+
+Werner, Abel, and Smith's physically informed TR-808 bass-drum paper describes
+the bridged-T resonator, trigger pulse, short center-frequency shift, and longer
+pitch sigh. Roland's service notes independently establish the original bass-
+drum circuit context. Chowning's FM paper supports the separate House Impact
+hypothesis that a decaying modulation index can turn a complex onset into a
+simple tonal body. Only these general signal relationships were used; no
+third-party source, preset, sample, equation, parameter table, schematic,
+prose, or figure was copied.
+
+The first Long Pressure implementation used recursive time-varying two-pole
+resonators. Although its poles were inside the unit circle, its 48 kHz versus
+384 kHz fitted residual was approximately -1 to -2.5 dB, so it was rejected.
+The retained original implementation evaluates the two damped swept modes in
+closed form and applies a causal body-rise/coupling envelope. It measures
+-88.953 dB under the same windowed-sinc high-rate comparison. House Impact's
+closed-form phase trajectory measures -89.935 dB. This replacement is an
+engineering result about rate consistency, not proof of better sound.
+
+Primary sources and licensing boundary:
+
+- Kurt James Werner, Jonathan S. Abel, and Julius O. Smith III, “A
+  Physically-Informed, Circuit-Bendable, Digital Model of the Roland TR-808
+  Bass Drum Circuit,” *Proceedings of DAFx-14*, 2014, pp. 159-166,
+  <https://pure.qub.ac.uk/files/124500900/dafx14_kurt_james_werner_a_physically_informed_ci.pdf>.
+  The institutional copy states copyright 2014 by the authors.
+- Roland Corporation, *TR-808 Service Notes*, first edition, June 1981,
+  <https://manuals.plus/m/471e79efe21a3f44a7bfcc01e2ac2145869d12240070c1644e57f5db236b7cd5.pdf>.
+  Treat this proprietary service document as factual reference only.
+- John M. Chowning, “The Synthesis of Complex Audio Spectra by Means of
+  Frequency Modulation,” *Journal of the Audio Engineering Society* 21(7),
+  1973, pp. 526-534,
+  <https://charlesames.net/pdf/JohnChowning/frequency-modulation.pdf>.
+  Publisher copyright should be presumed.
+
+The resulting voices are original Moj Sint experiments, not 808/909
+emulations or compatible presets. Their automated gates establish finite,
+bounded, deterministic output and causal mechanism activity only. Musical
+quality remains an open human-listening question.
+
 ## Real-time I/O and platform
 
 - JACK project, [API overview](https://jackaudio.org/api/) and

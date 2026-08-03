@@ -34,12 +34,7 @@ impl HouseImpact {
         let samples = (0..frames)
             .map(|frame| {
                 let time = frame as f64 / f64::from(sample_rate);
-                let attack = if time < ATTACK_SECONDS {
-                    0.5 - 0.5 * (PI * time / ATTACK_SECONDS).cos()
-                } else {
-                    1.0
-                };
-                let amplitude = attack * (-1000.0_f64.ln() * time / DECAY_60_DB_SECONDS).exp();
+                let amplitude = amplitude_at(time);
                 let carrier_phase = swept_phase(time);
                 let modifier_phase = MODIFIER_RATIO * (carrier_phase - PHASE_OFFSET_CYCLES);
                 let index = f64::from(config.modifier_amount)
@@ -89,6 +84,15 @@ fn swept_phase(time: f64) -> f64 {
         + (START_HZ - BODY_HZ) * (1.0 - (-rate * time).exp()) / rate
 }
 
+fn amplitude_at(time: f64) -> f64 {
+    let attack = if time < ATTACK_SECONDS {
+        0.5 - 0.5 * (PI * time / ATTACK_SECONDS).cos()
+    } else {
+        1.0
+    };
+    attack * (-1000.0_f64.ln() * time / DECAY_60_DB_SECONDS).exp()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,6 +106,17 @@ mod tests {
         let before = swept_phase(PITCH_SECONDS - 1.0e-9);
         let after = swept_phase(PITCH_SECONDS + 1.0e-9);
         assert!((after - before).abs() < 1.0e-5);
+    }
+
+    #[test]
+    fn amplitude_envelope_decreases_after_the_attack_and_reaches_its_decay_window() {
+        let mut previous = amplitude_at(ATTACK_SECONDS);
+        for frame in 49..=48_000 {
+            let current = amplitude_at(frame as f64 / 48_000.0);
+            assert!(current <= previous);
+            previous = current;
+        }
+        assert!(amplitude_at(DECAY_60_DB_SECONDS) <= 1.0e-3);
     }
 
     #[test]
