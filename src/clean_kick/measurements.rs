@@ -95,7 +95,8 @@ pub fn evaluate(render: &KickRender) -> Result<KickEvidence, KickError> {
     }
     let mut metrics = measure(&render.samples);
     let (high_rate_residual_db, true_peak) = measure_high_rate(render.config, render.sample_rate)?;
-    metrics.true_peak_dbfs = amplitude_db(true_peak);
+    metrics.true_peak_dbfs =
+        amplitude_db(true_peak.max(10.0_f64.powf(metrics.sample_peak_dbfs / 20.0)));
     let (onset_ablation_db, body_ablation_db) = measure_ablation(render)?;
     Ok(KickEvidence {
         topology: render.config.topology,

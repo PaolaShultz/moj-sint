@@ -1,6 +1,6 @@
 use assert_no_alloc::assert_no_alloc;
 use moj_sint::clean_kick::{
-    KickTopology, PreparedKick, SAMPLE_RATE, evaluate, render_solo, select,
+    KickTopology, PreparedKick, SAMPLE_RATE, evaluate, render_repeated, render_solo, select,
 };
 
 #[test]
@@ -54,5 +54,19 @@ fn selected_voices_pass_every_engineering_gate() {
         assert!(evidence.metrics.absolute_dc < 1.0e-5);
         assert!(evidence.metrics.maximum_jump < 0.10);
         assert!(evidence.high_rate_residual_db <= -60.0);
+
+        let stress = render_repeated(config, SAMPLE_RATE, 248, 4).unwrap();
+        assert!(stress.samples.iter().all(|sample| sample.is_finite()));
+        assert!(
+            stress
+                .samples
+                .windows(2)
+                .all(|pair| (pair[1] - pair[0]).abs() < 0.10)
+        );
+        assert!(
+            stress.samples[stress.samples.len() - 256..]
+                .iter()
+                .all(|&sample| sample == 0.0)
+        );
     }
 }

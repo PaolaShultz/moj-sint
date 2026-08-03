@@ -123,7 +123,7 @@ pub fn render_solo(config: KickConfig, sample_rate: u32) -> Result<KickRender, K
         KickTopology::HouseImpact => 1.0,
         KickTopology::LongPressure => 1.5,
     };
-    let frames = (seconds * sample_rate as f32).round() as usize;
+    let frames = (seconds * sample_rate as f32).round() as usize + sample_rate as usize / 100;
     let mut voice = PreparedKick::from_config(config, sample_rate)?;
     voice.trigger();
     let samples = (0..frames).map(|_| voice.sample()).collect();
