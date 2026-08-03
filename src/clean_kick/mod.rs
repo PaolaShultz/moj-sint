@@ -1,4 +1,5 @@
 mod house;
+mod pressure;
 
 use thiserror::Error;
 
@@ -22,19 +23,23 @@ pub enum KickError {
 
 pub enum PreparedKick {
     House(house::HouseImpact),
+    Pressure(pressure::LongPressure),
 }
 
 impl PreparedKick {
     pub fn new(topology: KickTopology, sample_rate: u32) -> Result<Self, KickError> {
         match topology {
             KickTopology::HouseImpact => Ok(Self::House(house::HouseImpact::new(sample_rate)?)),
-            KickTopology::LongPressure => Err(KickError::Unavailable),
+            KickTopology::LongPressure => {
+                Ok(Self::Pressure(pressure::LongPressure::new(sample_rate)?))
+            }
         }
     }
 
     pub fn trigger(&mut self) {
         match self {
             Self::House(voice) => voice.trigger(),
+            Self::Pressure(voice) => voice.trigger(),
         }
     }
 
@@ -42,6 +47,7 @@ impl PreparedKick {
     pub fn sample(&mut self) -> f32 {
         match self {
             Self::House(voice) => voice.sample(),
+            Self::Pressure(voice) => voice.sample(),
         }
     }
 }
