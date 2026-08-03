@@ -3,6 +3,7 @@
 pub const ENGINE_NAME: &str = "Moj Sint";
 
 pub mod analysis;
+pub mod clean_kick;
 pub mod compact_composite;
 pub mod composite_machine;
 pub mod control;
