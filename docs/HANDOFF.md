@@ -1937,33 +1937,39 @@ saturation to 0.32, versus Big Rock's -5 dB output, 0.18 body, and 0.12
 saturation. Compression or normalization can raise it, but EQ alone cannot
 create the missing low-frequency source identity.
 
-The disposable successor at
-`artifacts/KICK-REVIEW--CURRENT-ONLY--COMPRESSED-AND-ROOM/` contains 12
-kick-only 48 kHz stereo float32 files. Its folder says explicitly that it is
-the only current batch. Every WAV filename repeats the source, engine,
-parallel-compression ratio, dry/no-reverb or 12% short-room state, optional sub
-repair, and -1 dBFS peak. A leading plain-text file gives the exact listening
-order and all processing values without requiring Markdown rendering. Each of
-the five sources has one dry and one restrained short-room version. Every file
-uses the same -6 dBFS detector input, 4:1 parallel-compression branch at -18
-dBFS, 4 ms attack, 120 ms release, 3 ms lookahead, 6 dB branch makeup, and
-final -1.0 dBFS sample peak. The room is a 12% return high-passed at 120 Hz. No
-file contains a snare, pattern, second kit, or second kick sample.
+The next 12-file solo-kick successor was also rejected. Despite louder parallel
+compression, dry/room pairs, explicit source names, and a labelled sub-rescue,
+isolated one-shots did not provide a rhythm against which the user could judge
+kick/snare balance. The user also still heard tom-like sources. That entire
+solo folder and its support files were permanently deleted rather than
+retained as another batch.
 
-Two separately labelled Experimental Noise rescue files add a centered
-83-to-49 Hz synthesized sub with a 750 ms decay and cut 185 Hz by 3.5 dB before
-the same processing. This raises its below-90 Hz RMS by about 4.6 dB and its
-whole-file RMS by about 4.5 dB relative to the ordinary compressed version at
-the same -1.0 dBFS peak. It is a transparent audition hypothesis, not a hidden
-claim that the factory source itself is bass-heavy.
+The only current audition is now
+`artifacts/RHYTHMS - CURRENT ONLY/`. It contains exactly three simply named
+WAVs plus `Effects.txt`: `Big Rock - Rhythm - Processed.wav`, `Experimental
+Noise - Rhythm - Processed.wav`, and `Electronic House - Rhythm -
+Processed.wav`. Each file uses one fresh instance of its named SHR Drums kit
+and schedules eight literal alternating quarter-note hits at 124 BPM and
+velocity 127: kick note 36, snare note 38, repeated four times. No file mixes
+kits. Moj Sint is excluded because it has no same-kit snare; no substitute was
+invented.
 
-The isolated renderer's four focused compression, sub, room, and peak-safety
-tests passed with Rust 1.97.1. Two release generations matched byte-for-byte.
-All sample peaks are -1.0 dBFS; independent 4x SoX resampling found a maximum
-amplitude of 0.912, below full scale. After the user rejected retained trash,
-the superseded first v2 render, redundant second candidate, temporary renderer,
-and their Trash metadata were permanently deleted, recovering approximately
-476 MiB. No other artifact, musical file, factory package, or source was
-removed. No JACK, ALSA, MIDI, playback, or hardware action ran, no factory
-package or production source changed, and human listening of the successor
-remains open.
+All three files receive the same external presentation after the kit's own bus:
+4:1 compression at -18 dBFS with 4 ms attack, 120 ms release, and 3 ms
+lookahead; one restrained short-room return at -10 dB wet gain; and fixed -1
+dBFS peak normalization. They are stereo 48 kHz float32. The temporary rhythm
+renderer, its raw WAVs, build output, obsolete solo helper, and prior solo batch
+were permanently removed after the three final files passed basic format
+checks.
+
+The user explicitly authorized soundcard playback. A private reusable
+allocation-free C JACK WAV player now preloads float WAVs, uses
+`JACK_NO_START_SERVER`, creates only `shr-wav-review:out_l/out_r`, connects
+them to `system:playback_1/2`, and closes cleanly after playback. The first
+attempt to discover an installed player accidentally ran `jack_simple_client`'s
+built-in approximately 1 kHz test oscillator; it was stopped immediately and
+left no ports. Do not run unknown JACK example clients to discover their CLI.
+Use `user/bin/play-current-rhythms`, which played the three current files
+through the configured AudioBox in Big Rock, Experimental Noise, Electronic
+House order and disconnected cleanly. No JACK lifecycle, persistent route,
+MIDI, recording, factory package, or production source changed.
