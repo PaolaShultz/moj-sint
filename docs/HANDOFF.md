@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-08-01, Europe/Zagreb.
+Last updated: 2026-08-03, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -1798,3 +1798,30 @@ Fresh feature-worktree verification:
   byte-for-byte except `workstation-cost.txt`; and
 - artifact hygiene confirmed one ignored directory, exactly one passing WAV,
   and no rejected or prior-batch output.
+
+## Two clean house-kick design checkpoint
+
+Approved for written design on 2026-08-03 and awaiting spec review before
+implementation:
+
+- build two separate offline kick voices rather than one morphing compromise;
+- make **House Impact** a tight 200-400 ms phase-modulated carrier whose shape
+  envelope drives pitch and modifier depth;
+- make **Long Pressure** a 500-900 ms linearly coupled two-resonator body whose
+  envelope transfers energy from an impact mode into a low mode;
+- obtain weight from envelope motion, phase, and controlled resonance, with no
+  noise layer, clipping, saturation, waveshaping, limiter, compressor, or
+  automatic normalization;
+- render exactly two solo WAVs and one 124 BPM four-on-the-floor presentation
+  for each topology under `artifacts/two-clean-house-kicks/`;
+- require finite, deterministic, allocation-free output, zero clipped samples,
+  -1 dBTP headroom, DC/jump/decay/retrigger checks, causal ablations, and an 8x
+  high-rate comparison; and
+- keep production `Engine`, models, presets, twelve controls, JACK, ALSA,
+  SHR-DAW, and factory catalogs unchanged until human listening and an explicit
+  later integration decision.
+
+The canonical design is
+`docs/superpowers/specs/2026-08-03-two-clean-house-kicks-design.md`. Generated
+audio and reports remain disposable unless the user explicitly selects a
+specific result for preservation.
