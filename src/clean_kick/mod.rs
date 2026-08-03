@@ -133,3 +133,41 @@ pub fn render_solo(config: KickConfig, sample_rate: u32) -> Result<KickRender, K
         samples,
     })
 }
+
+pub fn render_repeated(
+    config: KickConfig,
+    sample_rate: u32,
+    bpm: u32,
+    bars: u32,
+) -> Result<KickRender, KickError> {
+    if bpm == 0 || bars == 0 {
+        return Err(KickError::InvalidConfig);
+    }
+    let beats = bars.checked_mul(4).ok_or(KickError::InvalidConfig)?;
+    let sequence_frames =
+        (u64::from(beats) * u64::from(sample_rate) * 60 / u64::from(bpm)) as usize;
+    let tail_frames = match config.topology {
+        KickTopology::HouseImpact => sample_rate as usize,
+        KickTopology::LongPressure => sample_rate as usize * 3 / 2,
+    };
+    let mut voice = PreparedKick::from_config(config, sample_rate)?;
+    let mut next_beat = 0_u32;
+    let samples = (0..sequence_frames + tail_frames)
+        .map(|frame| {
+            if next_beat < beats {
+                let trigger_frame =
+                    (u64::from(next_beat) * u64::from(sample_rate) * 60 / u64::from(bpm)) as usize;
+                if frame == trigger_frame {
+                    voice.trigger();
+                    next_beat += 1;
+                }
+            }
+            voice.sample()
+        })
+        .collect();
+    Ok(KickRender {
+        config,
+        sample_rate,
+        samples,
+    })
+}
