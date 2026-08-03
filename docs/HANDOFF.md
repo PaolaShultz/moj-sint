@@ -1951,8 +1951,9 @@ and Electronic House, each named `<sound> - Rhythm - Processed.wav`. Every file
 schedules eight literal alternating quarter-note hits at 124 BPM and velocity
 127: kick, snare, repeated four times. Big Rock, Experimental Noise, and
 Electronic House use one fresh instance of their own SHR Drums kit. At the
-user's explicit request, House Impact and Long Pressure use their named Moj
-Sint kick with the Electronic House snare; no other sources are mixed.
+user's explicit request, House Impact and Long Pressure now trigger their new
+notes 27 and 28 inside one fresh Electronic House kit instance with its
+note-38 snare; no other sources are mixed.
 
 All five files receive the same external presentation after the source bus:
 4:1 compression at -18 dBFS with 4 ms attack, 120 ms release, and 3 ms
@@ -1972,7 +1973,21 @@ high-pitched, distant fuzz because it stacked hard clipping, 4.3 kHz band-pass
 noise, FM, and ring modulation. The current revision instead uses a short 158
 Hz body, low-pass broadband noise, no FM or ring modulation, restrained cubic
 drive, and brief quiet modes. Its eight-hit rhythm was regenerated with the
-same external processing and replayed alone. Human acceptance remains open.
+same external processing and replayed alone. The owner accepted it as a
+convincing snare—possibly better than Big Rock's—and explicitly classified it
+as rock/industrial rather than suitable for Electronic House. Leave it as is
+in Experimental Noise and do not move it into the House kit.
+
+The owner subsequently selected House Impact and Long Pressure for inclusion
+as two additional Electronic House kicks. Notes 33–35 were already occupied by
+Tight Kick, Clipped Kick, and Sub Kick, so SHR preserved those voices and the
+original note-36 House Kick, adding the new sounds on free notes 27 and 28.
+Because SHR Drums does not implement Moj Sint's direct-PM and coupled-mode
+topologies, the kit stores their deterministic 48 kHz float32 CC0 synthetic
+one-shot exports rather than an altered approximation. Both trigger through
+the ordinary House kit bus and note-38 House snare. The two updated rhythms
+were played through the AudioBox; final judgment of their in-kit presentation
+remains open.
 
 The user explicitly authorized soundcard playback. A private reusable
 allocation-free C JACK WAV player now preloads float WAVs, uses
@@ -1985,4 +2000,5 @@ Use `user/bin/play-current-rhythms`, which played the five current files through
 the configured AudioBox in House Impact, Long Pressure, Big Rock, Experimental
 Noise, Electronic House order and disconnected cleanly. No JACK lifecycle,
 persistent route, MIDI, or recording changed. The Experimental Noise source
-repair is the sole factory-package change from this playback work.
+repair and the two added Electronic House kicks are the only factory-package
+changes from this playback work.
