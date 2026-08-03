@@ -1918,3 +1918,52 @@ second-generation output, worktree, and Trash entry were removed. The
 canonical design is
 `docs/superpowers/specs/2026-08-03-kick-comparison-with-snares-design.md`.
 No kick, balance, or integration direction is accepted until the user listens.
+
+Human listening rejected that batch on 2026-08-03. The delivered factory
+levels sounded distant, Experimental Noise sounded like an unsuccessful tom
+rather than a bass-heavy kick, the filenames did not make the comparison easy
+enough to navigate, and the controlled common-snare section's deliberate use
+of the Electronic House snare with other kits was unwanted and confusing. The
+old 15-file artifact was already absent when the rejection was processed; it
+was not regenerated or archived.
+
+Inspection explains the level and identity problem. The raw factory peaks were
+approximately -9.7 dBFS for Big Rock, -15.3 dBFS for Experimental Noise, and
+-6.8 dBFS for Electronic House at velocity 127. Big Rock and Experimental
+Noise use the same Muldjord note-36 kick sample assignments, voice gain, and
+voice envelope. Experimental Noise does not supply a distinct bass kick; its
+kit bus instead lowers output to -7 dB, reduces body to 0.10, and raises
+saturation to 0.32, versus Big Rock's -5 dB output, 0.18 body, and 0.12
+saturation. Compression or normalization can raise it, but EQ alone cannot
+create the missing low-frequency source identity.
+
+The disposable successor at
+`artifacts/KICK-REVIEW--CURRENT-ONLY--COMPRESSED-AND-ROOM/` contains 12
+kick-only 48 kHz stereo float32 files. Its folder says explicitly that it is
+the only current batch. Every WAV filename repeats the source, engine,
+parallel-compression ratio, dry/no-reverb or 12% short-room state, optional sub
+repair, and -1 dBFS peak. A leading plain-text file gives the exact listening
+order and all processing values without requiring Markdown rendering. Each of
+the five sources has one dry and one restrained short-room version. Every file
+uses the same -6 dBFS detector input, 4:1 parallel-compression branch at -18
+dBFS, 4 ms attack, 120 ms release, 3 ms lookahead, 6 dB branch makeup, and
+final -1.0 dBFS sample peak. The room is a 12% return high-passed at 120 Hz. No
+file contains a snare, pattern, second kit, or second kick sample.
+
+Two separately labelled Experimental Noise rescue files add a centered
+83-to-49 Hz synthesized sub with a 750 ms decay and cut 185 Hz by 3.5 dB before
+the same processing. This raises its below-90 Hz RMS by about 4.6 dB and its
+whole-file RMS by about 4.5 dB relative to the ordinary compressed version at
+the same -1.0 dBFS peak. It is a transparent audition hypothesis, not a hidden
+claim that the factory source itself is bass-heavy.
+
+The isolated renderer's four focused compression, sub, room, and peak-safety
+tests passed with Rust 1.97.1. Two release generations matched byte-for-byte.
+All sample peaks are -1.0 dBFS; independent 4x SoX resampling found a maximum
+amplitude of 0.912, below full scale. After the user rejected retained trash,
+the superseded first v2 render, redundant second candidate, temporary renderer,
+and their Trash metadata were permanently deleted, recovering approximately
+476 MiB. No other artifact, musical file, factory package, or source was
+removed. No JACK, ALSA, MIDI, playback, or hardware action ran, no factory
+package or production source changed, and human listening of the successor
+remains open.
