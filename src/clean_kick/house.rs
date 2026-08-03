@@ -1,167 +1,126 @@
-use crate::clean_kick::KickError;
-use crate::dsp::six_op_pm::SineTable;
-use std::f32::consts::TAU;
+use crate::clean_kick::{DcBlocker, KickConfig, KickError};
+use std::f64::consts::{PI, TAU};
 
-const START_HZ: f32 = 156.0;
-const BODY_HZ: f32 = 52.0;
-const PITCH_MS: f32 = 55.0;
-const MODIFIER_RATIO: f32 = 2.0;
-const INITIAL_INDEX_RADIANS: f32 = 0.9;
-const INDEX_MS: f32 = 45.0;
-const ATTACK_MS: f32 = 1.0;
-const DECAY_60_DB_MS: f32 = 320.0;
-const OUTPUT_GAIN: f32 = 0.8;
+const DURATION_SECONDS: f64 = 1.0;
+const START_HZ: f64 = 156.0;
+const BODY_HZ: f64 = 52.0;
+const PITCH_SECONDS: f64 = 0.055;
+const MODIFIER_RATIO: f64 = 2.0;
+const INDEX_SECONDS: f64 = 0.045;
+const ATTACK_SECONDS: f64 = 0.001;
+const DECAY_60_DB_SECONDS: f64 = 0.320;
+const PHASE_OFFSET_CYCLES: f64 = 0.75;
 
+/// A phase-modulated one-shot whose complete trajectory is prepared off the
+/// audio thread. Triggering and sampling only reset/read an index.
 pub struct HouseImpact {
-    table: SineTable,
-    sample_rate: f32,
-    carrier_phase: f32,
-    modifier_phase: f32,
-    frequency: f32,
-    pitch_step: f32,
-    pitch_remaining: u32,
-    pitch_frames: u32,
-    index: f32,
-    index_step: f32,
-    index_remaining: u32,
-    index_frames: u32,
-    amplitude: f32,
-    decay_step: f32,
-    attack_frames: u32,
-    frame: u32,
+    samples: Box<[f32]>,
+    frame: usize,
     active: bool,
 }
 
 impl HouseImpact {
-    pub fn new(sample_rate: u32) -> Result<Self, KickError> {
-        if sample_rate < 8_000 {
-            return Err(KickError::InvalidSampleRate);
+    pub fn new(config: KickConfig, sample_rate: u32) -> Result<Self, KickError> {
+        if sample_rate < 8_000
+            || !config.output_gain.is_finite()
+            || !(0.0..=2.0).contains(&config.output_gain)
+            || !config.modifier_amount.is_finite()
+            || !(0.0..=1.2).contains(&config.modifier_amount)
+        {
+            return Err(KickError::InvalidConfig);
         }
-        let pitch_frames = ms_frames(PITCH_MS, sample_rate);
-        let index_frames = ms_frames(INDEX_MS, sample_rate);
-        let attack_frames = ms_frames(ATTACK_MS, sample_rate);
-        let decay_frames = ms_frames(DECAY_60_DB_MS, sample_rate);
+        let frames = (DURATION_SECONDS * f64::from(sample_rate)).round() as usize;
+        let mut dc_blocker = DcBlocker::new(sample_rate);
+        let samples = (0..frames)
+            .map(|frame| {
+                let time = frame as f64 / f64::from(sample_rate);
+                let attack = if time < ATTACK_SECONDS {
+                    0.5 - 0.5 * (PI * time / ATTACK_SECONDS).cos()
+                } else {
+                    1.0
+                };
+                let amplitude = attack * (-1000.0_f64.ln() * time / DECAY_60_DB_SECONDS).exp();
+                let carrier_phase = swept_phase(time);
+                let modifier_phase = MODIFIER_RATIO * (carrier_phase - PHASE_OFFSET_CYCLES);
+                let index = f64::from(config.modifier_amount)
+                    * (-1000.0_f64.ln() * time / INDEX_SECONDS).exp();
+                let modifier = (TAU * modifier_phase).sin();
+                let output = f64::from(config.output_gain)
+                    * amplitude
+                    * (TAU * carrier_phase + index * modifier).sin();
+                dc_blocker.sample(output as f32)
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
         Ok(Self {
-            table: SineTable::new(),
-            sample_rate: sample_rate as f32,
-            carrier_phase: 0.0,
-            modifier_phase: 0.0,
-            frequency: START_HZ,
-            pitch_step: (BODY_HZ / START_HZ).powf(1.0 / pitch_frames as f32),
-            pitch_remaining: 0,
-            pitch_frames,
-            index: INITIAL_INDEX_RADIANS,
-            index_step: 1.0e-3_f32.powf(1.0 / index_frames as f32),
-            index_remaining: 0,
-            index_frames,
-            amplitude: 0.0,
-            decay_step: 1.0e-3_f32.powf(1.0 / decay_frames as f32),
-            attack_frames,
+            samples,
             frame: 0,
             active: false,
         })
     }
 
     pub fn trigger(&mut self) {
-        self.carrier_phase = 0.0;
-        self.modifier_phase = 0.0;
-        self.frequency = START_HZ;
-        self.pitch_remaining = self.pitch_frames;
-        self.index = INITIAL_INDEX_RADIANS;
-        self.index_remaining = self.index_frames;
-        self.amplitude = 0.0;
         self.frame = 0;
         self.active = true;
     }
 
     #[inline]
     pub fn sample(&mut self) -> f32 {
-        if !self.active {
-            return 0.0;
-        }
-        if self.frame < self.attack_frames {
-            self.amplitude = self.frame as f32 / self.attack_frames as f32;
-        } else {
-            self.amplitude *= self.decay_step;
-        }
-        let modifier = SineTable::lookup(&self.table, self.modifier_phase);
-        let offset_cycles = self.index * modifier / TAU;
-        let output = OUTPUT_GAIN
-            * self.amplitude
-            * SineTable::lookup(&self.table, self.carrier_phase + offset_cycles);
-        self.carrier_phase = (self.carrier_phase + self.frequency / self.sample_rate).fract();
-        self.modifier_phase =
-            (self.modifier_phase + MODIFIER_RATIO * self.frequency / self.sample_rate).fract();
-        if self.pitch_remaining > 0 {
-            self.pitch_remaining -= 1;
-            self.frequency = if self.pitch_remaining == 0 {
-                BODY_HZ
-            } else {
-                self.frequency * self.pitch_step
-            };
-        }
-        if self.index_remaining > 0 {
-            self.index_remaining -= 1;
-            self.index = if self.index_remaining == 0 {
-                0.0
-            } else {
-                self.index * self.index_step
-            };
-        }
-        self.frame = self.frame.saturating_add(1);
-        if self.amplitude < 1.0e-8 && self.frame > self.attack_frames {
+        if !self.active || self.frame >= self.samples.len() {
             self.active = false;
             return 0.0;
         }
+        let output = self.samples[self.frame];
+        self.frame += 1;
         if output.is_finite() { output } else { 0.0 }
     }
 }
 
-fn ms_frames(milliseconds: f32, sample_rate: u32) -> u32 {
-    (milliseconds * sample_rate as f32 / 1_000.0).round() as u32
+#[cfg(test)]
+fn frequency_at(time: f64) -> f64 {
+    let rate = 1000.0_f64.ln() / PITCH_SECONDS;
+    BODY_HZ + (START_HZ - BODY_HZ) * (-rate * time).exp()
+}
+
+fn swept_phase(time: f64) -> f64 {
+    let rate = 1000.0_f64.ln() / PITCH_SECONDS;
+    PHASE_OFFSET_CYCLES
+        + BODY_HZ * time
+        + (START_HZ - BODY_HZ) * (1.0 - (-rate * time).exp()) / rate
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clean_kick::KickTopology;
     use assert_no_alloc::assert_no_alloc;
 
     #[test]
-    fn pitch_and_modifier_settle_on_the_declared_frames() {
-        let mut voice = HouseImpact::new(48_000).unwrap();
-        voice.trigger();
-        assert_no_alloc(|| {
-            for _ in 0..voice.pitch_frames {
-                voice.sample();
-            }
-        });
-        assert_eq!(voice.frequency.to_bits(), BODY_HZ.to_bits());
-        assert_eq!(voice.pitch_remaining, 0);
-        assert_eq!(voice.index, 0.0);
+    fn pitch_settles_in_the_declared_body_range_without_a_phase_branch() {
+        assert_eq!(frequency_at(0.0), START_HZ);
+        assert!((48.0..=58.0).contains(&frequency_at(0.080)));
+        let before = swept_phase(PITCH_SECONDS - 1.0e-9);
+        let after = swept_phase(PITCH_SECONDS + 1.0e-9);
+        assert!((after - before).abs() < 1.0e-5);
     }
 
     #[test]
-    fn output_is_bounded_continuous_and_reaches_exact_silence() {
-        let mut voice = HouseImpact::new(48_000).unwrap();
-        voice.trigger();
-        let mut previous = 0.0;
-        let mut maximum_jump = 0.0_f32;
+    fn sample_and_retrigger_are_allocation_free_and_reach_exact_silence() {
+        let mut voice =
+            HouseImpact::new(KickConfig::default_for(KickTopology::HouseImpact), 48_000).unwrap();
         assert_no_alloc(|| {
+            voice.trigger();
             for _ in 0..48_000 {
-                let sample = voice.sample();
-                maximum_jump = maximum_jump.max((sample - previous).abs());
-                previous = sample;
+                assert!(voice.sample().is_finite());
             }
+            assert_eq!(voice.sample(), 0.0);
+            voice.trigger();
+            assert_eq!(voice.sample(), 0.0);
         });
-        assert!(maximum_jump < 0.10, "maximum_jump={maximum_jump}");
-        assert_eq!(voice.sample(), 0.0);
     }
 
     #[test]
     fn invalid_sample_rate_is_rejected() {
-        assert!(matches!(
-            HouseImpact::new(0),
-            Err(KickError::InvalidSampleRate)
-        ));
+        assert!(HouseImpact::new(KickConfig::default_for(KickTopology::HouseImpact), 0).is_err());
     }
 }

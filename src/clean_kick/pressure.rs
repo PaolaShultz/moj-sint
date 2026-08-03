@@ -1,205 +1,113 @@
-use crate::clean_kick::KickError;
-use std::f32::consts::TAU;
+use crate::clean_kick::{DcBlocker, KickConfig, KickError};
+use std::f64::consts::{PI, TAU};
 
-const DURATION_SECONDS: f32 = 1.5;
-const EXCITATION_MS: f32 = 1.0;
-const IMPACT_START_HZ: f32 = 112.0;
-const IMPACT_END_HZ: f32 = 76.0;
-const IMPACT_SWEEP_MS: f32 = 100.0;
-const IMPACT_DECAY_MS: f32 = 115.0;
-const BODY_START_HZ: f32 = 58.0;
-const BODY_END_HZ: f32 = 48.0;
-const BODY_SWEEP_MS: f32 = 280.0;
-const BODY_DECAY_MS: f32 = 760.0;
-const COUPLING_MS: f32 = 100.0;
-const IMPACT_INPUT_GAIN: f32 = 0.025;
-const BODY_INPUT_GAIN: f32 = 0.12;
-const COUPLING_GAIN: f32 = 0.16;
-const OUTPUT_GAIN: f32 = 0.72;
-
-#[derive(Clone, Copy, Default)]
-struct Resonator {
-    y1: f32,
-    y2: f32,
-}
-
-impl Resonator {
-    #[inline]
-    fn sample(&mut self, input: f32, coefficients: Coefficients) -> f32 {
-        let output =
-            coefficients.input_gain * input + coefficients.a1 * self.y1 - coefficients.a2 * self.y2;
-        self.y2 = self.y1;
-        self.y1 = output;
-        output
-    }
-
-    fn clear(&mut self) {
-        *self = Self::default();
-    }
-}
-
-#[derive(Clone, Copy)]
-struct Coefficients {
-    a1: f32,
-    a2: f32,
-    input_gain: f32,
-}
+const DURATION_SECONDS: f64 = 1.5;
+const EXCITATION_SECONDS: f64 = 0.001;
+const IMPACT_START_HZ: f64 = 112.0;
+const IMPACT_END_HZ: f64 = 76.0;
+const IMPACT_SWEEP_SECONDS: f64 = 0.100;
+const IMPACT_DECAY_SECONDS: f64 = 0.115;
+const BODY_START_HZ: f64 = 58.0;
+const BODY_END_HZ: f64 = 48.0;
+const BODY_SWEEP_SECONDS: f64 = 0.280;
+const BODY_DECAY_SECONDS: f64 = 0.760;
+const COUPLING_SECONDS: f64 = 0.100;
+const PHASE_OFFSET_CYCLES: f64 = -0.25;
 
 pub struct LongPressure {
-    impact: Resonator,
-    body: Resonator,
-    impact_coefficients: Box<[Coefficients]>,
-    body_coefficients: Box<[Coefficients]>,
-    excitation: Box<[f32]>,
-    coupling: Box<[f32]>,
+    samples: Box<[f32]>,
     frame: usize,
     active: bool,
 }
 
 impl LongPressure {
-    pub fn new(sample_rate: u32) -> Result<Self, KickError> {
-        if sample_rate < 8_000 {
+    pub fn new(config: KickConfig, sample_rate: u32) -> Result<Self, KickError> {
+        if sample_rate < 8_000
+            || !config.output_gain.is_finite()
+            || !(0.0..=2.0).contains(&config.output_gain)
+            || !config.modifier_amount.is_finite()
+            || !(0.0..=2.0).contains(&config.modifier_amount)
+        {
             return Err(KickError::InvalidSampleRate);
         }
-        let frames = (DURATION_SECONDS * sample_rate as f32).round() as usize;
-        let impact_radius = decay_radius(IMPACT_DECAY_MS, sample_rate);
-        let body_radius = decay_radius(BODY_DECAY_MS, sample_rate);
-        let impact_coefficients = coefficient_trajectory(
-            IMPACT_START_HZ,
-            IMPACT_END_HZ,
-            IMPACT_SWEEP_MS,
-            impact_radius,
-            IMPACT_INPUT_GAIN,
-            frames,
-            sample_rate,
-        );
-        let body_coefficients = coefficient_trajectory(
-            BODY_START_HZ,
-            BODY_END_HZ,
-            BODY_SWEEP_MS,
-            body_radius,
-            BODY_INPUT_GAIN,
-            frames,
-            sample_rate,
-        );
-        let excitation_frames = ms_frames(EXCITATION_MS, sample_rate) as usize;
-        let excitation = (0..frames)
+        let frames = (DURATION_SECONDS * f64::from(sample_rate)).round() as usize;
+        let mut dc_blocker = DcBlocker::new(sample_rate);
+        let samples = (0..frames)
             .map(|frame| {
-                if frame < excitation_frames {
-                    let phase = frame as f32 / (excitation_frames - 1).max(1) as f32;
-                    0.5 - 0.5 * (TAU * phase).cos()
+                let time = frame as f64 / f64::from(sample_rate);
+                let excitation = if time < EXCITATION_SECONDS {
+                    let phase = time / EXCITATION_SECONDS;
+                    0.5 - 0.5 * (PI * phase).cos()
                 } else {
-                    0.0
-                }
-            })
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
-        let coupling_frames = ms_frames(COUPLING_MS, sample_rate) as usize;
-        let coupling = (0..frames)
-            .map(|frame| {
-                if frame < coupling_frames {
-                    COUPLING_GAIN * (1.0 - frame as f32 / coupling_frames as f32)
-                } else {
-                    0.0
-                }
+                    1.0
+                };
+                let impact_envelope =
+                    excitation * (-1000.0_f64.ln() * time / IMPACT_DECAY_SECONDS).exp();
+                let body_rise = 1.0 - (-1000.0_f64.ln() * time / COUPLING_SECONDS).exp();
+                let body_envelope = f64::from(config.modifier_amount)
+                    * body_rise
+                    * (-1000.0_f64.ln() * time / BODY_DECAY_SECONDS).exp();
+                let impact_phase =
+                    swept_phase(time, IMPACT_START_HZ, IMPACT_END_HZ, IMPACT_SWEEP_SECONDS);
+                let body_phase = swept_phase(time, BODY_START_HZ, BODY_END_HZ, BODY_SWEEP_SECONDS);
+                let impact = impact_envelope * (TAU * impact_phase).sin();
+                let body = body_envelope * (TAU * body_phase).sin();
+                let output = (f64::from(config.output_gain) * (0.24 * impact + body)) as f32;
+                dc_blocker.sample(output)
             })
             .collect::<Vec<_>>()
             .into_boxed_slice();
         Ok(Self {
-            impact: Resonator::default(),
-            body: Resonator::default(),
-            impact_coefficients,
-            body_coefficients,
-            excitation,
-            coupling,
+            samples,
             frame: 0,
             active: false,
         })
     }
 
     pub fn trigger(&mut self) {
-        self.impact.clear();
-        self.body.clear();
         self.frame = 0;
         self.active = true;
     }
 
     #[inline]
     pub fn sample(&mut self) -> f32 {
-        if !self.active || self.frame >= self.excitation.len() {
-            self.impact.clear();
-            self.body.clear();
+        if !self.active || self.frame >= self.samples.len() {
             self.active = false;
             return 0.0;
         }
-        let impact = self.impact.sample(
-            self.excitation[self.frame],
-            self.impact_coefficients[self.frame],
-        );
-        let body = self.body.sample(
-            impact * self.coupling[self.frame],
-            self.body_coefficients[self.frame],
-        );
+        let output = self.samples[self.frame];
         self.frame += 1;
-        let output = OUTPUT_GAIN * (0.28 * impact + body);
         if output.is_finite() { output } else { 0.0 }
     }
 }
 
-fn coefficient_trajectory(
-    start_hz: f32,
-    end_hz: f32,
-    sweep_ms: f32,
-    radius: f32,
-    input_gain: f32,
-    frames: usize,
-    sample_rate: u32,
-) -> Box<[Coefficients]> {
-    let sweep_frames = ms_frames(sweep_ms, sample_rate).max(1) as usize;
-    (0..frames)
-        .map(|frame| {
-            let progress = (frame as f32 / sweep_frames as f32).min(1.0);
-            let frequency = start_hz * (end_hz / start_hz).powf(progress);
-            Coefficients {
-                a1: 2.0 * radius * (TAU * frequency / sample_rate as f32).cos(),
-                a2: radius * radius,
-                input_gain,
-            }
-        })
-        .collect::<Vec<_>>()
-        .into_boxed_slice()
+fn swept_phase(time: f64, start_hz: f64, end_hz: f64, sweep_seconds: f64) -> f64 {
+    let rate = 1000.0_f64.ln() / sweep_seconds;
+    PHASE_OFFSET_CYCLES + end_hz * time + (start_hz - end_hz) * (1.0 - (-rate * time).exp()) / rate
 }
 
-fn decay_radius(decay_60_db_ms: f32, sample_rate: u32) -> f32 {
-    let frames = ms_frames(decay_60_db_ms, sample_rate).max(1);
-    1.0e-3_f32.powf(1.0 / frames as f32)
-}
-
-fn ms_frames(milliseconds: f32, sample_rate: u32) -> u32 {
-    (milliseconds * sample_rate as f32 / 1_000.0).round() as u32
+#[cfg(test)]
+fn modal_radius(decay_seconds: f64, sample_rate: u32) -> f64 {
+    (-1000.0_f64.ln() / (decay_seconds * f64::from(sample_rate))).exp()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clean_kick::KickTopology;
     use assert_no_alloc::assert_no_alloc;
 
     #[test]
-    fn every_prepared_pole_is_strictly_stable() {
-        let voice = LongPressure::new(48_000).unwrap();
-        for coefficients in voice
-            .impact_coefficients
-            .iter()
-            .chain(voice.body_coefficients.iter())
-        {
-            assert!(coefficients.a2.sqrt() < 1.0);
-            assert!(coefficients.a1.is_finite());
+    fn analytic_modes_have_strictly_stable_equivalent_radii() {
+        for decay in [IMPACT_DECAY_SECONDS, BODY_DECAY_SECONDS] {
+            assert!(modal_radius(decay, 48_000) < 1.0);
         }
     }
 
     #[test]
     fn sample_and_retrigger_are_allocation_free_and_reach_silence() {
-        let mut voice = LongPressure::new(48_000).unwrap();
+        let mut voice =
+            LongPressure::new(KickConfig::default_for(KickTopology::LongPressure), 48_000).unwrap();
         assert_no_alloc(|| {
             voice.trigger();
             for _ in 0..72_000 {

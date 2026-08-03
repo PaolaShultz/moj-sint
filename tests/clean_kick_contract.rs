@@ -1,5 +1,7 @@
 use assert_no_alloc::assert_no_alloc;
-use moj_sint::clean_kick::{KickTopology, PreparedKick, SAMPLE_RATE};
+use moj_sint::clean_kick::{
+    KickTopology, PreparedKick, SAMPLE_RATE, evaluate, render_solo, select,
+};
 
 #[test]
 fn house_impact_is_deterministic_finite_and_allocation_free() {
@@ -33,4 +35,24 @@ fn long_pressure_is_distinct_stable_and_allocation_free() {
         }
         assert!(difference > 100.0);
     });
+}
+
+#[test]
+fn selected_voices_pass_every_engineering_gate() {
+    for topology in [KickTopology::HouseImpact, KickTopology::LongPressure] {
+        let config = select(topology, SAMPLE_RATE).unwrap();
+        let render = render_solo(config, SAMPLE_RATE).unwrap();
+        let evidence = evaluate(&render).unwrap();
+        assert!(
+            evidence.rejection_reasons().is_empty(),
+            "{evidence:#?}: {:?}",
+            evidence.rejection_reasons()
+        );
+        assert!((-6.0..=-1.0).contains(&evidence.metrics.sample_peak_dbfs));
+        assert!(evidence.metrics.true_peak_dbfs <= -1.0);
+        assert_eq!(evidence.metrics.ceiling_contacts, 0);
+        assert!(evidence.metrics.absolute_dc < 1.0e-5);
+        assert!(evidence.metrics.maximum_jump < 0.10);
+        assert!(evidence.high_rate_residual_db <= -60.0);
+    }
 }
