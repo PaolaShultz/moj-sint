@@ -1,16 +1,15 @@
 # Moj Sint
 
-Moj Sint is a headless Rust Model D instrument and a distinct managed backend
+Moj Sint is a headless experimental synthesizer and a distinct managed backend
 for SHR-DAW. Its library keeps DSP independent of JACK, ALSA, files, processes,
 and clocks; the binary provides strict preset validation, deterministic offline
 rendering, and the live JACK/ALSA host.
 
-The production control surface has twelve stable absolute controls:
-`EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`, `SPACE`,
-`ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. Seven factory starting points
-preserve the exact authored bass, lead, filter-articulation, and matched
-diagnostic configurations. Moving the first eight controls opens the modeled
-mechanisms from any starting point; none has been rejected.
+The current experimental catalog contains three synthesis models: circuit-
+informed Model D, Six-Op PM, and Strange Oscillator. Every model has twelve
+stable absolute controls: eight model-specific timbral roles followed by
+`ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. The fourteen factory starts are
+playable research outcomes and starting points, not a production-release claim.
 
 ## Usage
 
@@ -23,10 +22,9 @@ cargo run -- render presets/reference.mojsint output.wav --note 60 --seconds 1
 cargo run -- --client-name shs-moj-sint --preset presets/reference.mojsint
 ```
 
-The factory catalog is ordered as Full Bass, Full Lead, Full Filter
-Articulation, Matched Idealized, Matched Linear Mixer, Matched Linear Ladder,
-and Matched No Drift or Feedback. These are editable live starting points, not
-seven claims of separate synthesis families.
+The factory catalog contains seven Model D starts, six Six-Op PM starts, and
+one Strange Oscillator start. These are editable live starting points, not
+fourteen claims of separate synthesis families.
 
 The live process publishes one ALSA Sequencer input named `input` and exactly
 two JACK outputs named `out_l` and `out_r`. It does not connect them to physical
@@ -57,7 +55,9 @@ cargo build --release --all-targets
 See [architecture](docs/ARCHITECTURE.md), the
 [live-host contract](docs/HOST_CONTRACT.md), the
 [preset/control schema](docs/PRESET_SCHEMA.md), and
-[portability notes](docs/PORTABILITY.md).
+[portability notes](docs/PORTABILITY.md). The deliberately unscheduled
+[experimental direction](docs/FUTURE_DIRECTION.md) describes open model
+authoring, low-code micro-machines, and AI-assisted exploration.
 
 The cleared public installation boundary and dependency licence review are in
 [THIRD_PARTY.md](THIRD_PARTY.md). Only the files named by

@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-08-04, Europe/Zagreb.
+Last updated: 2026-08-05, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -26,6 +26,38 @@ architecture to polyphony only after native Raspberry Pi callback/headroom
 measurements establish a safe voice budget.
 
 There is no UI in this repository. Control comes through MIDI and SHR-DAW.
+
+## 2026-08-05 Strange Oscillator live experimental integration
+
+The gated Strange Oscillator experiment is now the third live synthesis
+model. One `TYPE` macro selects triangle, saw, pulse, modulated resonator,
+deformed loop, stochastic breakpoints, scanned string, or register machine
+with a 10 ms crossfade. The remaining timbral positions are `FORM`, `WARP`,
+`COUPLE`, `MOTION`, `CHAOS`, `COLOR`, and `SPACE`; positions 9–12 remain ADSR.
+The engine preserves this model's stereo output while Model D and Six-Op PM
+remain dual mono. Live rendering is finite, bounded, deterministic, and
+allocation-free, including rapid macro movement.
+
+Preset schema 6 adds `model = "strange_oscillator"`,
+`strange_patch = "unified"`, and the exact model-specific macro names. Schemas
+1–5 still load and migrate in memory. The cleared starting point is
+`presets/14-strange-oscillator.mojsint`. SHR-DAW has matching schema, catalog,
+route, save, automation, and model-specific control support in its working
+tree. This remains experimental product work. On 2026-08-05 the owner
+explicitly authorized committing and publishing it for continued
+experimentation before the open musical and native-load verdicts. Publication
+is not production acceptance.
+
+## Open experimental direction
+
+Moj Sint should become open to model creation, not merely source-visible. The
+favored long-term authoring surface is the typed low-code micro-machine format
+already outlined in `docs/MICRO_MACHINE_ROUTING.md`, usable directly or with AI
+assistance while retaining the fixed eight-timbral-controls-plus-ADSR surface
+and all real-time validation. A swarm or supersaw-like instrument is a possible
+first familiar experiment for this architecture, not an approved model or
+scheduled promise. The concise product intent is in
+`docs/FUTURE_DIRECTION.md`.
 
 ## User working preferences and authorization
 
@@ -97,6 +129,55 @@ must not be presented as the musical-variation listening gate.
 ## Current workspace state
 
 At this checkpoint:
+
+- The current sound-research milestone is one isolated monophonic Strange
+  Oscillator instrument, not eight instruments. One `TYPE` control selects
+  triangle, saw, pulse, modulated resonator, deformed loop, stochastic
+  breakpoints, scanned string, or register machine. Runtime changes prepare the
+  new topology and crossfade for 10 ms; switching and both sample paths are
+  allocation-free. The other seven timbral roles are `FORM`, `WARP`, `COUPLE`,
+  `MOTION`, `CHAOS`, `COLOR`, and `SPACE`, followed by the unchanged outer ADSR
+  contract. Production `Engine`, schema, presets, host, JACK/ALSA, SHR-DAW, and
+  voice count remain unchanged during this gate.
+- The first 28-reel low/high mapping was rejected by the owner after Triangle:
+  all seven controls sounded like small variations of the same basic sound.
+  Its raw full-output residual floor is not acceptable evidence and must not be
+  cited as success. The replacement adds common structural stages after every
+  topology: strong contour/fifth-harmonic deformation, inharmonic cross/ring
+  coupling, a 0.05–50 Hz deep cyclic envelope, deterministic whole-cycle
+  admit/drop chaos, fundamental-to-fifth harmonic color anchoring plus two-pole
+  tone control, and protected mid/side width. Source-specific FORM behavior is
+  retained.
+- All eight TYPE positions now pass all seven domain-specific landmark tests.
+  FORM/WARP require at least 6 dB normalized harmonic-profile distance;
+  COUPLE requires at least 0.25 cycle decorrelation or equivalent normalized
+  spectral-topology displacement; MOTION proves at least 6 dB envelope depth
+  at each measured endpoint and a 200× rate ratio; CHAOS adds at least 0.08
+  nonrepeatability between modulation-cycle envelope contours; COLOR moves the
+  harmonic center by at least 2×; SPACE changes side/mid energy by at least
+  12 dB. These gates reject inert mappings but do not establish musical value.
+  Separately, the conservative high-rate diagnostic still rejects Saw,
+  stochastic breakpoints, and scanned string at MIDI 84 and rejects the
+  register machine at every test note; TYPE retention for listening is not a
+  production alias/sample-rate acceptance claim.
+- The redesigned disposable listening batch contains exactly sixteen files:
+  eight neutral TYPE references, one uninterrupted held-note TYPE reel through
+  all eight positions using the live crossfade, and seven plainly named
+  `low, silence, high` macro reels on Saw, which the owner preferred in the
+  earlier source comparison. MOTION's low state lasts eleven seconds; CHAOS
+  endpoints last four seconds. No ADSR, effect, master strip, input mix, other
+  synth, sampler, drums, JACK, ALSA, MIDI, or SHR-DAW is rendered. Human
+  listening of this replacement batch is the next decision. The owner-authorized
+  AudioBox playback completed in TYPE, FORM, WARP, COUPLE, MOTION, CHAOS,
+  COLOR, SPACE order and the temporary JACK ports disconnected cleanly; the
+  owner's musical verdict remains open.
+- Fresh Rust 1.97.1 AArch64 validation passed formatting, `git diff --check`,
+  all 304 active normal all-target/all-feature tests, warning-denied Clippy,
+  and the release lab build. Thirty-four historical research, audition,
+  publication-recovery, and native-benchmark tests remained intentionally
+  ignored. Two independent release batches matched recursively byte-for-byte;
+  the aggregate `sha256sum` of the canonical top-level inventory is
+  `d934ec46f6e17853abd261d283f1656b15b58883830f66b544bb53f5cdd4f75e`.
 
 - Version 0.2.3 makes the public install boundary reproducible without changing
   synthesis or host behavior. `rust-toolchain.toml` now pins exact Rust 1.97.1,
@@ -1013,34 +1094,32 @@ context and should not be copied back into the new prompt:
 Continue Moj Sint in `/home/shome/p/moj-sint`. Confirm the owning repository
 and inspect live Git state before changing files.
 
-Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, and the production design and plan
-in
-`docs/superpowers/specs/2026-07-31-six-operator-pm-production-integration-design.md`
-and
-`docs/superpowers/plans/2026-07-31-six-operator-pm-production-integration.md`.
+Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, `docs/FUTURE_DIRECTION.md`, and
+`docs/MICRO_MACHINE_ROUTING.md` before planning the next experiment.
 
-Continue from the single live Moj Sint engine with two selectable synthesis
-models: Model D has seven factory starts and Six-Op PM has six. Strict schema 5
-owns model-specific patch and macro fields; schemas 1–4 migrate to Model D.
-SHR-DAW presents ENGINE -> MODEL -> PATCH in FT2 ROUTE and uses the loaded
-model's twelve labels in Playback.
+Continue from the single live Moj Sint engine with three selectable synthesis
+models: Model D has seven factory starts, Six-Op PM has six, and Strange
+Oscillator has one. Strict schema 6 owns model-specific patch and macro fields;
+schemas 1–5 remain readable. SHR-DAW presents ENGINE -> MODEL -> PATCH in FT2
+ROUTE and uses the loaded model's twelve labels in Playback.
 
 Do not touch connected JACK/hardware, add SIMD, claim whole-system Pi
 performance, or expand production polyphony without explicit scope and native
-evidence. Keep both models inside the one owned process and settled 12-control
+evidence. Keep every model inside the one owned process and settled 12-control
 budget.
 ```
 
 ## Next action
 
-Musically test all six Six-Op PM starts through SHR-DAW at a low monitoring
-level, including every timbral control, outer ADSR, note release, voice reuse,
-panic, Model D/Six-Op model switching, and Route Apply/Cancel. Automated tests
-establish bounded deterministic software behavior but do not establish sound
-quality, native callback headroom, or hardware acceptance. The historical
-listening-render and exhaustive research tests are opt-in; they are not part of
-ordinary development unless their own renderer, measurements, or evidence
-changes.
+The owner selected a small modular swarm/supersaw-like synth as the next
+possible experiment for the typed micro-machine direction. It must begin as an
+isolated design and offline experiment, not as a fourth production model. The
+Strange Oscillator musical and native-load verdicts also remain open.
+Automated tests establish bounded deterministic software behavior but do not
+establish sound quality, native callback headroom, or hardware acceptance. The
+historical listening-render and exhaustive research tests are opt-in; they are
+not part of ordinary development unless their own renderer, measurements, or
+evidence changes.
 
 ## Executed foundation checkpoint
 

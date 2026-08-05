@@ -16,6 +16,8 @@ quickly, measured reproducibly, and compiled into a safe fixed real-time graph.
 This is a future architecture. The current `Engine` and research sources are
 hardwired Rust signal paths, and the final hybrid sound lab deliberately
 remains hardwired so it can reveal which node vocabulary is actually useful.
+The broader musician and community intent is recorded in
+[Experimental direction](FUTURE_DIRECTION.md).
 
 ## Example guidance, not an approved design
 

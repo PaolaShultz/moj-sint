@@ -19,24 +19,23 @@ offline note specification ---------------+
 `Engine::render_block` uses preallocated voices, caller-owned output buffers,
 and a borrowed event slice. Tests using `assert_no_alloc` guard both candidate
 oscillator sample paths and the complete block boundary, including rapid macro
-events. The current production engine writes the same mono mix to both output
-buffers; two JACK ports and two-channel WAV metadata do not yet imply stereo
-sound generation.
+events. Model D and Six-Op PM remain dual-mono; Strange Oscillator preserves
+its model-owned stereo through the same two output buffers.
 
 The host/model/instrument boundary is explicit: the `moj-sint` process is the
 engine, each preset selects a `SynthesisModelId`, and the preset is the
 instrument. Each voice dispatches through a fixed `VoiceModel` enum prepared
 before the callback; models do not share DSP state or add runtime allocation.
 
-The first production model is the circuit-informed Model D path: three independently
+The first live model is the circuit-informed Model D path: three independently
 phased bandlimited VCOs, a continuously variable linear/nonlinear mixer,
 prepared four-times-oversampled ladder, filter contour, output feedback, and a
 separate live ADSR. Historical generic oscillators, character layers, and
 listening labs remain research evidence but are not reached by `Engine`.
-The production render is dual-mono; its two host ports do not claim stereo
+The live render is dual-mono; its two host ports do not claim stereo
 generation.
 
-The second production model is Six-Op PM. Its six independently authored
+The second live model is Six-Op PM. Its six independently authored
 listening patches feed a small `six_op_pm::live` adapter that retains one
 prepared sine table, selects a fixed graph and patch before rendering, and
 exposes the same preallocated `VoiceModel` boundary as Model D. The historical
@@ -44,18 +43,26 @@ lab, scheduler, renderers, and measurement reports remain research tools; they
 are not a parallel live engine. Separate legal review still governs
 distribution of the clean-room-oriented implementation.
 
-## Production control and polyphony contract
+The third live model is Strange Oscillator. One `TYPE` macro selects
+eight source topologies through a prepared 10 ms crossfade. Seven shared
+structural controls then expose large form, deformation, coupling, motion,
+irregularity, color, and stereo changes. Its public start is an experimental
+instrument whose musical verdict and native Raspberry Pi headroom remain open.
+
+## Live control and polyphony contract
 
 SHR-DAW exposes exactly twelve continuous synth controls per model. Model D
 implements `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`,
 and `SPACE`. Six-Op PM implements `INDEX`, `RATIO`, `FEEDBACK`, `OP DECAY`,
-`BALANCE`, `KEY SCALE`, `VELOCITY`, and `MOTION`. Both append `ATTACK`,
-`DECAY`, `SUSTAIN`, and `RELEASE`.
+`BALANCE`, `KEY SCALE`, `VELOCITY`, and `MOTION`. Strange Oscillator implements
+`TYPE`, `FORM`, `WARP`, `COUPLE`, `MOTION`, `CHAOS`, `COLOR`, and `SPACE`.
+Every model appends `ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`.
 `WIDTH` was removed because this Model D engine has no supported width
 experiment. There is no hidden page or master-encoder takeover.
 
-The catalog preserves all seven authored Model D audition starting points and
-all six accepted Six-Op PM listening starts. Model D contains
+The catalog preserves all seven authored Model D audition starting points, all
+six accepted Six-Op PM listening starts, and one Strange Oscillator start.
+Model D contains
 three full bass/lead/filter-articulation patches and four matched bass
 diagnostics. They are selectable states of one modeled instrument, not separate
 synthesis families. The eight timbral controls expose oscillator
@@ -95,7 +102,7 @@ possible product result; eight has no special status and is not required.
 - `preset`: strict, versioned `.mojsint` TOML parsing and validation.
 - `engine`: timestamped note/macro/panic events, fixed voice storage, voice
   stealing, 10 ms smoothing for every control, live ADSR, model dispatch,
-  finite guards, and dual-mono block rendering.
+  finite guards, and bounded stereo block rendering.
 - `host`: dynamic JACK ownership/callback, ALSA Sequencer translation,
   fixed-capacity SPSC handoff, period timing, overflow reporting, and shutdown.
 - `native_bench`: reusable native callback-simulation cases for the exact
@@ -106,8 +113,8 @@ possible product result; eight has no special status and is not required.
   Fourier references. Its `alias_error_db` is explicitly a conservative sum
   of alias energy and amplitude/phase deviation after DC removal and fitted
   gain, not a perceptual score.
-- `offline`: deterministic two-channel float WAV output, currently dual-mono
-  when rendering `Engine`.
+- `offline`: deterministic two-channel float WAV output that retains each
+  model's dual-mono or stereo result.
 - `dsp::research`: five disposable, monophonic, allocation-free scalar source
   states used only by the five-family listening gate. They are not variants of
   the production voice and are not reachable from `Engine` or presets.
@@ -202,7 +209,7 @@ determinism checks pass, but none establishes perceived power, distinction, or
 musical value. Digital level is not acoustic SPL.
 The clean-room-oriented six-operator PM gate passed its finite, level, DC,
 jump, pair-RMS, pitch, spectral, alias/error, sweep, and determinism bounds.
-Its six authored sounds are now selectable production starts under one Six-Op
+Its six authored sounds are now selectable live starts under one Six-Op
 PM model with eight bounded timbral controls. Musical acceptance in the live
 SHR/JACK path and native Pi headroom remain open; automated evidence does not
 claim either.

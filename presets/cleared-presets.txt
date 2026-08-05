@@ -11,3 +11,4 @@ reference.mojsint
 11-six-op-glass-wood.mojsint
 12-six-op-brass-bass.mojsint
 13-six-op-mechanical-stab.mojsint
+14-strange-oscillator.mojsint

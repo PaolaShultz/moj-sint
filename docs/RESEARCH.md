@@ -1440,6 +1440,108 @@ emulations or compatible presets. Their automated gates establish finite,
 bounded, deterministic output and causal mechanism activity only. Musical
 quality remains an open human-listening question.
 
+## 2026-08-05 Strange Oscillator third-model gate
+
+The isolated Strange Oscillator lab tests eight source mechanisms behind one
+quantized `TYPE` control: triangle, saw, pulse, modulated resonator, deformed closed
+loop, dynamic stochastic breakpoints, scanned string, and a fixed-width
+register machine. The other timbral roles are `FORM`, `WARP`, `COUPLE`,
+`MOTION`, `CHAOS`, `COLOR`, and `SPACE`; production ADSR, effects, routing,
+schema, presets, and polyphony are deliberately absent.
+
+The independent implementation uses these sources only for mathematical,
+historical, and instrument-design claims. No source code, table, preset,
+sample, prose, equation, or figure was copied.
+
+- Georg Essl, “Deforming the Oscillator: Iterative Phases Over Parametrizable
+  Closed Paths,” DAFx-20in22, 2022,
+  <https://www.dafx.de/paper-archive/2022/papers/DAFx20in22_paper_23.pdf>.
+  Separating iterative phase from projection over a parametrized loop supports
+  the deformed-loop topology; the paper also warns that sharp loop geometry
+  aliases. The paper states CC BY 3.0 terms.
+- Georg Essl, “Exploring the Sound of Chaotic Oscillators via Parameter
+  Spaces,” DAFx-19, 2019,
+  <https://www.dafx.de/paper-archive/2019/DAFx2019_paper_7.pdf>. Its
+  perceptually motivated parameter-plane method supports mapping stable,
+  mode-locked, and chaotic regions before exposing a performance control. The
+  paper states CC BY 3.0 terms.
+- Bill Verplank, Max Mathews, and Robert Shaw, “Scanned Synthesis,” ICMC 2000,
+  <https://peabody.sapp.org/class/st2/read/ScannedSynthesis.PDF>. It supports
+  manipulating a slow dynamic system separately from scanning it at audible
+  pitch. Publication copyright should be presumed.
+- Sergio Luque, “The Stochastic Synthesis of Iannis Xenakis,” *Leonardo Music
+  Journal* 19, 2009, pp. 77-84,
+  <https://doi.org/10.1162/lmj.2009.19.77>. It provides historical and
+  algorithmic context for dynamic stochastic synthesis. Publisher copyright
+  applies; the Moj Sint breakpoint walk is independently authored and does not
+  reproduce GENDY software.
+- The fixed-width source retains the Heikkilä short-program and Analog Devices
+  DDS provenance already registered above. It uses independently authored
+  wrapping arithmetic, rotate, carry/borrow injection, and projections.
+
+The hard gate checks deterministic reset, finite and bounded low/middle/high
+notes, silence, DC, maximum jump, mono fold-down, prepared-path allocation,
+source distinction, and all seven shared macro routes. Every mechanism uses an
+eight-times-rate windowed-sinc residual comparison. The modulated resonator
+also has to expose 3-24 dB of measured cyclic-envelope movement at the neutral
+control position.
+
+The first source-4 implementation used resonant broadband noise. During the
+complete 13-file playback the owner rejected it as mostly noise and selected
+source 2, saw, as the strongest direction. The replacement keeps a pitched
+saw-related carrier and modal partial. `MOTION` maps a modulation oscillator
+from 0.05 to 50 Hz, `COUPLE` sends it to amplitude and timbral envelopes, and
+`CHAOS` adds bounded per-cycle variation only above midpoint. In the structural
+revision it passes the tonal residual gate at -32.597/-21.191/-12.787 dB and
+measures 9.050/7.057/8.275 dB of cyclic movement at MIDI 36/60/84.
+
+Triangle, pulse, modulated resonator, and deformed loop pass the current tonal
+mechanical thresholds. Saw, stochastic breakpoints, and scanned string are
+rejected only at MIDI 84 with -11.102/-11.716/-11.727 dB residuals against the
+-12 dB floor. The register machine is rejected at all three notes with
+-0.000/-0.002/-1.209 dB residual; this confirms severe sample-rate dependence
+rather than hiding an interesting raw sound behind a false alias claim. A
+mechanical pass proves neither musical usefulness nor a production
+architecture; dry human listening remains the next gate.
+
+The owner listened to the first Triangle parameter reels and rejected the
+entire 28-reel mapping approach: all seven controls sounded like small
+variations of the same basic sound. The 0.02 full-output residual criterion was
+therefore a false proxy for the requested drastic transformation. Those values
+remain negative historical evidence and are not an acceptance argument.
+
+The redesign keeps one instrument and makes `TYPE` a real eight-detent runtime
+topology control. `StrangeInstrument` prepares a complete incoming voice and
+crossfades it over 10 ms; TYPE switching and both sample paths allocate
+nothing. All topologies then enter shared structural stages: strong
+contour/fifth-harmonic deformation, inharmonic ring/cross coupling, a deep
+0.05–50 Hz cyclic envelope, deterministic whole-cycle admit/drop decisions,
+fundamental-to-fifth color anchoring plus two-pole tone control, and protected
+mid/side width. Source-specific FORM transformations remain before that common
+path.
+
+The replacement admission gate measures each claimed perceptual domain rather
+than raw waveform difference. Across all eight TYPE positions the weakest
+FORM/WARP harmonic-profile distances are 6.566/6.327 dB against 6 dB floors;
+the weakest COUPLE topology distance is 0.327 against 0.25; MOTION is 251.189×
+at every type against 200× and is credited only when both endpoint envelopes
+move by at least 6 dB; the weakest added CHAOS envelope-cycle irregularity is
+0.326 against 0.08; the weakest COLOR harmonic-center ratio is 4.345× against
+2×; and the weakest SPACE side/mid change is 29.498 dB against 12 dB. COUPLE
+accepts either cycle decorrelation or a normalized 6 dB spectral-topology
+shift because the already aperiodic register source saturates a
+periodicity-only measure. CHAOS compares windowed cycle envelopes so carrier
+phase cannot masquerade as irregularity.
+
+The new listening presentation has sixteen dry files rather than 28 ambiguous
+reels: eight neutral TYPE references, one uninterrupted held-note TYPE reel
+through all eight positions, and seven named `low, silence, high` macro reels
+on Saw, the owner's preferred earlier source. The TYPE reel has no silence at
+switches, exposing the real crossfade. MOTION retains an eleven-second low
+state; CHAOS gives both endpoints four seconds. These automated landmarks are
+strong rejection gates, not evidence that the transformations sound good or
+form a coherent instrument. Human listening remains decisive.
+
 ## Real-time I/O and platform
 
 - JACK project, [API overview](https://jackaudio.org/api/) and

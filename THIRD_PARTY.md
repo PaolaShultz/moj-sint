@@ -1,6 +1,6 @@
 # Dependencies, licensing, and public presets
 
-Moj Sint source and its 13 factory `.mojsint` starts are MIT licensed. The
+Moj Sint source and its 14 factory `.mojsint` starts are MIT licensed. The
 factory starts are project-authored parameter documents; they contain no
 third-party samples, recordings, factory patches, firmware, SysEx data, source
 code, prose, diagrams, or artwork. `presets/cleared-presets.txt` is the sole

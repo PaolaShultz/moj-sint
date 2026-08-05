@@ -1,0 +1,20 @@
+schema_version = 6
+name = "14 Strange Oscillator"
+voices = 4
+output_gain = 0.35
+model = "strange_oscillator"
+strange_patch = "unified"
+
+[macros]
+type = 0.14285715
+form = 0.5
+warp = 0.5
+couple = 0.5
+motion = 0.5
+chaos = 0.5
+color = 0.5
+space = 0.5
+attack = 0.05
+decay = 0.35
+sustain = 0.8
+release = 0.25

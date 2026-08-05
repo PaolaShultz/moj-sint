@@ -71,8 +71,9 @@ impl Voice {
         values: MacroValues,
         model_id: SynthesisModelId,
         patch_id: ModelPatchId,
+        voice_seed: u32,
     ) -> Result<Self, EngineError> {
-        let model = VoiceModel::new(sample_rate, model_id, patch_id)?;
+        let model = VoiceModel::new(sample_rate, model_id, patch_id, voice_seed)?;
         let initial = MacroId::ALL.map(|id| values.get(id).get());
         let macros = initial.map(|value| {
             Smoother::new(value, sample_rate, SMOOTH_SECONDS)
@@ -105,7 +106,7 @@ impl Voice {
     }
 
     #[inline]
-    fn next(&mut self) -> f32 {
+    fn next(&mut self) -> [f32; 2] {
         let values = self.macros.each_mut().map(Smoother::advance);
         self.model.set_live_controls([
             values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7],
@@ -114,10 +115,14 @@ impl Voice {
             values[8], values[9], values[10], values[11],
         ));
         if self.envelope.is_idle() {
-            return 0.0;
+            return [0.0, 0.0];
         }
         let envelope = self.envelope.advance();
-        let sample = finite_or_zero(self.model.sample() * envelope);
+        let model = self.model.sample();
+        let sample = [
+            finite_or_zero(model[0] * envelope),
+            finite_or_zero(model[1] * envelope),
+        ];
         if self.envelope.is_idle() {
             self.model.reset();
         }
@@ -163,12 +168,13 @@ impl Engine {
             return Err(EngineError::InvalidSampleRate);
         }
         let mut voices = Vec::with_capacity(preset.voices);
-        for _ in 0..preset.voices {
+        for index in 0..preset.voices {
             voices.push(Voice::new(
                 sample_rate,
                 preset.macros,
                 preset.model,
                 preset.model_patch,
+                0x51a7_2026 ^ (index as u32).wrapping_mul(0x9e37_79b9),
             )?);
         }
         Ok(Self {
@@ -206,13 +212,14 @@ impl Engine {
                 self.apply_event(events[event_index].event);
                 event_index += 1;
             }
-            let mut mixed = 0.0;
+            let mut mixed = [0.0, 0.0];
             for voice in &mut self.voices {
-                mixed += voice.next();
+                let sample = voice.next();
+                mixed[0] += sample[0];
+                mixed[1] += sample[1];
             }
-            let sample = finite_or_zero(mixed * self.output_gain);
-            left[sample_index] = sample;
-            right[sample_index] = sample;
+            left[sample_index] = finite_or_zero(mixed[0] * self.output_gain);
+            right[sample_index] = finite_or_zero(mixed[1] * self.output_gain);
         }
         Ok(())
     }
@@ -318,7 +325,7 @@ mod tests {
         left
     }
 
-    fn factory_sources() -> [&'static str; 13] {
+    fn factory_sources() -> [&'static str; 14] {
         [
             include_str!("../presets/01-full-bass.mojsint"),
             include_str!("../presets/02-full-lead.mojsint"),
@@ -333,6 +340,7 @@ mod tests {
             include_str!("../presets/11-six-op-glass-wood.mojsint"),
             include_str!("../presets/12-six-op-brass-bass.mojsint"),
             include_str!("../presets/13-six-op-mechanical-stab.mojsint"),
+            include_str!("../presets/14-strange-oscillator.mojsint"),
         ]
     }
 
@@ -385,7 +393,7 @@ mod tests {
     }
 
     #[test]
-    fn thirteen_factory_starting_points_are_finite_and_pairwise_distinct() {
+    fn fourteen_factory_starting_points_are_finite_and_pairwise_distinct() {
         let renders = factory_sources().map(|source| {
             let mut preset = Preset::parse(source).unwrap();
             preset.voices = 1;
@@ -405,8 +413,8 @@ mod tests {
                     &mut right,
                 )
                 .unwrap();
-            assert_eq!(left, right);
             assert!(left.iter().all(|sample| sample.is_finite()));
+            assert!(right.iter().all(|sample| sample.is_finite()));
             left
         });
 
@@ -462,5 +470,38 @@ mod tests {
         assert!(left.iter().all(|sample| sample.is_finite()));
         assert!(left.iter().all(|sample| sample.abs() < 4.0));
         assert_eq!(engine.voice_capacity(), 2);
+    }
+
+    #[test]
+    fn strange_oscillator_is_stereo_finite_and_allocation_free_under_live_macros() {
+        let mut preset =
+            Preset::parse(include_str!("../presets/14-strange-oscillator.mojsint")).unwrap();
+        preset.voices = 2;
+        let mut engine = Engine::new(48_000.0, &preset).unwrap();
+        let mut events = [TimedEvent::new(0, Event::AllNotesOff); 9];
+        events[0] = TimedEvent::new(
+            0,
+            Event::NoteOn {
+                note: 60,
+                velocity: 0.9,
+            },
+        );
+        for (index, id) in MacroId::TIMBRAL.into_iter().enumerate() {
+            events[index + 1] = TimedEvent::new(
+                index + 1,
+                Event::SetMacro {
+                    id,
+                    value: Normalized::new(if index % 2 == 0 { 1.0 } else { 0.0 }).unwrap(),
+                },
+            );
+        }
+        let mut left = [0.0; 2_048];
+        let mut right = [0.0; 2_048];
+        assert_no_alloc(|| {
+            engine.render_block(&events, &mut left, &mut right).unwrap();
+        });
+        assert!(left.iter().chain(&right).all(|sample| sample.is_finite()));
+        assert!(left.iter().chain(&right).all(|sample| sample.abs() <= 1.0));
+        assert!(left.iter().zip(right).any(|(left, right)| left != &right));
     }
 }

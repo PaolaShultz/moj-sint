@@ -23,5 +23,7 @@ pub mod offline;
 pub mod preset;
 pub mod research;
 pub mod six_op_pm;
+pub mod strange;
+pub mod strange_lab;
 pub mod struck_object;
 mod synthesis_model;
