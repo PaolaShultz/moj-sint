@@ -1,78 +1,82 @@
 # Preset and Control Schema
 
-`.mojsint` is strict TOML. Schema version 6 keeps the Moj Sint process
-(`engine`) separate from its synthesis model and makes the patch field and
-macro table model-specific. Every preset has `schema_version`, `name`,
-`voices`, `output_gain`, `model`, one matching patch field, and `macros`.
-Unknown, mixed-model, or missing fields fail validation. Presets must be
-regular UTF-8 files, names must be non-empty, voices are 1–64, and gain/macro
-values are finite numbers in `0..=1`.
+`.mojsint` is strict TOML. Schema version 7 keeps the Moj Sint process
+(`engine`) separate from its synthesis model, makes patch identity and macros
+model-specific, and adds `instrument_volume`. Every preset has
+`schema_version`, `name`, `voices`, `output_gain`, `instrument_volume`,
+`model`, one matching patch field, and one exact `macros` table. Unknown,
+mixed-model, or missing fields fail validation. Names must be non-empty,
+voices are 1–64, and all gain, volume, and macro values are finite in `0..=1`.
 
-Model D uses `model = "model_d"`, `model_d_patch`, and its established macros.
-Six-Op PM uses `model = "six_op_pm"`, `six_op_patch`, and the second macro
-shape. The six patch IDs are `bell_metal`, `fractured_metal`,
-`electric_piano_mallet`, `glass_wood`, `brass_bass`, and `mechanical_stab`.
-Strange Oscillator uses `model = "strange_oscillator"`,
-`strange_patch = "unified"`, and its own eight macro names.
+The five model identities are:
+
+| Model | Patch field and accepted IDs |
+| --- | --- |
+| `model_d` | `model_d_patch`: `bass`, `lead`, `filter_articulation` |
+| `six_op_pm` | `six_op_patch`: `bell_metal`, `fractured_metal`, `electric_piano_mallet`, `glass_wood`, `brass_bass`, `mechanical_stab` |
+| `strange_oscillator` | `strange_patch = "unified"` |
+| `swarm_machine` | `swarm_patch = "warm_pad"` |
+| `bass_matrix` | `bass_matrix_patch = "transformer"` |
 
 ```toml
-schema_version = 6
-name = "08 Six-Op Bell Metal"
+schema_version = 7
+name = "16 Bass Matrix"
 voices = 4
-output_gain = 0.8
-model = "six_op_pm"
-six_op_patch = "bell_metal"
+output_gain = 0.46
+instrument_volume = 1.0
+model = "bass_matrix"
+bass_matrix_patch = "transformer"
 
 [macros]
-index = 0.5
-ratio = 0.5
-feedback = 0.5
-operator_decay = 0.5
-balance = 0.5
-key_scale = 0.5
-velocity = 0.5
-motion = 0.5
-attack = 0.05
-decay = 0.35
-sustain = 0.8
-release = 0.25
+body = 0.66
+growl = 0.18
+metal = 0.08
+punch = 0.42
+character = 0.5
+drive = 0.2
+filter = 0.48
+unstable = 0.08
+attack = 0.005
+decay = 0.2
+sustain = 0.82
+release = 0.15
 ```
 
-Schema versions 1–5 remain readable through strict migrations. Version 4
-already carries `model = "model_d"`; versions 1–3 gain that identity during
-migration, while version 5 retains Model D and Six-Op PM exactly. In-memory
-identity becomes version 6. New presets must use version 6. The library's
-`Preset::to_toml` serializer
-always writes that strict current schema: migrated Model D sounds retain the
-matching `model_d_patch` and macro names, while Six-Op PM retains
-`six_op_patch` and its exact model-specific macro vocabulary. Strange
-Oscillator retains `strange_patch = "unified"` and its exact macros.
+Schemas 1–6 remain readable through strict migrations. Older presets gain
+`instrument_volume = 1.0`, so their previous full-level behavior and timbre
+remain unchanged. The serializer always writes schema 7 and retains the exact
+model-specific patch and macro vocabulary.
 
-The physical positions stay CC 20–31. Their meaning comes from the loaded
-model:
+## Twelve physical positions
 
-| CC | Model D | Six-Op PM | Strange Oscillator |
-| ---: | --- | --- | --- |
-| 20 | `EVOLVE` — oscillator character and drift | `INDEX` — phase-modulation depth | `TYPE` — source topology |
-| 21 | `SHAPE` — source balance | `RATIO` — modulator-ratio spread | `FORM` — topology-specific structure |
-| 22 | `COLOR` — ladder cutoff | `FEEDBACK` — delayed-feedback amount | `WARP` — contour and harmonic deformation |
-| 23 | `EDGE` — mixer character and drive | `OP DECAY` — operator-envelope time and live decay emphasis | `COUPLE` — cross/ring interaction |
-| 24 | `COUPLE` — output feedback | `BALANCE` — carrier/modulator balance | `MOTION` — cyclic movement and rate |
-| 25 | `MOTION` — filter-contour amount | `KEY SCALE` — keyboard-brightness response | `CHAOS` — held-cycle disruption |
-| 26 | `DEPTH` — ladder character and drive | `VELOCITY` — operator velocity response | `COLOR` — harmonic and tone travel |
-| 27 | `SPACE` — ladder resonance | `MOTION` — pitch-envelope and LFO movement | `SPACE` — mid/side width |
-| 28 | `ATTACK` | `ATTACK` | `ATTACK` |
-| 29 | `DECAY` | `DECAY` | `DECAY` |
-| 30 | `SUSTAIN` | `SUSTAIN` | `SUSTAIN` |
-| 31 | `RELEASE` | `RELEASE` | `RELEASE` |
+Position 5 is instrument volume for every model. Moj Sint receives it as MIDI
+CC 7 and smooths the linear gain over 10 ms after synthesis, so it changes
+level without changing tone. The other seven timbre positions and four ADSR
+positions remain model-specific:
 
-All twelve values use the live 10 ms smoothing path. The outer ADSR is live
-for all models, including release changes made after Note Off. Six-Op PM
-timbral controls affect held notes; operator-envelope time itself is prepared
-from the smoothed value when the next note starts. Neutral `0.5` timbral values
-preserve each authored six-operator patch.
+| Position | Model D | Six-Op PM | Strange | Swarm | Bass Matrix |
+| ---: | --- | --- | --- | --- | --- |
+| 1 | `EVOLVE` | `INDEX` | `TYPE` | `MASS` | `BODY` |
+| 2 | `SHAPE` | `RATIO` | `FORM` | `DETUNE` | `GROWL` |
+| 3 | `COLOR` | `FEEDBACK` | `WARP` | `SPREAD` | `METAL` |
+| 4 | `EDGE` | `OP DECAY` | `COUPLE` | `SHAPE` | `PUNCH` |
+| 5 | `VOLUME` | `VOLUME` | `VOLUME` | `VOLUME` | `VOLUME` |
+| 6 | `MOTION` | `KEY SCALE` | `CHAOS` | `MOTION` | `DRIVE` |
+| 7 | `DEPTH` | `VELOCITY` | `COLOR` | `COLOR` | `FILTER` |
+| 8 | `SPACE` | `MOTION` | `SPACE` | `SPACE` | `UNSTABLE` |
+| 9–12 | `ATTACK`, `DECAY`, `SUSTAIN`, `RELEASE` | same | same | same | same |
 
-The tracked catalog contains seven Model D starts, six Six-Op PM starts, and
-one Strange Oscillator start. There is no thirteenth control, hidden page, or
-master-encoder mode. Model D remains intentionally dual-mono and has no width
-control; Strange Oscillator generates model-owned stereo.
+The schema retains the historical fifth timbre macro (`couple`, `balance`,
+`motion`, `bite`, or `character`) so old automation and exact sound identity
+remain loadable. The SHR surface no longer assigns that slot to position 5;
+new physical performance uses the separate `instrument_volume` field.
+
+All live controls use the bounded event path. Timbre and ADSR use the existing
+10 ms macro smoothers; volume has its own 10 ms smoother. Loading or RESET in
+SHR re-arms pickup against the loaded values.
+
+The tracked catalog contains seven Model D, six Six-Op PM, one Strange
+Oscillator, one Swarm Machine, and one Bass Matrix start. The graph description
+in `experiments/swarm-micro-machine-v1.toml` remains a strict authoring input;
+the live `swarm_machine` model compiles that graph before audio rendering and
+never parses or allocates in the callback.

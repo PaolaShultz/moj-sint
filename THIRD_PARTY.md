@@ -1,6 +1,6 @@
 # Dependencies, licensing, and public presets
 
-Moj Sint source and its 14 factory `.mojsint` starts are MIT licensed. The
+Moj Sint source and its 16 factory `.mojsint` starts are MIT licensed. The
 factory starts are project-authored parameter documents; they contain no
 third-party samples, recordings, factory patches, firmware, SysEx data, source
 code, prose, diagrams, or artwork. `presets/cleared-presets.txt` is the sole
@@ -28,3 +28,9 @@ The Six-Op PM implementation was independently authored from cited mathematical
 and functional facts. Its clean-room source register and limitations are in
 `docs/RESEARCH.md` and `docs/HANDOFF.md`; it makes no compatibility,
 affiliation, or historical-emulation claim.
+
+The Bass Matrix implementation was also independently authored. GPL-3.0 Surge
+XT and VCV Fundamental sources were inspected only as architectural comparison
+material; no code, constants, presets, or text were copied. Paper/book
+provenance and the exact functional claims used are recorded in
+`docs/BASS_MATRIX.md` and `docs/BASS_IMPACT_RESEARCH.md`.

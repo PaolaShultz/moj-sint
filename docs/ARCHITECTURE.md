@@ -115,6 +115,19 @@ possible product result; eight has no special status and is not required.
   gain, not a perceptual score.
 - `offline`: deterministic two-channel float WAV output that retains each
   model's dual-mono or stereo result.
+- `micro_machine`: strict schema-1 TOML parsing, typed-port
+  validation, deterministic topological compilation, fixed resource
+  accounting, the seven-node swarm vocabulary, its eight timbral controls,
+  and an outer-ADSR experimental voice. Its compiled plan and fixed state are
+  allocation-free in sample/block rendering. The authored swarm graph is
+  compiled while voices are constructed and is reachable through the live
+  `swarm_machine` model; parsing and compilation never occur in the callback.
+- `bass_matrix`: fixed-state bass voice with a phase-locked half-frequency
+  body, PM/growl and inharmonic upper branches, selective two-substep nonlinear
+  processing, note-tracked filtering, bounded feedback, DC removal, and a
+  static output guard. The linear body stays outside the driven branch.
+- `micro_machine_lab`: non-real-time MIDI-note conversion and conservative
+  48 kHz versus 384 kHz fitted residual measurement for that experiment.
 - `dsp::research`: five disposable, monophonic, allocation-free scalar source
   states used only by the five-family listening gate. They are not variants of
   the production voice and are not reachable from `Engine` or presets.
@@ -151,6 +164,12 @@ possible product result; eight has no special status and is not required.
   reachable from `Engine`, presets, or stable macros.
 - `main`: live host invocation plus non-real-time `validate` and `render`
   commands.
+
+The separate `micro-machine-lab` binary is the swarm graph's offline file-I/O
+boundary. It compiles one explicit graph and writes a neutral reference, lead,
+pad, eight control demonstrations, and dry resource/level/stereo/mono/error
+reports into an empty output directory. It does not run in the live callback;
+the same compiled graph now supplies the Swarm Machine production voice.
 
 The separate `five-family-lab` binary renders those research sources into an
 explicit output directory. Its mechanisms are nonlinear PM, excited comb,
@@ -213,8 +232,8 @@ Its six authored sounds are now selectable live starts under one Six-Op
 PM model with eight bounded timbral controls. Musical acceptance in the live
 SHR/JACK path and native Pi headroom remain open; automated evidence does not
 claim either.
-The future typed micro-machine graph is specified in
-`MICRO_MACHINE_ROUTING.md`, but extraction starts only after listening reveals
-which nodes and connections deserve reuse. Full control-usefulness thresholds
-and Pi profiling remain measured future milestones. No SIMD or
-architecture-specific path should precede profiling on the Pi.
+The first typed micro-machine slice is specified in
+`MICRO_MACHINE_ROUTING.md`. It compiles one swarm-oriented TOML vocabulary and
+is now the fourth live model, without approving runtime graph editing or a
+general graph runtime. Musical acceptance and native Pi profiling remain open.
+No SIMD or architecture-specific path should precede profiling on the Pi.

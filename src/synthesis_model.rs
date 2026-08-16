@@ -1,8 +1,68 @@
+use crate::bass_matrix::{BassMatrixControls, BassMatrixVoice};
 use crate::engine::EngineError;
+use crate::micro_machine::{CompiledMicroMachine, MicroMachineGraph, SwarmControls};
 use crate::model_d::voice::{ModelDDiagnostics, ModelDPatch, ModelDVoice};
 use crate::preset::{ModelDPatchId, ModelPatchId, SynthesisModelId};
 use crate::six_op_pm::live::LiveSixOpVoice;
 use crate::strange::{StrangeControls, StrangeInstrument};
+
+const SWARM_GRAPH: &str = include_str!("../experiments/swarm-micro-machine-v1.toml");
+
+#[derive(Debug)]
+pub(crate) struct LiveSwarmVoice {
+    machine: CompiledMicroMachine,
+    velocity: f32,
+}
+
+impl LiveSwarmVoice {
+    fn new(sample_rate: f32) -> Result<Self, EngineError> {
+        let graph =
+            MicroMachineGraph::parse(SWARM_GRAPH).map_err(|_| EngineError::InvalidModelPatch)?;
+        let machine = graph
+            .compile(sample_rate, 440.0, SwarmControls::PAD)
+            .map_err(|_| EngineError::InvalidSampleRate)?;
+        Ok(Self {
+            machine,
+            velocity: 0.0,
+        })
+    }
+
+    fn set_live_controls(&mut self, values: [f32; 8]) {
+        let controls = SwarmControls {
+            mass: values[0],
+            detune: values[1],
+            spread: values[2],
+            shape: values[3],
+            bite: values[4],
+            motion: values[5],
+            color: values[6],
+            space: values[7],
+        };
+        if self.machine.set_controls(controls).is_err() {
+            self.reset();
+        }
+    }
+
+    fn note_on(&mut self, note: u8, velocity: f32) {
+        let frequency = 440.0 * 2.0_f32.powf((f32::from(note) - 69.0) / 12.0);
+        if self.machine.set_frequency(frequency).is_err() {
+            self.reset();
+            return;
+        }
+        self.machine.reset();
+        self.velocity = velocity.clamp(0.0, 1.0);
+    }
+
+    #[inline]
+    fn sample(&mut self) -> [f32; 2] {
+        self.machine.sample().map(|sample| sample * self.velocity)
+    }
+
+    fn reset(&mut self) {
+        self.machine.reset();
+        self.velocity = 0.0;
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct LiveStrangeVoice {
@@ -95,6 +155,8 @@ pub(crate) enum VoiceModel {
     ModelD(ModelDVoice),
     SixOpPm(LiveSixOpVoice),
     StrangeOscillator(LiveStrangeVoice),
+    SwarmMachine(LiveSwarmVoice),
+    BassMatrix(BassMatrixVoice),
 }
 
 impl VoiceModel {
@@ -127,6 +189,14 @@ impl VoiceModel {
             (SynthesisModelId::StrangeOscillator, ModelPatchId::StrangeOscillator(_)) => {
                 LiveStrangeVoice::new(sample_rate, voice_seed).map(Self::StrangeOscillator)
             }
+            (SynthesisModelId::SwarmMachine, ModelPatchId::SwarmMachine(_)) => {
+                LiveSwarmVoice::new(sample_rate).map(Self::SwarmMachine)
+            }
+            (SynthesisModelId::BassMatrix, ModelPatchId::BassMatrix(_)) => {
+                BassMatrixVoice::new(sample_rate, voice_seed)
+                    .map(Self::BassMatrix)
+                    .ok_or(EngineError::InvalidSampleRate)
+            }
             _ => Err(EngineError::InvalidModelPatch),
         }
     }
@@ -140,6 +210,10 @@ impl VoiceModel {
             ),
             Self::SixOpPm(model) => model.set_live_controls(values),
             Self::StrangeOscillator(model) => model.set_live_controls(values),
+            Self::SwarmMachine(model) => model.set_live_controls(values),
+            Self::BassMatrix(model) => {
+                model.set_controls(BassMatrixControls::from_macro_values(values));
+            }
         }
     }
 
@@ -152,6 +226,8 @@ impl VoiceModel {
                 }
             }
             Self::StrangeOscillator(model) => model.note_on(note, velocity),
+            Self::SwarmMachine(model) => model.note_on(note, velocity),
+            Self::BassMatrix(model) => model.note_on(note, velocity),
         }
     }
 
@@ -160,6 +236,7 @@ impl VoiceModel {
             Self::ModelD(model) => model.note_off(),
             Self::SixOpPm(model) => model.note_off(),
             Self::StrangeOscillator(_) => {}
+            Self::SwarmMachine(_) | Self::BassMatrix(_) => {}
         }
     }
 
@@ -175,6 +252,8 @@ impl VoiceModel {
                 [sample, sample]
             }
             Self::StrangeOscillator(model) => model.sample(),
+            Self::SwarmMachine(model) => model.sample(),
+            Self::BassMatrix(model) => model.sample(),
         }
     }
 
@@ -183,6 +262,8 @@ impl VoiceModel {
             Self::ModelD(model) => model.reset(),
             Self::SixOpPm(model) => model.reset(),
             Self::StrangeOscillator(model) => model.reset(),
+            Self::SwarmMachine(model) => model.reset(),
+            Self::BassMatrix(model) => model.reset(),
         }
     }
 }

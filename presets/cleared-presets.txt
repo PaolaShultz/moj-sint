@@ -12,3 +12,5 @@ reference.mojsint
 12-six-op-brass-bass.mojsint
 13-six-op-mechanical-stab.mojsint
 14-strange-oscillator.mojsint
+15-swarm-warm-pad.mojsint
+16-bass-matrix.mojsint

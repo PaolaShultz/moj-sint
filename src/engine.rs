@@ -24,6 +24,7 @@ pub enum Event {
     NoteOn { note: u8, velocity: f32 },
     NoteOff { note: u8 },
     SetMacro { id: MacroId, value: Normalized },
+    SetVolume { value: Normalized },
     AllNotesOff,
 }
 
@@ -159,6 +160,7 @@ fn envelope_config(attack: f32, decay: f32, sustain: f32, release: f32) -> AdsrC
 pub struct Engine {
     voices: Vec<Voice>,
     output_gain: f32,
+    instrument_volume: Smoother,
     note_age: u64,
 }
 
@@ -180,6 +182,12 @@ impl Engine {
         Ok(Self {
             voices,
             output_gain: preset.output_gain,
+            instrument_volume: Smoother::new(
+                preset.instrument_volume.get(),
+                sample_rate,
+                SMOOTH_SECONDS,
+            )
+            .map_err(|_| EngineError::InvalidSampleRate)?,
             note_age: 0,
         })
     }
@@ -218,8 +226,9 @@ impl Engine {
                 mixed[0] += sample[0];
                 mixed[1] += sample[1];
             }
-            left[sample_index] = finite_or_zero(mixed[0] * self.output_gain);
-            right[sample_index] = finite_or_zero(mixed[1] * self.output_gain);
+            let volume = self.instrument_volume.advance();
+            left[sample_index] = finite_or_zero(mixed[0] * self.output_gain * volume);
+            right[sample_index] = finite_or_zero(mixed[1] * self.output_gain * volume);
         }
         Ok(())
     }
@@ -231,6 +240,7 @@ impl Engine {
                     voice.set_macro_target(id, value);
                 }
             }
+            Event::SetVolume { value } => self.instrument_volume.set_target(value.get()),
             Event::NoteOn { note, velocity } if velocity > 0.0 => {
                 self.note_age = self.note_age.wrapping_add(1);
                 let index = self
@@ -325,7 +335,7 @@ mod tests {
         left
     }
 
-    fn factory_sources() -> [&'static str; 14] {
+    fn factory_sources() -> [&'static str; 16] {
         [
             include_str!("../presets/01-full-bass.mojsint"),
             include_str!("../presets/02-full-lead.mojsint"),
@@ -341,6 +351,8 @@ mod tests {
             include_str!("../presets/12-six-op-brass-bass.mojsint"),
             include_str!("../presets/13-six-op-mechanical-stab.mojsint"),
             include_str!("../presets/14-strange-oscillator.mojsint"),
+            include_str!("../presets/15-swarm-warm-pad.mojsint"),
+            include_str!("../presets/16-bass-matrix.mojsint"),
         ]
     }
 
@@ -393,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn fourteen_factory_starting_points_are_finite_and_pairwise_distinct() {
+    fn sixteen_factory_starting_points_are_finite_and_pairwise_distinct() {
         let renders = factory_sources().map(|source| {
             let mut preset = Preset::parse(source).unwrap();
             preset.voices = 1;
@@ -503,5 +515,116 @@ mod tests {
         assert!(left.iter().chain(&right).all(|sample| sample.is_finite()));
         assert!(left.iter().chain(&right).all(|sample| sample.abs() <= 1.0));
         assert!(left.iter().zip(right).any(|(left, right)| left != &right));
+    }
+
+    #[test]
+    fn both_new_models_render_live_stereo_allocation_free_with_rapid_controls() {
+        for source in [
+            include_str!("../presets/15-swarm-warm-pad.mojsint"),
+            include_str!("../presets/16-bass-matrix.mojsint"),
+        ] {
+            let mut preset = Preset::parse(source).unwrap();
+            preset.voices = 2;
+            let mut engine = Engine::new(48_000.0, &preset).unwrap();
+            let mut events = [TimedEvent::new(0, Event::AllNotesOff); 9];
+            events[0] = TimedEvent::new(
+                0,
+                Event::NoteOn {
+                    note: 36,
+                    velocity: 0.9,
+                },
+            );
+            for (index, id) in MacroId::TIMBRAL.into_iter().enumerate() {
+                events[index + 1] = TimedEvent::new(
+                    32 + index * 32,
+                    Event::SetMacro {
+                        id,
+                        value: Normalized::new(if index % 2 == 0 { 1.0 } else { 0.0 }).unwrap(),
+                    },
+                );
+            }
+            let mut left = [0.0; 4_096];
+            let mut right = [0.0; 4_096];
+            assert_no_alloc(|| {
+                engine.render_block(&events, &mut left, &mut right).unwrap();
+            });
+            assert!(left.iter().chain(&right).all(|sample| sample.is_finite()));
+            assert!(left.iter().chain(&right).all(|sample| sample.abs() <= 1.0));
+            assert!(left.iter().zip(right).any(|(left, right)| left != &right));
+        }
+    }
+
+    #[test]
+    fn instrument_volume_is_linear_spectral_neutral_and_reaches_silence() {
+        let source = include_str!("../presets/16-bass-matrix.mojsint");
+        let mut full = Preset::parse(source).unwrap();
+        full.voices = 1;
+        let mut half = full.clone();
+        half.instrument_volume = Normalized::new(0.5).unwrap();
+        let mut silent = full.clone();
+        silent.instrument_volume = Normalized::new(0.0).unwrap();
+
+        let render = |preset: &Preset| {
+            let mut engine = Engine::new(48_000.0, preset).unwrap();
+            let mut left = vec![0.0; 8_192];
+            let mut right = vec![0.0; left.len()];
+            engine
+                .render_block(
+                    &[TimedEvent::new(
+                        0,
+                        Event::NoteOn {
+                            note: 36,
+                            velocity: 0.8,
+                        },
+                    )],
+                    &mut left,
+                    &mut right,
+                )
+                .unwrap();
+            left
+        };
+        let full = render(&full);
+        let half = render(&half);
+        let silent = render(&silent);
+        assert!(silent.iter().all(|sample| *sample == 0.0));
+        assert!(
+            full.iter()
+                .zip(half)
+                .all(|(full, half)| (half - 0.5 * *full).abs() < 1.0e-6)
+        );
+    }
+
+    #[test]
+    fn live_volume_change_is_smoothed_and_allocation_free() {
+        let mut preset = Preset::parse(include_str!("../presets/16-bass-matrix.mojsint")).unwrap();
+        preset.voices = 1;
+        let mut engine = Engine::new(48_000.0, &preset).unwrap();
+        let events = [
+            TimedEvent::new(
+                0,
+                Event::NoteOn {
+                    note: 36,
+                    velocity: 0.8,
+                },
+            ),
+            TimedEvent::new(
+                128,
+                Event::SetVolume {
+                    value: Normalized::new(0.0).unwrap(),
+                },
+            ),
+        ];
+        let mut left = [0.0; 4_096];
+        let mut right = [0.0; 4_096];
+        assert_no_alloc(|| engine.render_block(&events, &mut left, &mut right).unwrap());
+        assert!(left.iter().all(|sample| sample.is_finite()));
+        assert!(left.windows(2).all(|pair| (pair[1] - pair[0]).abs() < 0.25));
+        let tail_rms = (left[3_584..]
+            .iter()
+            .map(|x| f64::from(*x).powi(2))
+            .sum::<f64>()
+            / 512.0)
+            .sqrt();
+        assert!(tail_rms < 0.001, "tail rms={tail_rms}");
     }
 }

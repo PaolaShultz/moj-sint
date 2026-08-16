@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-08-05, Europe/Zagreb.
+Last updated: 2026-08-16, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -27,6 +27,41 @@ measurements establish a safe voice budget.
 
 There is no UI in this repository. Control comes through MIDI and SHR-DAW.
 
+## 2026-08-16 two-model live integration
+
+The owner explicitly requested two new instruments for immediate SHR testing.
+The earlier warm-pad swarm hypothesis is now the fourth live model rather than
+remaining offline: `model = "swarm_machine"`, `swarm_patch = "warm_pad"`, and
+`presets/15-swarm-warm-pad.mojsint`. Its typed graph is parsed and compiled only
+while fixed voices are constructed; frequency changes, controls, reset, and
+sample rendering are allocation-free.
+
+The fifth live model is the deliberately different Bass Matrix:
+`model = "bass_matrix"`, `bass_matrix_patch = "transformer"`, and
+`presets/16-bass-matrix.mojsint`. It keeps a clean phase-locked half-frequency
+body outside a PM/metal/drive/filter/feedback branch so bass weight survives
+aggressive transformations. Its seven physical timbre roles are `BODY`,
+`GROWL`, `METAL`, `PUNCH`, `DRIVE`, `FILTER`, and `UNSTABLE`.
+
+Preset schema 7 adds exact identities for both models plus independent
+`instrument_volume`. Schemas 1–6 migrate at unity volume. Physical position 5
+is now volume for every Moj model; MIDI CC 7 drives a separate 10 ms output-gain
+smoother and does not alter model tone. The historical fifth timbre macro stays
+serialized so old preset/automation sound identity remains intact. SHR-DAW owns
+matching catalog, Player, FT2, pickup, reset, save, and automation routes for
+all five models.
+
+Automated output evidence is technical only. Native Raspberry Pi callback
+headroom and the musical usefulness of both new starts remain owner listening
+decisions; do not claim either from workstation tests.
+
+The authorized combined pass used exact Rust 1.97.1
+(`rustc 1.97.1 (8bab26f4f 2026-07-14)`). Formatting, locked all-target and
+all-feature checking, the complete normal test suite, and debug and release
+all-target/all-feature builds passed. The suite left 34 documented historical,
+audition, and benchmark tests ignored. Both release presets validate with the
+release CLI. No JACK, ALSA, MIDI, synth launch, or audible test was performed.
+
 ## 2026-08-05 Strange Oscillator live experimental integration
 
 The gated Strange Oscillator experiment is now the third live synthesis
@@ -47,6 +82,89 @@ tree. This remains experimental product work. On 2026-08-05 the owner
 explicitly authorized committing and publishing it for continued
 experimentation before the open musical and native-load verdicts. Publication
 is not production acceptance.
+
+## Historical 2026-08-05 typed swarm micro-machine experiment
+
+This section records the earlier isolated gate. Its stop decision was
+superseded by the owner's 2026-08-16 instruction above to wire the warm-pad
+hypothesis as a live model.
+
+The smallest useful vertical slice of the low-code typed micro-machine
+direction began as an isolated offline experiment. The tracked authoring input is
+`experiments/swarm-micro-machine-v1.toml`; generated listening material is
+disposable below ignored `artifacts/micro-machine-swarm-v1/`.
+
+Schema 1 is deliberately specific to this experiment. It compiles seven
+transparent node kinds—phase swarm, bandlimited saw bank, bounded stereo mix,
+spectral tilt, bounded drive, stereo width, and output guard—rather than
+hiding the instrument inside one supersaw node. The typed route is
+`PhaseBank -> OscillatorBank -> AudioStereo -> GuardedStereo`. Unknown graph
+or node fields, unknown node types, duplicate IDs, bad references, incompatible
+ports, instantaneous cycles, non-finite/out-of-range values, and fixed resource
+limit violations fail before rendering. Compilation allocates and prepares an
+immutable deterministic topological plan; sample/block rendering uses only its
+fixed mutable state and caller-owned output.
+
+The exact experimental timbral controls are `MASS`, `DETUNE`, `SPREAD`,
+`SHAPE`, `BITE`, `MOTION`, `COLOR`, and `SPACE`. ADSR remains the existing
+outer four-control envelope and is not represented as a graph node. MASS
+crossfades a preallocated population without allocation, DETUNE and MOTION
+drive prepared phase/drift/gear state, SPREAD places the individual machines,
+SHAPE moves the bandlimited waveform bank, and the four downstream controls
+own their named spectral, nonlinear, and stereo stages. The deterministic
+cycle gear perturbation gives MOTION a small machine-coupled phase behavior
+without an instantaneous feedback cycle.
+
+The current graph compiles to seven nodes, six edges, nine oscillator slots,
+3,416 fixed state bytes, and a conservative declared 355 work units per sample.
+These are bounded scalar implementation facts, not workstation timing,
+Raspberry Pi callback, polyphony, or latency claims. Focused contracts cover
+strict parsing/validation, deterministic plan identity and seeded reset,
+allocation-free machine and outer-voice rendering, rapid live controls,
+internal/output bounds, low/mid/high notes, a three-note chord, real stereo,
+mono fold, MASS gain normalization, note release/panic cleanup, conservative
+48 kHz versus 384 kHz error diagnostics, and resource ceilings.
+
+`micro-machine-lab` renders eleven clearly named dry float32 stereo WAVs: a
+neutral reference, forceful lead, warm pad, and one low/high demonstration for
+each timbral control. It also writes deterministic hashes, level/stereo/mono
+measurements, the compiled resource summary, and alias/error diagnostics. No
+reverb or production effect is present. Automated evidence proves that the
+small TOML graph can become a strict fixed render plan and produce a bounded,
+recognisably swarm-oriented listening set. It does not prove musical value,
+production readiness, native Pi headroom, or safe polyphony. It supplied the
+evidence later used for the deliberately narrow live integration above.
+
+Focused validation used pinned Rust 1.97.1. Eight micro-machine contract tests
+and the offline-lab CLI test pass; the focused binary/test Clippy command passes
+with warnings denied, formatting passes, and two independently generated lab
+directories compare recursively byte-for-byte. The final listening set peaks
+at 0.434786 or below and every report row is finite. Neutral 48 kHz versus
+384 kHz fitted residual diagnostics are -24.821754, -21.198766, and
+-13.636553 dB at MIDI 36, 60, and 84. The complete production suite,
+historical/ignored research matrices, release build, native benchmark, JACK,
+ALSA, MIDI, playback, and hardware tests were intentionally not run for this
+isolated new experiment.
+
+The owner listened to the complete dry set on 2026-08-06. The warm pad was
+described as really nice and is the only promising result from this pass. The
+neutral reference, forceful lead, and control demonstrations were not
+compelling, and the graph is not accepted in its current overall “shape.” This
+was not approval of the complete batch. The later 2026-08-16 instruction chose
+the pad as the specific live hypothesis while leaving the rejected sounds out
+of the factory catalog.
+
+The listening discussion also exposed the next authoring gap. Schema 1 lists
+the eight public control names, but their destinations are still fixed by the
+Rust node implementations: MASS/SPREAD own the mixer, DETUNE/MOTION own phase
+state, SHAPE owns the waveform bank, COLOR owns the spectral node, BITE owns
+drive, and SPACE owns width. A later graph-authoring slice should make those
+bindings explicit and typed in TOML, including target parameter, bounded
+range, curve/polarity, smoothing, and optional coordinated gain compensation.
+Graph topology, maximum allocations, seed policy, state/delay sizes, and the
+final safety ceiling remain compile-time constructor policy rather than live
+knob targets. Do not build this extension until its exact small graph and
+listening question are chosen.
 
 ## Open experimental direction
 
@@ -687,13 +805,13 @@ for Rust DSP, source curation, persistent project knowledge, benchmarking,
 dependency auditing, and Raspberry Pi deployment. Do not install speculative
 or abandoned integrations merely because they exist.
 
-The future typed micro-machine routing direction is recorded in
-`docs/MICRO_MACHINE_ROUTING.md`. It describes a versioned experiment graph that
-can connect audio, phase, integer-word, trigger, measurement, feedback, and
-stereo nodes, then compile them outside real time into fixed preallocated
-execution state. Do not build the generic graph before the complete hybrid
-listening work identifies which primitives and connections are genuinely
-useful.
+The typed micro-machine routing direction is recorded in
+`docs/MICRO_MACHINE_ROUTING.md`. Its first narrow swarm slice now connects
+phase, oscillator-bank, stereo-audio, and guarded-output ports and compiles
+outside real time into fixed state. The broader audio, integer-word, trigger,
+measurement, feedback, and delay vocabulary remains future work. Do not turn
+the isolated slice into a generic graph merely because its first listening set
+exists.
 
 Potential skill gaps identified so far:
 
@@ -1097,11 +1215,12 @@ and inspect live Git state before changing files.
 Read `docs/HANDOFF.md`, `docs/RESEARCH.md`, `docs/FUTURE_DIRECTION.md`, and
 `docs/MICRO_MACHINE_ROUTING.md` before planning the next experiment.
 
-Continue from the single live Moj Sint engine with three selectable synthesis
-models: Model D has seven factory starts, Six-Op PM has six, and Strange
-Oscillator has one. Strict schema 6 owns model-specific patch and macro fields;
-schemas 1–5 remain readable. SHR-DAW presents ENGINE -> MODEL -> PATCH in FT2
-ROUTE and uses the loaded model's twelve labels in Playback.
+Continue from the single live Moj Sint engine with five selectable synthesis
+models: Model D has seven factory starts, Six-Op PM has six, and Strange,
+Swarm, and Bass Matrix have one each. Strict schema 7 owns model-specific patch
+and macro fields plus instrument volume; schemas 1–6 remain readable. SHR-DAW
+presents ENGINE -> MODEL -> PATCH in FT2 ROUTE and uses the loaded model's
+twelve labels in Player and FT2.
 
 Do not touch connected JACK/hardware, add SIMD, claim whole-system Pi
 performance, or expand production polyphony without explicit scope and native
@@ -1111,15 +1230,14 @@ budget.
 
 ## Next action
 
-The owner selected a small modular swarm/supersaw-like synth as the next
-possible experiment for the typed micro-machine direction. It must begin as an
-isolated design and offline experiment, not as a fourth production model. The
-Strange Oscillator musical and native-load verdicts also remain open.
-Automated tests establish bounded deterministic software behavior but do not
-establish sound quality, native callback headroom, or hardware acceptance. The
-historical listening-render and exhaustive research tests are opt-in; they are
-not part of ordinary development unless their own renderer, measurements, or
-evidence changes.
+The next action is owner listening of the live Swarm warm pad and Bass Matrix
+transformer in SHR-DAW. Do not widen the graph vocabulary or claim either model
+musically accepted from automated evidence. Strange, Swarm, and Bass Matrix
+musical/native-load verdicts remain open. Automated tests establish bounded
+deterministic software behavior but not sound quality, native callback headroom,
+or hardware acceptance. Historical listening-render and exhaustive research
+tests remain opt-in unless their own code, evidence, or protected assumption
+changes.
 
 ## Executed foundation checkpoint
 

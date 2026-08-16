@@ -1,0 +1,21 @@
+schema_version = 7
+name = "16 Bass Matrix Transformer"
+voices = 4
+output_gain = 0.46
+instrument_volume = 1.0
+model = "bass_matrix"
+bass_matrix_patch = "transformer"
+
+[macros]
+body = 0.66
+growl = 0.18
+metal = 0.08
+punch = 0.42
+character = 0.5
+drive = 0.20
+filter = 0.48
+unstable = 0.08
+attack = 0.02
+decay = 0.28
+sustain = 0.82
+release = 0.22

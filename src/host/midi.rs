@@ -24,6 +24,11 @@ pub fn translate(event: &AlsaEvent<'_>) -> Option<Event> {
             let cc = u8::try_from(control.param).ok()?;
             if cc == 120 || cc == 123 {
                 Some(Event::AllNotesOff)
+            } else if cc == 7 {
+                Some(Event::SetVolume {
+                    value: Normalized::new((control.value.clamp(0, 127) as f32) / 127.0)
+                        .expect("bounded controller value"),
+                })
             } else {
                 MacroId::from_cc(cc).map(|id| Event::SetMacro {
                     id,
@@ -73,6 +78,17 @@ mod tests {
                 ..
             })
         ));
+        let volume = EvCtrl {
+            param: 7,
+            value: 63,
+            ..EvCtrl::default()
+        };
+        assert_eq!(
+            translate(&AlsaEvent::new(EventType::Controller, &volume)),
+            Some(Event::SetVolume {
+                value: Normalized::new(63.0 / 127.0).unwrap()
+            })
+        );
         let panic = EvCtrl {
             param: 123,
             ..EvCtrl::default()

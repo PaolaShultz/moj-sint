@@ -1,0 +1,21 @@
+schema_version = 7
+name = "15 Swarm Warm Pad"
+voices = 4
+output_gain = 0.24
+instrument_volume = 1.0
+model = "swarm_machine"
+swarm_patch = "warm_pad"
+
+[macros]
+mass = 0.92
+detune = 0.68
+spread = 0.88
+shape = 0.22
+bite = 0.18
+motion = 0.62
+color = 0.38
+space = 0.78
+attack = 0.34
+decay = 0.48
+sustain = 0.82
+release = 0.56

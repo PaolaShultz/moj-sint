@@ -5,10 +5,11 @@ for SHR-DAW. Its library keeps DSP independent of JACK, ALSA, files, processes,
 and clocks; the binary provides strict preset validation, deterministic offline
 rendering, and the live JACK/ALSA host.
 
-The current experimental catalog contains three synthesis models: circuit-
-informed Model D, Six-Op PM, and Strange Oscillator. Every model has twelve
-stable absolute controls: eight model-specific timbral roles followed by
-`ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. The fourteen factory starts are
+The current experimental catalog contains five synthesis models: circuit-
+informed Model D, Six-Op PM, Strange Oscillator, the typed-graph Swarm Machine,
+and Bass Matrix. Every model has twelve stable absolute controls: seven
+model-specific timbre roles, shared `VOLUME` at physical position 5, then
+`ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. The sixteen factory starts are
 playable research outcomes and starting points, not a production-release claim.
 
 ## Usage
@@ -22,9 +23,10 @@ cargo run -- render presets/reference.mojsint output.wav --note 60 --seconds 1
 cargo run -- --client-name shs-moj-sint --preset presets/reference.mojsint
 ```
 
-The factory catalog contains seven Model D starts, six Six-Op PM starts, and
-one Strange Oscillator start. These are editable live starting points, not
-fourteen claims of separate synthesis families.
+The factory catalog contains seven Model D starts, six Six-Op PM starts, one
+Strange Oscillator start, one Swarm Machine warm pad, and one Bass Matrix
+transformer. These are editable live starting points, not sixteen claims of
+separate synthesis families.
 
 The live process publishes one ALSA Sequencer input named `input` and exactly
 two JACK outputs named `out_l` and `out_r`. It does not connect them to physical
@@ -54,7 +56,8 @@ cargo build --release --all-targets
 
 See [architecture](docs/ARCHITECTURE.md), the
 [live-host contract](docs/HOST_CONTRACT.md), the
-[preset/control schema](docs/PRESET_SCHEMA.md), and
+[preset/control schema](docs/PRESET_SCHEMA.md),
+[Bass Matrix design and evidence](docs/BASS_MATRIX.md), and
 [portability notes](docs/PORTABILITY.md). The deliberately unscheduled
 [experimental direction](docs/FUTURE_DIRECTION.md) describes open model
 authoring, low-code micro-machines, and AI-assisted exploration.

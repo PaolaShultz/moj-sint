@@ -2,7 +2,7 @@ use crate::control::{MacroId, Normalized};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub const PRESET_SCHEMA_VERSION: u32 = 6;
+pub const PRESET_SCHEMA_VERSION: u32 = 7;
 pub const MAX_VOICES: usize = 64;
 
 #[derive(Debug, Error)]
@@ -52,6 +52,18 @@ pub enum StrangePatchId {
     Unified,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SwarmPatchId {
+    WarmPad,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BassMatrixPatchId {
+    Transformer,
+}
+
 impl SixOpPatchId {
     pub const ALL: [Self; 6] = [
         Self::BellMetal,
@@ -68,6 +80,8 @@ pub enum ModelPatchId {
     ModelD(ModelDPatchId),
     SixOpPm(SixOpPatchId),
     StrangeOscillator(StrangePatchId),
+    SwarmMachine(SwarmPatchId),
+    BassMatrix(BassMatrixPatchId),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -76,6 +90,8 @@ pub enum SynthesisModelId {
     ModelD,
     SixOpPm,
     StrangeOscillator,
+    SwarmMachine,
+    BassMatrix,
 }
 
 impl SynthesisModelId {
@@ -84,6 +100,8 @@ impl SynthesisModelId {
             Self::ModelD => "model_d",
             Self::SixOpPm => "six_op_pm",
             Self::StrangeOscillator => "strange_oscillator",
+            Self::SwarmMachine => "swarm_machine",
+            Self::BassMatrix => "bass_matrix",
         }
     }
 
@@ -92,6 +110,8 @@ impl SynthesisModelId {
             Self::ModelD => "Model D",
             Self::SixOpPm => "Six-Op PM",
             Self::StrangeOscillator => "Strange Osc",
+            Self::SwarmMachine => "Swarm Machine",
+            Self::BassMatrix => "Bass Matrix",
         }
     }
 }
@@ -138,6 +158,7 @@ pub struct Preset {
     pub name: String,
     pub voices: usize,
     pub output_gain: f32,
+    pub instrument_volume: Normalized,
     pub model: SynthesisModelId,
     pub model_patch: ModelPatchId,
     pub macros: MacroValues,
@@ -152,7 +173,8 @@ impl Preset {
             .and_then(|version| u32::try_from(version).ok())
             .ok_or(PresetError::UnsupportedVersion(0))?;
         let preset = match version {
-            PRESET_SCHEMA_VERSION => VersionSixPreset::parse(source)?,
+            PRESET_SCHEMA_VERSION => VersionSevenPreset::parse(source)?,
+            6 => VersionSixPreset::parse(source)?,
             5 => VersionFivePreset::parse(source)?,
             4 => VersionFourPreset::parse(source)?.into_current(),
             3 => VersionThreePreset::parse(source)?.into_current(),
@@ -184,6 +206,11 @@ impl Preset {
                     SynthesisModelId::StrangeOscillator,
                     ModelPatchId::StrangeOscillator(_)
                 )
+                | (
+                    SynthesisModelId::SwarmMachine,
+                    ModelPatchId::SwarmMachine(_)
+                )
+                | (SynthesisModelId::BassMatrix, ModelPatchId::BassMatrix(_))
         ) {
             return Err(PresetError::InvalidPatch);
         }
@@ -191,7 +218,7 @@ impl Preset {
     }
 
     /// Encode the current preset as the strict public schema. Older presets
-    /// are migrated by `parse`, so saving always publishes schema 6 with the
+    /// are migrated by `parse`, so saving always publishes schema 7 with the
     /// exact model-specific patch and macro field names.
     pub fn to_toml(&self) -> Result<String, PresetError> {
         let preset = self.clone().validate()?;
@@ -202,6 +229,7 @@ impl Preset {
                     name: preset.name,
                     voices: preset.voices,
                     output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
                     model: SynthesisModelId::ModelD,
                     model_d_patch,
                     macros: preset.macros,
@@ -213,6 +241,7 @@ impl Preset {
                     name: preset.name,
                     voices: preset.voices,
                     output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
                     model: SynthesisModelId::SixOpPm,
                     six_op_patch,
                     macros: preset.macros.into(),
@@ -224,8 +253,33 @@ impl Preset {
                     name: preset.name,
                     voices: preset.voices,
                     output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
                     model: SynthesisModelId::StrangeOscillator,
                     strange_patch,
+                    macros: preset.macros.into(),
+                })?)
+            }
+            ModelPatchId::SwarmMachine(swarm_patch) => {
+                Ok(toml::to_string_pretty(&VersionSevenSwarmPreset {
+                    schema_version: PRESET_SCHEMA_VERSION,
+                    name: preset.name,
+                    voices: preset.voices,
+                    output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
+                    model: SynthesisModelId::SwarmMachine,
+                    swarm_patch,
+                    macros: preset.macros.into(),
+                })?)
+            }
+            ModelPatchId::BassMatrix(bass_matrix_patch) => {
+                Ok(toml::to_string_pretty(&VersionSevenBassPreset {
+                    schema_version: PRESET_SCHEMA_VERSION,
+                    name: preset.name,
+                    voices: preset.voices,
+                    output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
+                    model: SynthesisModelId::BassMatrix,
+                    bass_matrix_patch,
                     macros: preset.macros.into(),
                 })?)
             }
@@ -240,6 +294,8 @@ struct VersionFiveModelDPreset {
     name: String,
     voices: usize,
     output_gain: f32,
+    #[serde(default = "full_volume")]
+    instrument_volume: Normalized,
     model: SynthesisModelId,
     model_d_patch: ModelDPatchId,
     macros: MacroValues,
@@ -307,6 +363,8 @@ struct VersionFiveSixOpPreset {
     name: String,
     voices: usize,
     output_gain: f32,
+    #[serde(default = "full_volume")]
+    instrument_volume: Normalized,
     model: SynthesisModelId,
     six_op_patch: SixOpPatchId,
     macros: SixOpMacroValues,
@@ -375,9 +433,202 @@ struct VersionSixStrangePreset {
     name: String,
     voices: usize,
     output_gain: f32,
+    #[serde(default = "full_volume")]
+    instrument_volume: Normalized,
     model: SynthesisModelId,
     strange_patch: StrangePatchId,
     macros: StrangeMacroValues,
+}
+
+fn full_volume() -> Normalized {
+    Normalized::new(1.0).expect("one is normalized")
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct SwarmMacroValues {
+    mass: Normalized,
+    detune: Normalized,
+    spread: Normalized,
+    shape: Normalized,
+    bite: Normalized,
+    motion: Normalized,
+    color: Normalized,
+    space: Normalized,
+    attack: Normalized,
+    decay: Normalized,
+    sustain: Normalized,
+    release: Normalized,
+}
+
+impl From<SwarmMacroValues> for MacroValues {
+    fn from(v: SwarmMacroValues) -> Self {
+        Self {
+            evolve: v.mass,
+            shape: v.detune,
+            color: v.spread,
+            edge: v.shape,
+            couple: v.bite,
+            motion: v.motion,
+            depth: v.color,
+            space: v.space,
+            attack: v.attack,
+            decay: v.decay,
+            sustain: v.sustain,
+            release: v.release,
+        }
+    }
+}
+
+impl From<MacroValues> for SwarmMacroValues {
+    fn from(v: MacroValues) -> Self {
+        Self {
+            mass: v.evolve,
+            detune: v.shape,
+            spread: v.color,
+            shape: v.edge,
+            bite: v.couple,
+            motion: v.motion,
+            color: v.depth,
+            space: v.space,
+            attack: v.attack,
+            decay: v.decay,
+            sustain: v.sustain,
+            release: v.release,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct BassMacroValues {
+    body: Normalized,
+    growl: Normalized,
+    metal: Normalized,
+    punch: Normalized,
+    character: Normalized,
+    drive: Normalized,
+    filter: Normalized,
+    unstable: Normalized,
+    attack: Normalized,
+    decay: Normalized,
+    sustain: Normalized,
+    release: Normalized,
+}
+
+impl From<BassMacroValues> for MacroValues {
+    fn from(v: BassMacroValues) -> Self {
+        Self {
+            evolve: v.body,
+            shape: v.growl,
+            color: v.metal,
+            edge: v.punch,
+            couple: v.character,
+            motion: v.drive,
+            depth: v.filter,
+            space: v.unstable,
+            attack: v.attack,
+            decay: v.decay,
+            sustain: v.sustain,
+            release: v.release,
+        }
+    }
+}
+
+impl From<MacroValues> for BassMacroValues {
+    fn from(v: MacroValues) -> Self {
+        Self {
+            body: v.evolve,
+            growl: v.shape,
+            metal: v.color,
+            punch: v.edge,
+            character: v.couple,
+            drive: v.motion,
+            filter: v.depth,
+            unstable: v.space,
+            attack: v.attack,
+            decay: v.decay,
+            sustain: v.sustain,
+            release: v.release,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct VersionSevenSwarmPreset {
+    schema_version: u32,
+    name: String,
+    voices: usize,
+    output_gain: f32,
+    instrument_volume: Normalized,
+    model: SynthesisModelId,
+    swarm_patch: SwarmPatchId,
+    macros: SwarmMacroValues,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct VersionSevenBassPreset {
+    schema_version: u32,
+    name: String,
+    voices: usize,
+    output_gain: f32,
+    instrument_volume: Normalized,
+    model: SynthesisModelId,
+    bass_matrix_patch: BassMatrixPatchId,
+    macros: BassMacroValues,
+}
+
+struct VersionSevenPreset;
+
+impl VersionSevenPreset {
+    fn parse(source: &str) -> Result<Preset, PresetError> {
+        let value: toml::Value = toml::from_str(source)?;
+        match value
+            .get("model")
+            .and_then(toml::Value::as_str)
+            .ok_or(PresetError::InvalidModel)?
+        {
+            "swarm_machine" => {
+                let p: VersionSevenSwarmPreset = toml::from_str(source)?;
+                if p.schema_version != PRESET_SCHEMA_VERSION
+                    || p.model != SynthesisModelId::SwarmMachine
+                {
+                    return Err(PresetError::InvalidModel);
+                }
+                Ok(Preset {
+                    schema_version: PRESET_SCHEMA_VERSION,
+                    name: p.name,
+                    voices: p.voices,
+                    output_gain: p.output_gain,
+                    instrument_volume: p.instrument_volume,
+                    model: p.model,
+                    model_patch: ModelPatchId::SwarmMachine(p.swarm_patch),
+                    macros: p.macros.into(),
+                })
+            }
+            "bass_matrix" => {
+                let p: VersionSevenBassPreset = toml::from_str(source)?;
+                if p.schema_version != PRESET_SCHEMA_VERSION
+                    || p.model != SynthesisModelId::BassMatrix
+                {
+                    return Err(PresetError::InvalidModel);
+                }
+                Ok(Preset {
+                    schema_version: PRESET_SCHEMA_VERSION,
+                    name: p.name,
+                    voices: p.voices,
+                    output_gain: p.output_gain,
+                    instrument_volume: p.instrument_volume,
+                    model: p.model,
+                    model_patch: ModelPatchId::BassMatrix(p.bass_matrix_patch),
+                    macros: p.macros.into(),
+                })
+            }
+            _ => VersionSixPreset::parse(source),
+        }
+    }
 }
 
 struct VersionSixPreset;
@@ -392,7 +643,7 @@ impl VersionSixPreset {
         match model {
             "model_d" => {
                 let preset: VersionFiveModelDPreset = toml::from_str(source)?;
-                if preset.schema_version != PRESET_SCHEMA_VERSION
+                if !matches!(preset.schema_version, 6 | PRESET_SCHEMA_VERSION)
                     || preset.model != SynthesisModelId::ModelD
                 {
                     return Err(PresetError::UnsupportedVersion(preset.schema_version));
@@ -402,6 +653,7 @@ impl VersionSixPreset {
                     name: preset.name,
                     voices: preset.voices,
                     output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
                     model: preset.model,
                     model_patch: ModelPatchId::ModelD(preset.model_d_patch),
                     macros: preset.macros,
@@ -409,7 +661,7 @@ impl VersionSixPreset {
             }
             "six_op_pm" => {
                 let preset: VersionFiveSixOpPreset = toml::from_str(source)?;
-                if preset.schema_version != PRESET_SCHEMA_VERSION
+                if !matches!(preset.schema_version, 6 | PRESET_SCHEMA_VERSION)
                     || preset.model != SynthesisModelId::SixOpPm
                 {
                     return Err(PresetError::UnsupportedVersion(preset.schema_version));
@@ -419,6 +671,7 @@ impl VersionSixPreset {
                     name: preset.name,
                     voices: preset.voices,
                     output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
                     model: preset.model,
                     model_patch: ModelPatchId::SixOpPm(preset.six_op_patch),
                     macros: preset.macros.into(),
@@ -426,7 +679,7 @@ impl VersionSixPreset {
             }
             "strange_oscillator" => {
                 let preset: VersionSixStrangePreset = toml::from_str(source)?;
-                if preset.schema_version != PRESET_SCHEMA_VERSION
+                if !matches!(preset.schema_version, 6 | PRESET_SCHEMA_VERSION)
                     || preset.model != SynthesisModelId::StrangeOscillator
                 {
                     return Err(PresetError::UnsupportedVersion(preset.schema_version));
@@ -436,6 +689,7 @@ impl VersionSixPreset {
                     name: preset.name,
                     voices: preset.voices,
                     output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
                     model: preset.model,
                     model_patch: ModelPatchId::StrangeOscillator(preset.strange_patch),
                     macros: preset.macros.into(),
@@ -466,6 +720,7 @@ impl VersionFivePreset {
                     name: preset.name,
                     voices: preset.voices,
                     output_gain: preset.output_gain,
+                    instrument_volume: full_volume(),
                     model: preset.model,
                     model_patch: ModelPatchId::ModelD(preset.model_d_patch),
                     macros: preset.macros,
@@ -481,6 +736,7 @@ impl VersionFivePreset {
                     name: preset.name,
                     voices: preset.voices,
                     output_gain: preset.output_gain,
+                    instrument_volume: full_volume(),
                     model: preset.model,
                     model_patch: ModelPatchId::SixOpPm(preset.six_op_patch),
                     macros: preset.macros.into(),
@@ -518,6 +774,7 @@ impl VersionFourPreset {
             name: self.name,
             voices: self.voices,
             output_gain: self.output_gain,
+            instrument_volume: full_volume(),
             model: SynthesisModelId::ModelD,
             model_patch: ModelPatchId::ModelD(self.model_d_patch),
             macros: self.macros,
@@ -551,6 +808,7 @@ impl VersionThreePreset {
             name: self.name,
             voices: self.voices,
             output_gain: self.output_gain,
+            instrument_volume: full_volume(),
             model: SynthesisModelId::ModelD,
             model_patch: ModelPatchId::ModelD(self.model_d_patch),
             macros: self.macros,
@@ -583,6 +841,7 @@ impl VersionTwoPreset {
             name: self.name,
             voices: self.voices,
             output_gain: self.output_gain,
+            instrument_volume: full_volume(),
             model: SynthesisModelId::ModelD,
             model_patch: ModelPatchId::ModelD(ModelDPatchId::Bass),
             macros: self.macros,
@@ -660,6 +919,7 @@ impl LegacyPreset {
             name: self.name,
             voices: self.voices,
             output_gain: self.output_gain,
+            instrument_volume: full_volume(),
             model: SynthesisModelId::ModelD,
             model_patch: ModelPatchId::ModelD(ModelDPatchId::Bass),
             macros: MacroValues {
@@ -806,6 +1066,8 @@ release = 0.4
             include_str!("../presets/12-six-op-brass-bass.mojsint"),
             include_str!("../presets/13-six-op-mechanical-stab.mojsint"),
             include_str!("../presets/14-strange-oscillator.mojsint"),
+            include_str!("../presets/15-swarm-warm-pad.mojsint"),
+            include_str!("../presets/16-bass-matrix.mojsint"),
         ];
         let presets = sources.map(|source| Preset::parse(source).unwrap());
         let mut names = presets
@@ -814,7 +1076,7 @@ release = 0.4
             .collect::<Vec<_>>();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 14);
+        assert_eq!(names.len(), 16);
         assert!(
             presets[..7]
                 .iter()
@@ -826,6 +1088,8 @@ release = 0.4
                 .all(|preset| preset.model == SynthesisModelId::SixOpPm)
         );
         assert_eq!(presets[13].model, SynthesisModelId::StrangeOscillator);
+        assert_eq!(presets[14].model, SynthesisModelId::SwarmMachine);
+        assert_eq!(presets[15].model, SynthesisModelId::BassMatrix);
         assert_eq!(
             presets[0].model_patch,
             ModelPatchId::ModelD(ModelDPatchId::Bass)
@@ -844,6 +1108,19 @@ release = 0.4
         assert_eq!(
             presets[13].model_patch,
             ModelPatchId::StrangeOscillator(StrangePatchId::Unified)
+        );
+        assert_eq!(
+            presets[14].model_patch,
+            ModelPatchId::SwarmMachine(SwarmPatchId::WarmPad)
+        );
+        assert_eq!(
+            presets[15].model_patch,
+            ModelPatchId::BassMatrix(BassMatrixPatchId::Transformer)
+        );
+        assert!(
+            presets
+                .iter()
+                .all(|preset| preset.instrument_volume == Normalized::new(1.0).unwrap())
         );
     }
 
@@ -867,7 +1144,7 @@ release = 0.4
         let preset = Preset::parse(VALID).unwrap();
         let encoded = preset.to_toml().unwrap();
 
-        assert!(encoded.contains("schema_version = 6"));
+        assert!(encoded.contains("schema_version = 7"));
         assert!(encoded.contains("model = \"model_d\""));
         assert!(encoded.contains("model_d_patch = \"bass\""));
         assert!(!encoded.contains("six_op_patch"));
@@ -880,7 +1157,7 @@ release = 0.4
             Preset::parse(include_str!("../presets/08-six-op-bell-metal.mojsint")).unwrap();
         let encoded = preset.to_toml().unwrap();
 
-        assert!(encoded.contains("schema_version = 6"));
+        assert!(encoded.contains("schema_version = 7"));
         assert!(encoded.contains("model = \"six_op_pm\""));
         assert!(encoded.contains("six_op_patch = \"bell_metal\""));
         for field in [
@@ -902,6 +1179,40 @@ release = 0.4
         assert!(!encoded.contains("evolve ="));
         assert!(!encoded.contains("model_d_patch"));
         assert_eq!(Preset::parse(&encoded).unwrap(), preset);
+    }
+
+    #[test]
+    fn new_models_round_trip_with_exact_schema_seven_identity() {
+        for (source, model, patch_field) in [
+            (
+                include_str!("../presets/15-swarm-warm-pad.mojsint"),
+                SynthesisModelId::SwarmMachine,
+                "swarm_patch = \"warm_pad\"",
+            ),
+            (
+                include_str!("../presets/16-bass-matrix.mojsint"),
+                SynthesisModelId::BassMatrix,
+                "bass_matrix_patch = \"transformer\"",
+            ),
+        ] {
+            let preset = Preset::parse(source).unwrap();
+            assert_eq!(preset.model, model);
+            let encoded = preset.to_toml().unwrap();
+            assert!(encoded.contains("schema_version = 7"));
+            assert!(encoded.contains("instrument_volume = 1.0"));
+            assert!(encoded.contains(patch_field));
+            assert_eq!(Preset::parse(&encoded).unwrap(), preset);
+        }
+    }
+
+    #[test]
+    fn schema_six_presets_migrate_at_unity_volume_without_changing_macros() {
+        let source = include_str!("../presets/14-strange-oscillator.mojsint");
+        let migrated = Preset::parse(source).unwrap();
+        assert_eq!(migrated.schema_version, PRESET_SCHEMA_VERSION);
+        assert_eq!(migrated.instrument_volume, Normalized::new(1.0).unwrap());
+        assert_eq!(migrated.macros.get(MacroId::Couple).get(), 0.5);
+        assert_eq!(migrated.macros.get(MacroId::Motion).get(), 0.5);
     }
 
     #[test]

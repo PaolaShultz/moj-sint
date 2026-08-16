@@ -1,0 +1,57 @@
+schema_version = 1
+name = "Moj Swarm Micro-Machine"
+seed = 1369919526
+controls = [
+  "MASS",
+  "DETUNE",
+  "SPREAD",
+  "SHAPE",
+  "BITE",
+  "MOTION",
+  "COLOR",
+  "SPACE",
+]
+output = "guard.output"
+
+[[nodes]]
+id = "phases"
+type = "phase_swarm"
+max_oscillators = 9
+detune_cents = 34.0
+drift_cents = 4.5
+coupling = 0.38
+
+[[nodes]]
+id = "waves"
+type = "bandlimited_saw_bank"
+input = "phases.phases"
+
+[[nodes]]
+id = "mass_mix"
+type = "bounded_stereo_mix"
+input = "waves.waves"
+
+[[nodes]]
+id = "color"
+type = "spectral_tilt"
+input = "mass_mix.stereo"
+min_cutoff_hz = 900.0
+max_cutoff_hz = 18000.0
+
+[[nodes]]
+id = "bite"
+type = "bounded_drive"
+input = "color.stereo"
+drive = 2.8
+
+[[nodes]]
+id = "space"
+type = "stereo_width"
+input = "bite.stereo"
+max_width = 1.7
+
+[[nodes]]
+id = "guard"
+type = "output_guard"
+input = "space.stereo"
+ceiling = 0.92

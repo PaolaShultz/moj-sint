@@ -1017,3 +1017,28 @@ tables, or figures from these works are imported.
 - Numeric ranges stated for envelopes are proposed experiment bounds, not
   literature-derived laws.
 - No source code, presets, samples, prose, tables, or figures were copied.
+
+## 2026-08-16 applied Bass Matrix note
+
+Bass Matrix applies this register as one coherent split-path instrument. A
+phase-reset main oscillator and phase-locked half-frequency sub form a linear,
+mono-compatible body. Phase modulation and an inharmonic product form the upper
+branch; only that branch receives asymmetric shaping, two fixed midpoint/current
+substeps, note-tracked filtering, bounded delayed feedback, and stereo side
+motion. The branches recombine before an explicit DC blocker and static output
+guard. Position 5 is a separate smoothed post-synthesis gain.
+
+Additional implementation checks used these authoritative and inspectable
+sources:
+
+- Vadim Zavalishin, [*The Art of VA Filter Design*](https://www.native-instruments.com/fileadmin/ni_media/downloads/pdf/VAFilterDesign_2.1.2.pdf), revision 2.1.2. Used for functional reasoning about explicit delay/state, feedback, and nonlinear filter structures. Copyright remains with the author; no prose, diagrams, or implementation were copied.
+- Vesa Välimäki and Antti Huovilainen, [“Antialiasing Oscillators in Subtractive Synthesis”](https://research.aalto.fi/en/publications/antialiasing-oscillators-in-subtractive-synthesis/), *IEEE Signal Processing Magazine* 24(2), 2007, DOI 10.1109/MSP.2007.323276. Used for the distinction among bandlimited, quasi-bandlimited, and alias-reducing oscillator methods and for PolyBLEP context. IEEE copyright applies; no algorithm code or text was copied.
+- Juhan Nam, Vesa Välimäki, Jonathan S. Abel, and Julius O. Smith, [“Efficient Antialiasing Oscillator Algorithms Using Low-Order Fractional Delay Filters”](https://mac.kaist.ac.kr/pubs/jnam-taslp2010.pdf), *IEEE TASLP* 18(4), 2010, DOI 10.1109/TASL.2009.2035039. Used to confirm that sync, super-saw, and classic discontinuous waveforms need an explicit alias/cost strategy. IEEE copyright applies; no implementation was copied.
+- Julian D. Parker, Vadim Zavalishin, and Efflam Le Bivic, [“Reducing the Aliasing of Nonlinear Waveshaping Using Continuous-Time Convolution”](https://www.dafx.de/paper-archive/details/vem_XXF5qBbfiWOH2RVVAA), DAFx-16. Used for the bounded claim that nonlinear waveshaping and feedback generate alias-prone upper products and that low-order oversampling can improve them. Publication copyright applies; Bass Matrix uses an independently authored fixed two-substep approximation, not the paper's method.
+- [Surge XT source](https://github.com/surge-synthesizer/surge) and [VCV Fundamental VCF source](https://github.com/VCVRack/Fundamental/blob/v2/src/VCF.cpp), both GPL-3.0, were inspectable comparisons only. Their licensing is incompatible with copying into this MIT codebase, so no source, constants, presets, or prose were reused.
+
+The implementation deliberately uses sinusoidal phase-domain sources rather
+than adding a naïve discontinuous oscillator. Selective upper-branch substeps,
+finite guards, DC removal, and deterministic high-rate/error tests reduce risk;
+they are not an alias-free guarantee. The clean body bypasses the nonlinear
+path so added harmonics do not require sacrificing the actual sub component.

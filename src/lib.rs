@@ -3,6 +3,7 @@
 pub const ENGINE_NAME: &str = "Moj Sint";
 
 pub mod analysis;
+pub mod bass_matrix;
 pub mod clean_kick;
 pub mod compact_composite;
 pub mod composite_machine;
@@ -16,6 +17,8 @@ pub mod envelope_audition;
 pub mod host;
 pub mod hybrid;
 pub mod hybrid_subset;
+pub mod micro_machine;
+pub mod micro_machine_lab;
 pub mod model_d;
 pub mod model_d_lab;
 pub mod native_bench;
