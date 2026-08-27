@@ -28,7 +28,8 @@ The ALSA thread translates:
 
 - Note On, including velocity-zero Note On as Note Off;
 - Note Off;
-- CC 20–31 as the twelve stable macros;
+- CC 20–34 as the 15-position superset (older models retain CC 20–31);
+- CC 35 as the press-only Dual Filter core toggle and CC 36 as exact core state;
 - CC 120, CC 123, and Sequencer Reset as immediate All Notes Off.
 
 It writes fixed-size events into a 1,024-slot SPSC queue. A full queue drops the

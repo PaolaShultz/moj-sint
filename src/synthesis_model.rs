@@ -1,8 +1,10 @@
 use crate::bass_matrix::{BassMatrixControls, BassMatrixVoice};
+use crate::dual_filter::{DualFilterCore, DualFilterInstrument};
+use crate::dual_filter_concept::ConceptControls;
 use crate::engine::EngineError;
 use crate::micro_machine::{CompiledMicroMachine, MicroMachineGraph, SwarmControls};
 use crate::model_d::voice::{ModelDDiagnostics, ModelDPatch, ModelDVoice};
-use crate::preset::{ModelDPatchId, ModelPatchId, SynthesisModelId};
+use crate::preset::{DualFilterPatchId, ModelDPatchId, ModelPatchId, SynthesisModelId};
 use crate::six_op_pm::live::LiveSixOpVoice;
 use crate::strange::{StrangeControls, StrangeInstrument};
 
@@ -157,6 +159,7 @@ pub(crate) enum VoiceModel {
     StrangeOscillator(LiveStrangeVoice),
     SwarmMachine(LiveSwarmVoice),
     BassMatrix(BassMatrixVoice),
+    DualFilter(DualFilterInstrument),
 }
 
 impl VoiceModel {
@@ -197,23 +200,36 @@ impl VoiceModel {
                     .map(Self::BassMatrix)
                     .ok_or(EngineError::InvalidSampleRate)
             }
+            (SynthesisModelId::DualFilter, ModelPatchId::DualFilter(core)) => {
+                let core = match core {
+                    DualFilterPatchId::Industrial => DualFilterCore::Industrial,
+                    DualFilterPatchId::Counter => DualFilterCore::Counter,
+                };
+                DualFilterInstrument::new(sample_rate, ConceptControls::MIDPOINT, core)
+                    .map(Self::DualFilter)
+                    .map_err(|_| EngineError::InvalidSampleRate)
+            }
             _ => Err(EngineError::InvalidModelPatch),
         }
     }
 
     #[inline]
-    pub(crate) fn set_live_controls(&mut self, values: [f32; 8]) {
+    pub(crate) fn set_live_controls(&mut self, values: [f32; 15]) {
+        let timbral = [
+            values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7],
+        ];
         match self {
             Self::ModelD(model) => model.set_live_controls(
                 values[0], values[1], values[2], values[3], values[4], values[5], values[6],
                 values[7],
             ),
-            Self::SixOpPm(model) => model.set_live_controls(values),
-            Self::StrangeOscillator(model) => model.set_live_controls(values),
-            Self::SwarmMachine(model) => model.set_live_controls(values),
+            Self::SixOpPm(model) => model.set_live_controls(timbral),
+            Self::StrangeOscillator(model) => model.set_live_controls(timbral),
+            Self::SwarmMachine(model) => model.set_live_controls(timbral),
             Self::BassMatrix(model) => {
-                model.set_controls(BassMatrixControls::from_macro_values(values));
+                model.set_controls(BassMatrixControls::from_macro_values(timbral));
             }
+            Self::DualFilter(model) => model.set_controls(ConceptControls::clamped(values)),
         }
     }
 
@@ -228,6 +244,7 @@ impl VoiceModel {
             Self::StrangeOscillator(model) => model.note_on(note, velocity),
             Self::SwarmMachine(model) => model.note_on(note, velocity),
             Self::BassMatrix(model) => model.note_on(note, velocity),
+            Self::DualFilter(model) => model.note_on(note, velocity),
         }
     }
 
@@ -237,6 +254,7 @@ impl VoiceModel {
             Self::SixOpPm(model) => model.note_off(),
             Self::StrangeOscillator(_) => {}
             Self::SwarmMachine(_) | Self::BassMatrix(_) => {}
+            Self::DualFilter(model) => model.note_off(),
         }
     }
 
@@ -254,6 +272,10 @@ impl VoiceModel {
             Self::StrangeOscillator(model) => model.sample(),
             Self::SwarmMachine(model) => model.sample(),
             Self::BassMatrix(model) => model.sample(),
+            Self::DualFilter(model) => {
+                let sample = model.sample();
+                [sample, sample]
+            }
         }
     }
 
@@ -264,6 +286,26 @@ impl VoiceModel {
             Self::StrangeOscillator(model) => model.reset(),
             Self::SwarmMachine(model) => model.reset(),
             Self::BassMatrix(model) => model.reset(),
+            Self::DualFilter(model) => model.reset(),
+        }
+    }
+
+    pub(crate) fn is_idle(&self) -> bool {
+        match self {
+            Self::DualFilter(model) => model.is_idle(),
+            _ => false,
+        }
+    }
+
+    pub(crate) fn set_dual_filter_core(&mut self, core: DualFilterCore) {
+        if let Self::DualFilter(model) = self {
+            model.set_core(core);
+        }
+    }
+
+    pub(crate) fn toggle_dual_filter_core(&mut self) {
+        if let Self::DualFilter(model) = self {
+            model.toggle_core();
         }
     }
 }

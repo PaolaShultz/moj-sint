@@ -4,6 +4,7 @@ use crate::dsp::{
     finite_or_zero,
     oscillator::{OscillatorMethod, OscillatorMethod::IntegratedWavetable},
 };
+use crate::dual_filter::DualFilterCore;
 use crate::envelope::{Adsr, AdsrConfig};
 use crate::preset::{MacroValues, ModelPatchId, Preset, SynthesisModelId};
 use crate::synthesis_model::VoiceModel;
@@ -25,6 +26,8 @@ pub enum Event {
     NoteOff { note: u8 },
     SetMacro { id: MacroId, value: Normalized },
     SetVolume { value: Normalized },
+    SetDualFilterCore { core: DualFilterCore },
+    ToggleDualFilterCore,
     AllNotesOff,
 }
 
@@ -63,7 +66,8 @@ struct Voice {
     age: u64,
     model: VoiceModel,
     envelope: Adsr,
-    macros: [Smoother; 12],
+    macros: [Smoother; 15],
+    uses_internal_envelopes: bool,
 }
 
 impl Voice {
@@ -96,6 +100,7 @@ impl Voice {
             model,
             envelope,
             macros,
+            uses_internal_envelopes: model_id == SynthesisModelId::DualFilter,
         })
     }
 
@@ -103,15 +108,18 @@ impl Voice {
         self.note = note;
         self.age = age;
         self.model.note_on(note, velocity);
-        self.envelope.restart();
+        if !self.uses_internal_envelopes {
+            self.envelope.restart();
+        }
     }
 
     #[inline]
     fn next(&mut self) -> [f32; 2] {
         let values = self.macros.each_mut().map(Smoother::advance);
-        self.model.set_live_controls([
-            values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7],
-        ]);
+        self.model.set_live_controls(values);
+        if self.uses_internal_envelopes {
+            return self.model.sample().map(finite_or_zero);
+        }
         self.envelope.set_config(envelope_config(
             values[8], values[9], values[10], values[11],
         ));
@@ -137,6 +145,21 @@ impl Voice {
     fn panic(&mut self) {
         self.envelope.reset();
         self.model.reset();
+    }
+
+    fn is_idle(&self) -> bool {
+        if self.uses_internal_envelopes {
+            self.model.is_idle()
+        } else {
+            self.envelope.is_idle()
+        }
+    }
+
+    fn note_off(&mut self) {
+        self.model.note_off();
+        if !self.uses_internal_envelopes {
+            self.envelope.note_off();
+        }
     }
 }
 
@@ -241,28 +264,33 @@ impl Engine {
                 }
             }
             Event::SetVolume { value } => self.instrument_volume.set_target(value.get()),
+            Event::SetDualFilterCore { core } => {
+                for voice in &mut self.voices {
+                    voice.model.set_dual_filter_core(core);
+                }
+            }
+            Event::ToggleDualFilterCore => {
+                for voice in &mut self.voices {
+                    voice.model.toggle_dual_filter_core();
+                }
+            }
             Event::NoteOn { note, velocity } if velocity > 0.0 => {
                 self.note_age = self.note_age.wrapping_add(1);
-                let index = self
-                    .voices
-                    .iter()
-                    .position(|voice| voice.envelope.is_idle())
-                    .or_else(|| {
-                        self.voices
-                            .iter()
-                            .enumerate()
-                            .min_by_key(|(_, voice)| voice.age)
-                            .map(|(index, _)| index)
-                    });
+                let index = self.voices.iter().position(Voice::is_idle).or_else(|| {
+                    self.voices
+                        .iter()
+                        .enumerate()
+                        .min_by_key(|(_, voice)| voice.age)
+                        .map(|(index, _)| index)
+                });
                 if let Some(index) = index {
                     self.voices[index].start(note, velocity, self.note_age);
                 }
             }
             Event::NoteOn { note, .. } | Event::NoteOff { note } => {
                 for voice in &mut self.voices {
-                    if voice.note == note && !voice.envelope.is_idle() {
-                        voice.model.note_off();
-                        voice.envelope.note_off();
+                    if voice.note == note && !voice.is_idle() {
+                        voice.note_off();
                     }
                 }
             }
@@ -279,10 +307,7 @@ impl Engine {
     }
 
     pub fn active_voice_count(&self) -> usize {
-        self.voices
-            .iter()
-            .filter(|voice| !voice.envelope.is_idle())
-            .count()
+        self.voices.iter().filter(|voice| !voice.is_idle()).count()
     }
 
     pub fn voice_storage_address(&self) -> usize {
@@ -335,7 +360,7 @@ mod tests {
         left
     }
 
-    fn factory_sources() -> [&'static str; 16] {
+    fn factory_sources() -> [&'static str; 21] {
         [
             include_str!("../presets/01-full-bass.mojsint"),
             include_str!("../presets/02-full-lead.mojsint"),
@@ -353,6 +378,11 @@ mod tests {
             include_str!("../presets/14-strange-oscillator.mojsint"),
             include_str!("../presets/15-swarm-warm-pad.mojsint"),
             include_str!("../presets/16-bass-matrix.mojsint"),
+            include_str!("../presets/17-dual-filter-industrial-lead.mojsint"),
+            include_str!("../presets/18-dual-filter-serial-bass.mojsint"),
+            include_str!("../presets/19-dual-filter-counter-growl.mojsint"),
+            include_str!("../presets/20-dual-filter-envelope-punch.mojsint"),
+            include_str!("../presets/21-dual-filter-topology-motion.mojsint"),
         ]
     }
 
@@ -405,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    fn sixteen_factory_starting_points_are_finite_and_pairwise_distinct() {
+    fn twenty_one_factory_starting_points_are_finite_and_pairwise_distinct() {
         let renders = factory_sources().map(|source| {
             let mut preset = Preset::parse(source).unwrap();
             preset.voices = 1;
@@ -450,7 +480,7 @@ mod tests {
     #[test]
     fn rapid_control_movement_is_finite_bounded_and_allocation_free() {
         let mut engine = Engine::new(48_000.0, &preset(2)).unwrap();
-        let mut events = [TimedEvent::new(0, Event::AllNotesOff); 25];
+        let mut events = [TimedEvent::new(0, Event::AllNotesOff); 31];
         events[0] = TimedEvent::new(
             0,
             Event::NoteOn {

@@ -14,3 +14,8 @@ reference.mojsint
 14-strange-oscillator.mojsint
 15-swarm-warm-pad.mojsint
 16-bass-matrix.mojsint
+17-dual-filter-industrial-lead.mojsint
+18-dual-filter-serial-bass.mojsint
+19-dual-filter-counter-growl.mojsint
+20-dual-filter-envelope-punch.mojsint
+21-dual-filter-topology-motion.mojsint

@@ -11,6 +11,8 @@ pub mod control;
 pub mod coupled_wire_motion;
 pub mod coupled_wire_thump;
 pub mod dsp;
+pub mod dual_filter;
+pub mod dual_filter_concept;
 pub mod engine;
 pub mod envelope;
 pub mod envelope_audition;

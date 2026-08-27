@@ -1,0 +1,24 @@
+schema_version = 8
+name = "Dual Filter Topology Motion"
+voices = 4
+output_gain = 0.18
+instrument_volume = 1.0
+model = "dual_filter"
+dual_filter_core = "industrial"
+
+[controls]
+filter_a_cutoff = 0.34
+filter_a_resonance = 0.62
+filter_a_envelope_depth = 0.67
+filter_b_cutoff = 0.50
+filter_b_resonance = 0.38
+filter_b_envelope_depth = 0.56
+structure = 0.50
+filter_attack = 0.14
+filter_decay = 0.39
+filter_sustain = 0.34
+filter_release = 0.42
+amp_attack = 0.02
+amp_decay = 0.36
+amp_sustain = 0.68
+amp_release = 0.24

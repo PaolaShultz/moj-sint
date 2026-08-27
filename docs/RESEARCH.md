@@ -1542,6 +1542,106 @@ state; CHAOS gives both endpoints four seconds. These automated landmarks are
 strong rejection gates, not evidence that the transformations sound good or
 form a coherent instrument. Human listening remains decisive.
 
+## 2026-08-27 dual-filter and envelope controller concept
+
+The owner supplied the current hardware fact: sixteen physical rotaries, one
+reserved as the master, leave fifteen direct continuous controls for the
+instrument. Of the two clickable rotaries, the non-master click is available
+as one synth action. The arrangement is temporary. The exercise therefore
+uses six direct filter controls, one routing control, filter ADSR, and amp ADSR;
+the synth click toggles serial/parallel topology without a hidden parameter
+bank.
+
+The Korg multi/poly was researched as a workflow reference rather than a sound
+or implementation target. Korg documents two filter slots, serial or parallel
+routing, continuous per-source A/B balance, dedicated envelope depth in
+semitones, independent cutoff/resonance/trim/output controls, multi-output
+filter blending, curved and loopable envelopes, and VCA-dependent amp-envelope
+response. The original exercise deliberately retains only the broad
+relationships that fit the physical budget: two independently controlled
+filters, one shared curved filter ADSR with independent signed depths, a
+separate curved amp ADSR, continuous routing, and one topology push.
+
+Primary sources and licensing boundary:
+
+- Korg Inc., [*multi/poly, multi/poly module Owner's Manual*, English,
+  revision E2](https://cdn.korg.com/us/support/download/files/4c699f9371bafe7e1c66f46415663f87.pdf),
+  2025. Pages 40-51 document dual-filter routing, filter types, saturation and
+  resonance interaction, cutoff, resonance, and envelope depth; pages 67-70
+  document DAHDSR stages, segment curvature, overshoot, retriggering, and
+  looping. Korg's download terms retain intellectual-property ownership; the
+  manual is factual reference only.
+- Korg Inc., [multi/poly product page](https://www.korg.com/us/products/synthesizers/multipoly/).
+  This independently confirms four oscillators, dual modeled filters,
+  serial/parallel use, Virtual Voice Card state, envelope curvature, and
+  modeled VCA response. Marketing sound-quality claims are not treated as
+  technical proof.
+- Andrew Simper, [“Linear Trapezoidal Integrated State Variable Filter With
+  Low Noise Optimisation”](https://www.cytomic.com/files/dsp/SvfLinearTrapOptimised.pdf),
+  Cytomic, 2011. This supplies the published trapezoidal SVF derivation and
+  bounded-coefficient structure used as mathematical guidance. Cytomic's
+  technical-paper index describes the shared knowledge and algorithms as
+  public domain, while its current download page also refers to an EULA; no
+  source code, prose, figure, or workbook was copied.
+
+The resulting source is an independently authored Moj Sint experiment. Filter
+coefficients and envelope coefficients are prepared outside the sample path;
+sampling performs no allocation, lock, I/O, logging, formatting, panic, or
+per-sample transcendental setup. Three audition files test genuinely different
+topologies: cascaded low-pass serial filtering, split-source parallel
+low-pass/band-pass filtering, and opposing multimode branches fed by additive,
+product, and difference sources. They are not a parameter sweep.
+
+Human listening rejected the first static three-file batch as a presentation:
+three fixed parameter combinations did not reveal what the controls do during
+a sound. It did provide one useful directional verdict. The first serial sound
+was promising as a strange, "cute" lead for nasty techno or electro-industrial
+music. This is not production acceptance, and the other static points were not
+selected. The rejected batch was removed from the repository artifact tree.
+
+The successor gate contains only WAVs. Fifteen files keep the promising lead
+source while moving exactly one rotary from its starting point toward low,
+through high, and back during playback. The seven direct filter/routing values
+move over one held note. Filter and amp ADSR files retrigger notes throughout
+the motion so attack, decay, sustain, and release changes are exposed rather
+than hidden in one already-running envelope stage. A sixteenth lead file
+performs three serial/parallel pushes. Seven direct controls have 10 ms target
+smoothing; topology changes use a 5 ms fade-out, switch only at zero, then a
+5 ms fade-in.
+
+Four additional low-register files ask whether the same machine has useful
+bass behavior: serial cutoff/resonance movement, counter-motion growl/routing,
+envelope-punch movement, and topology pushes. Each changes controls while its
+note pattern plays. Focused proof covers all fifteen routes plus the push,
+allocation-free note/sample work, finite bounded output, twenty distinct WAVs,
+and byte-identical repeat generation. The earlier 48 kHz versus 192 kHz fitted
+residual matrix spans -13.485698 to -22.490217 dB across MIDI 36/60/84. It is a
+transfer-conflated diagnostic, not an alias-energy estimate or acceptance
+bound.
+
+Human listening accepted the overall moving-control exercise enthusiastically:
+the complete experiment was described as awesome and likely to work very well.
+All four low-register examples were described as nice and having substantial
+potential. This is positive evidence for the instrument concept and its bass
+range, rather than selection of one canonical bass or proof of production
+readiness. The owner subsequently approved production and SHR-DAW integration.
+
+Dual Filter now preserves those accepted directions as one instrument with two
+backstage cores and one standardized 15-position surface. INDUSTRIAL
+continuously moves serial to parallel with STRUCTURE; COUNTER retains the
+counter-motion routing/growl behavior. A dedicated synth click crossfades the
+already-running core state without retriggering or changing any pot value.
+This is sequential reachability, not simultaneous layering.
+
+The production wrapper renders synchronized serial, parallel, and counter
+graphs continuously and performs only linear per-sample crossfades. Prepared
+cutoff and envelope-coefficient tables keep live control updates free of
+transcendental setup. Schema 8 persists exact control names and core state; MIDI
+uses CC20–34, toggle CC35, and state CC36. Focused allocation, finite-output,
+held-note transition, preset, MIDI, and factory-distinction tests pass on the
+x86_64 development host. Native Raspberry Pi headroom and integrated listening
+remain open evidence.
+
 ## Real-time I/O and platform
 
 - JACK project, [API overview](https://jackaudio.org/api/) and

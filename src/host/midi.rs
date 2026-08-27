@@ -1,4 +1,5 @@
 use crate::control::{MacroId, Normalized};
+use crate::dual_filter::{CORE_STATE_CC, CORE_TOGGLE_CC, DualFilterCore};
 use crate::engine::Event;
 use alsa::seq::{EvCtrl, EvNote, Event as AlsaEvent, EventType};
 
@@ -28,6 +29,16 @@ pub fn translate(event: &AlsaEvent<'_>) -> Option<Event> {
                 Some(Event::SetVolume {
                     value: Normalized::new((control.value.clamp(0, 127) as f32) / 127.0)
                         .expect("bounded controller value"),
+                })
+            } else if cc == CORE_TOGGLE_CC {
+                (control.value > 0).then_some(Event::ToggleDualFilterCore)
+            } else if cc == CORE_STATE_CC {
+                Some(Event::SetDualFilterCore {
+                    core: if control.value >= 64 {
+                        DualFilterCore::Counter
+                    } else {
+                        DualFilterCore::Industrial
+                    },
                 })
             } else {
                 MacroId::from_cc(cc).map(|id| Event::SetMacro {
@@ -96,6 +107,26 @@ mod tests {
         assert_eq!(
             translate(&AlsaEvent::new(EventType::Controller, &panic)),
             Some(Event::AllNotesOff)
+        );
+        let core_click = EvCtrl {
+            param: u32::from(CORE_TOGGLE_CC),
+            value: 127,
+            ..EvCtrl::default()
+        };
+        assert_eq!(
+            translate(&AlsaEvent::new(EventType::Controller, &core_click)),
+            Some(Event::ToggleDualFilterCore)
+        );
+        let core_state = EvCtrl {
+            param: u32::from(CORE_STATE_CC),
+            value: 127,
+            ..EvCtrl::default()
+        };
+        assert_eq!(
+            translate(&AlsaEvent::new(EventType::Controller, &core_state)),
+            Some(Event::SetDualFilterCore {
+                core: DualFilterCore::Counter
+            })
         );
     }
 }

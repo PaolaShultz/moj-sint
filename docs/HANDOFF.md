@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-08-16, Europe/Zagreb.
+Last updated: 2026-08-27, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -26,6 +26,102 @@ architecture to polyphony only after native Raspberry Pi callback/headroom
 measurements establish a safe voice budget.
 
 There is no UI in this repository. Control comes through MIDI and SHR-DAW.
+
+## 2026-08-27 dual-filter/envelope controller exercise
+
+The owner reported a replacement physical controller with sixteen rotaries in
+total. One remains the master rotary, leaving fifteen continuous synth
+controls; two rotaries are clickable in total, so after reserving the master
+there is one synth-specific push action. The physical arrangement is temporary
+and will be revisited. This superseded the old hardware-count assumption. The
+later explicit production approval expands only Dual Filter to 15 mapped
+values; the five older models retain their 12-value contracts.
+
+An isolated original dual-filter concept now tests that fifteen-control budget:
+`A CUTOFF`, `A RESONANCE`, `A ENV DEPTH`, `B CUTOFF`, `B RESONANCE`,
+`B ENV DEPTH`, `STRUCTURE`, filter ADSR, and amp ADSR. The one available synth
+push toggles serial versus parallel routing and does not open a hidden control
+page. The continuous routing control changes the A/B contribution in parallel;
+in serial it moves from A-then-B toward direct-to-B, retaining a clear result in
+both states.
+
+`src/dual_filter_concept.rs` independently implements two trapezoidal-integrated
+state-variable branches, log-spaced prepared cutoff coefficients, curved
+filter and amp contours, a bounded nonlinear input/output response, and four
+existing band-limited oscillators. `SweetSerial`, `ParallelSplit`, and
+`CounterMotion` use fundamentally different filter/source routing topologies.
+This is informed by the Korg multi/poly workflow, but it is not a Korg filter
+model, factory preset, UI copy, compatibility mode, or production Moj Sint
+model. No Korg code, preset, sample, diagram, parameter values, prose, or
+figures were copied.
+
+The first static three-file presentation was rejected as uninformative because
+it exposed only three fixed points among many parameter combinations. Its first
+sound nevertheless received a promising identity: a strange but "cute" lead
+for nasty techno or electro-industrial use. The owner requested actual control
+changes during playback and bass examples from the same machine. The rejected
+batch was removed from the repository artifact tree.
+
+The replacement disposable gate is
+`artifacts/dual-filter-controller-listening/` and contains WAV files only. Its
+first fifteen files retain that promising lead source and demonstrate one
+physical rotary each. Direct filter/routing controls move continuously over a
+held note; filter and amp envelope controls use repeated notes so their stages
+can actually be heard. File 16 performs three click-conscious serial/parallel
+topology pushes. Files 17-20 are low-register musical examples with audible
+cutoff/resonance motion, counter-motion routing, envelope-punch motion, and
+topology pushes. Direct controls use 10 ms smoothing and topology changes fade
+out, switch at zero, and fade in over 5 ms per side.
+
+Focused contract and CLI tests pass: exactly fifteen distinct controls,
+deterministic distinct WAV-only output, finite bounded samples, allocation-free
+sample/note paths, and byte-identical repeat generation. Earlier explicit
+48 kHz versus 192 kHz fitted residuals range from -13.485698 to -22.490217 dB;
+they conflate filter transfer/phase changes with foldback and remain diagnostic
+only.
+
+Human listening gave the complete exercise a strongly positive verdict:
+the moving-control presentation is "awesome" and expected to work very well,
+and all four bass examples have substantial potential and sound nice. This
+passed the first musical concept gate for the dual-filter/controller machine,
+not merely one static patch. The owner then explicitly approved production and
+SHR-DAW integration.
+
+Dual Filter is now the sixth production model. One instrument owns two
+backstage cores: INDUSTRIAL preserves the accepted lead plus serial/topology
+bass directions and continuously crossfades serial to parallel with STRUCTURE;
+COUNTER preserves the accepted counter-motion growl direction and uses the same
+STRUCTURE position as its routing/growl macro. Both cores and both INDUSTRIAL
+branches render preallocated state continuously. CC35 changes only the core and
+crossfades over 30 ms without retriggering a held note; CC36 restores exact
+core state. All fifteen knob positions remain unchanged across the switch.
+
+Preset schema 8 adds `dual_filter`, exact `[controls]` names, and persisted
+`dual_filter_core`. Five factory starts preserve the accepted lead and four
+bass directions. The existing five models, their CC20–31 behavior, and schemas
+1–7 remain readable; Dual Filter uses CC20–34 and owns its filter and amp
+envelopes internally. Focused production contracts cover all 15 controls,
+continuous STRUCTURE endpoints/midpoint, held-note core crossfade, finite
+bounded output, reset-to-silence, allocation-free note/control/core/sample
+work, strict round-trip persistence, MIDI CC translation, and 21 distinct
+finite factory starts.
+
+No JACK server, ALSA hardware route, synth launch, physical controller, audible
+review of the integrated host, or Raspberry Pi timing/headroom measurement was
+performed. The production voice runs three synchronized concept graphs per
+voice, so native Pi voice capacity is specifically open and must be measured
+before any polyphony claim.
+
+The workstation software pass completed after integration: formatting and
+diff checks passed; the normal all-target/all-feature suite passed (277 library
+tests passed with five documented development-only ignores, and every active
+binary/integration test passed); warning-denied Clippy and the all-target
+release build passed. `cargo audit` found no vulnerability, and `cargo deny
+check` passed advisories, bans, licenses, and sources with only the existing
+duplicate-`winnow` warning. Two independent release renders of Counter Growl
+were byte-identical at SHA-256
+`78b69760b7bd82d61de6e9ac365dc6f47fa0a1dd8592e8847f72ceebe17e4762`;
+their temporary files were removed.
 
 ## 2026-08-16 two-model live integration
 

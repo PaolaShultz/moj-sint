@@ -1,0 +1,24 @@
+schema_version = 8
+name = "Dual Filter Counter Growl"
+voices = 4
+output_gain = 0.18
+instrument_volume = 1.0
+model = "dual_filter"
+dual_filter_core = "counter"
+
+[controls]
+filter_a_cutoff = 0.30
+filter_a_resonance = 0.70
+filter_a_envelope_depth = 0.76
+filter_b_cutoff = 0.50
+filter_b_resonance = 0.55
+filter_b_envelope_depth = 0.18
+structure = 0.46
+filter_attack = 0.06
+filter_decay = 0.34
+filter_sustain = 0.30
+filter_release = 0.34
+amp_attack = 0.02
+amp_decay = 0.30
+amp_sustain = 0.62
+amp_release = 0.26

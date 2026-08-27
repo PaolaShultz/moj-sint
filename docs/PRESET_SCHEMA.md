@@ -1,14 +1,15 @@
 # Preset and Control Schema
 
-`.mojsint` is strict TOML. Schema version 7 keeps the Moj Sint process
-(`engine`) separate from its synthesis model, makes patch identity and macros
-model-specific, and adds `instrument_volume`. Every preset has
+`.mojsint` is strict TOML. Schema version 8 adds the Dual Filter production
+model and persisted backstage core while retaining the existing model-specific
+identity and independent `instrument_volume`. Every preset has
 `schema_version`, `name`, `voices`, `output_gain`, `instrument_volume`,
-`model`, one matching patch field, and one exact `macros` table. Unknown,
+`model`, one matching patch/core field, and one exact `macros` or `controls`
+table. Unknown,
 mixed-model, or missing fields fail validation. Names must be non-empty,
 voices are 1–64, and all gain, volume, and macro values are finite in `0..=1`.
 
-The five model identities are:
+The six model identities are:
 
 | Model | Patch field and accepted IDs |
 | --- | --- |
@@ -17,6 +18,7 @@ The five model identities are:
 | `strange_oscillator` | `strange_patch = "unified"` |
 | `swarm_machine` | `swarm_patch = "warm_pad"` |
 | `bass_matrix` | `bass_matrix_patch = "transformer"` |
+| `dual_filter` | `dual_filter_core`: `industrial`, `counter` |
 
 ```toml
 schema_version = 7
@@ -42,12 +44,12 @@ sustain = 0.82
 release = 0.15
 ```
 
-Schemas 1–6 remain readable through strict migrations. Older presets gain
+Schemas 1–7 remain readable through strict migrations. Older presets gain
 `instrument_volume = 1.0`, so their previous full-level behavior and timbre
-remain unchanged. The serializer always writes schema 7 and retains the exact
+remain unchanged. The serializer always writes schema 8 and retains the exact
 model-specific patch and macro vocabulary.
 
-## Twelve physical positions
+## Physical positions
 
 Position 5 is instrument volume for every model. Moj Sint receives it as MIDI
 CC 7 and smooths the linear gain over 10 ms after synthesis, so it changes
@@ -71,12 +73,27 @@ The schema retains the historical fifth timbre macro (`couple`, `balance`,
 remain loadable. The SHR surface no longer assigns that slot to position 5;
 new physical performance uses the separate `instrument_volume` field.
 
+Dual Filter alone uses all 15 positions and owns both its filter and amp
+envelopes internally:
+
+| Position | Dual Filter |
+| ---: | --- |
+| 1–3 | `FILTER A CUTOFF`, `FILTER A RESONANCE`, `FILTER A ENVELOPE DEPTH` |
+| 4–6 | `FILTER B CUTOFF`, `FILTER B RESONANCE`, `FILTER B ENVELOPE DEPTH` |
+| 7 | `STRUCTURE` (serial to parallel in INDUSTRIAL; routing/growl macro in COUNTER) |
+| 8–11 | filter `ATTACK`, `DECAY`, `SUSTAIN`, `RELEASE` |
+| 12–15 | amp `ATTACK`, `DECAY`, `SUSTAIN`, `RELEASE` |
+
+MIDI CC20–34 carry those positions. CC35 is a press-only reversible core
+toggle; CC36 restores exact core state (`0` INDUSTRIAL, `127` COUNTER). Current
+positions are preserved across the internal 30 ms held-note crossfade.
+
 All live controls use the bounded event path. Timbre and ADSR use the existing
 10 ms macro smoothers; volume has its own 10 ms smoother. Loading or RESET in
 SHR re-arms pickup against the loaded values.
 
 The tracked catalog contains seven Model D, six Six-Op PM, one Strange
-Oscillator, one Swarm Machine, and one Bass Matrix start. The graph description
+Oscillator, one Swarm Machine, one Bass Matrix, and five Dual Filter starts. The graph description
 in `experiments/swarm-micro-machine-v1.toml` remains a strict authoring input;
 the live `swarm_machine` model compiles that graph before audio rendering and
 never parses or allocates in the callback.

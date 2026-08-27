@@ -17,10 +17,13 @@ pub enum MacroId {
     Decay,
     Sustain,
     Release,
+    Control13,
+    Control14,
+    Control15,
 }
 
 impl MacroId {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 15] = [
         Self::Evolve,
         Self::Shape,
         Self::Color,
@@ -33,6 +36,9 @@ impl MacroId {
         Self::Decay,
         Self::Sustain,
         Self::Release,
+        Self::Control13,
+        Self::Control14,
+        Self::Control15,
     ];
     pub const TIMBRAL: [Self; 8] = [
         Self::Evolve,
@@ -60,6 +66,9 @@ impl MacroId {
             Self::Decay => "decay",
             Self::Sustain => "sustain",
             Self::Release => "release",
+            Self::Control13 => "control_13",
+            Self::Control14 => "control_14",
+            Self::Control15 => "control_15",
         }
     }
 
@@ -77,6 +86,9 @@ impl MacroId {
             Self::Decay => "DECAY",
             Self::Sustain => "SUSTAIN",
             Self::Release => "RELEASE",
+            Self::Control13 => "CONTROL 13",
+            Self::Control14 => "CONTROL 14",
+            Self::Control15 => "CONTROL 15",
         }
     }
 
@@ -189,19 +201,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exposes_exactly_twelve_unique_macros_with_stable_ccs() {
-        assert_eq!(MacroId::ALL.len(), 12);
+    fn preserves_the_original_twelve_ccs_and_adds_three_positions() {
+        assert_eq!(MacroId::ALL.len(), 15);
         assert_eq!(MacroId::TIMBRAL.len(), 8);
         let mut names = MacroId::ALL.map(MacroId::as_str).to_vec();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 12);
+        assert_eq!(names.len(), 15);
         for (index, id) in MacroId::ALL.into_iter().enumerate() {
             assert_eq!(id.cc(), 20 + index as u8);
             assert_eq!(MacroId::from_cc(id.cc()), Some(id));
         }
         assert_eq!(MacroId::from_cc(19), None);
-        assert_eq!(MacroId::from_cc(32), None);
+        assert_eq!(MacroId::from_cc(34), Some(MacroId::Control15));
+        assert_eq!(MacroId::from_cc(35), None);
     }
 
     #[test]

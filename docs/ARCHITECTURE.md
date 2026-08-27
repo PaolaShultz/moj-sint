@@ -51,12 +51,15 @@ instrument whose musical verdict and native Raspberry Pi headroom remain open.
 
 ## Live control and polyphony contract
 
-SHR-DAW exposes exactly twelve continuous synth controls per model. Model D
+SHR-DAW exposes twelve continuous controls for the first five models. Model D
 implements `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`,
 and `SPACE`. Six-Op PM implements `INDEX`, `RATIO`, `FEEDBACK`, `OP DECAY`,
 `BALANCE`, `KEY SCALE`, `VELOCITY`, and `MOTION`. Strange Oscillator implements
 `TYPE`, `FORM`, `WARP`, `COUPLE`, `MOTION`, `CHAOS`, `COLOR`, and `SPACE`.
-Every model appends `ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`.
+Those models append `ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. Dual Filter
+uses 15 positions: two cutoff/resonance/envelope-depth blocks, STRUCTURE,
+filter ADSR, and amp ADSR. Its dedicated synth click toggles only the backstage
+INDUSTRIAL/COUNTER core; the master encoder remains SHR navigation.
 `WIDTH` was removed because this Model D engine has no supported width
 experiment. There is no hidden page or master-encoder takeover.
 
@@ -84,7 +87,7 @@ possible product result; eight has no special status and is not required.
 
 ## Modules
 
-- `control`: twelve stable identities, CC 20–31, normalized values,
+- `control`: the stable CC 20–34 positional superset, normalized values,
   perceptual ADSR time mapping, and the smoothing primitive.
 - `dsp`: finite guards, the retained reference sine, independently implemented
   PolyBLEP and integrated-wavetable candidates, the negative-result shared-
