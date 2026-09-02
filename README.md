@@ -7,8 +7,8 @@ rendering, and the live JACK/ALSA host.
 
 The current experimental catalog contains six synthesis models: circuit-
 informed Model D, Six-Op PM, Strange Oscillator, the typed-graph Swarm Machine,
-Bass Matrix, and Dual Filter. The first five models retain twelve stable
-absolute controls. Dual Filter uses 15: two cutoff/resonance/envelope-depth
+Bass Matrix, and Dual Filter. The first five models expose twelve normalized
+engine controls. Dual Filter uses 15: two cutoff/resonance/envelope-depth
 blocks, continuous `STRUCTURE`, filter ADSR, and amp ADSR. Its separate synth
 rotary click crossfades between INDUSTRIAL and COUNTER cores without
 retriggering a held note. The 21 factory starts are playable research outcomes
@@ -57,17 +57,19 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo build --release --all-targets
 ```
 
-See [architecture](docs/ARCHITECTURE.md), the
-[live-host contract](docs/HOST_CONTRACT.md), the
-[preset/control schema](docs/PRESET_SCHEMA.md),
-[Bass Matrix design and evidence](docs/BASS_MATRIX.md), and
-[portability notes](docs/PORTABILITY.md). The deliberately unscheduled
-[experimental direction](docs/FUTURE_DIRECTION.md) describes open model
-authoring, low-code micro-machines, and AI-assisted exploration.
+The [documentation index](docs/README.md) separates current contracts from
+research evidence, historical plans, and future work. Start there for the
+architecture, live-host contract, preset schema, portability notes, model
+evidence, and experimental direction.
 
 The cleared public installation boundary and dependency licence review are in
 [THIRD_PARTY.md](THIRD_PARTY.md). Only the files named by
 `presets/cleared-presets.txt` are factory-installable.
+
+SHR-DAW owns its exact Moj Sint installation revision in
+`install/compatibility.json`, along with process startup, routing, and recovery.
+That pin can lag this repository's current schema and catalog; Moj Sint owns
+the host and preset contracts, not SHR-DAW's update schedule.
 
 Moj Sint source and its project-authored factory presets are available under
 the [MIT License](LICENSE).

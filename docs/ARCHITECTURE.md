@@ -49,6 +49,16 @@ structural controls then expose large form, deformation, coupling, motion,
 irregularity, color, and stereo changes. Its public start is an experimental
 instrument whose musical verdict and native Raspberry Pi headroom remain open.
 
+Swarm Machine is the fourth live model. It compiles the strict schema-1 typed
+graph before voice construction and renders the prepared nine-oscillator warm
+pad through fixed state. Bass Matrix is the fifth: a phase-locked sub/body,
+separate upper character paths, selective nonlinear processing, filtering,
+feedback, DC removal, and an output guard. Dual Filter is the sixth. It owns
+two independently enveloped filter blocks, continuous serial/parallel
+structure, and a click-selected INDUSTRIAL or COUNTER core. These models use
+the same preallocated `VoiceModel` and stereo host boundary as the earlier
+three.
+
 ## Live control and polyphony contract
 
 SHR-DAW exposes twelve continuous controls for the first five models. Model D
@@ -63,8 +73,9 @@ INDUSTRIAL/COUNTER core; the master encoder remains SHR navigation.
 `WIDTH` was removed because this Model D engine has no supported width
 experiment. There is no hidden page or master-encoder takeover.
 
-The catalog preserves all seven authored Model D audition starting points, all
-six accepted Six-Op PM listening starts, and one Strange Oscillator start.
+The catalog preserves seven authored Model D audition starting points, six
+accepted Six-Op PM listening starts, one Strange Oscillator start, one Swarm
+Machine start, one Bass Matrix start, and five Dual Filter starts.
 Model D contains
 three full bass/lead/filter-articulation patches and four matched bass
 diagnostics. They are selectable states of one modeled instrument, not separate
