@@ -10,14 +10,14 @@ those contracts from research records, proposals, and dated session evidence.
   tool boundaries.
 - [Live host contract](HOST_CONTRACT.md) defines process arguments, ALSA/JACK
   ports, event timing, overflow behavior, shutdown, and failure ownership.
-- [Preset and control schema](PRESET_SCHEMA.md) defines schema 8, model
+- [Preset and control schema](PRESET_SCHEMA.md) defines schema 9, model
   identities, exact fields, MIDI CCs, physical positions, and migrations.
 - [Portability and deployment](PORTABILITY.md) records toolchain, dependency,
   platform, and evidence limits.
 - [Bass Matrix](BASS_MATRIX.md) records the current model design and automated
   evidence.
 - [Dependencies, licensing, and public presets](../THIRD_PARTY.md) owns the
-  public 21-preset boundary and dependency review.
+  public 24-preset boundary and dependency review.
 
 SHR-DAW starts Moj Sint as an external managed process. Moj Sint owns synthesis,
 preset validation, ALSA input, and stereo JACK output. SHR-DAW owns its exact
@@ -30,6 +30,9 @@ Project state, and private preset storage.
   measurement record.
 - [Bass impact research](BASS_IMPACT_RESEARCH.md) records the research basis
   and limits behind Bass Matrix.
+- [Acid-chain synthesis research](ACID_CHAIN_RESEARCH.md) records the
+  TD-3-SB functional study, clean-room boundary, and original Pressure Chain
+  listening proposal. It is not a hardware model or live-engine contract.
 - [Composite machine research](COMPOSITE_MACHINE_RESEARCH.md) preserves
   offline experiments and listening gates. It is not a live-engine contract.
 - [Workspace handoff](HANDOFF.md) is a machine/session ledger. It includes

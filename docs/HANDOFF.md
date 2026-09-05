@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-08-27, Europe/Zagreb.
+Last updated: 2026-09-05, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -26,6 +26,134 @@ architecture to polyphony only after native Raspberry Pi callback/headroom
 measurements establish a safe voice budget.
 
 There is no UI in this repository. Control comes through MIDI and SHR-DAW.
+
+## 2026-09-05 Pressure Chain live integration
+
+The owner requested yesterday's model in SHR-DAW. Pressure Chain now enters
+`Engine` as one monophonic voice with its own amp envelope and three explicit
+preset topologies: Deep Cascade, Body Tap, and Cross Feed. Schema 9 owns
+`pressure_chain_topology` and twelve normalized macros; schemas 1–8 migrate
+without changing their values. More than one Pressure Chain voice is rejected.
+A fixed 128-key last-note stack makes overlapping notes slide, returns to
+still-held notes, and ignores stale releases. All Notes Off clears both voice
+and held-key state. The original oscillator/filter DSP is unchanged.
+
+SHR exposes all eight timbre values followed by amp ADSR on CC20–31, with
+SWEEP at physical position 5 and Project AUX sends at 13–15. It uses the
+existing one-owned-process and isolated stereo instrument strip path. This
+is the seventh model, with three new project-authored starts (24 total).
+No release executable was rebuilt and no audio/hardware session was started;
+source integration does not update an already installed or running host.
+Listening, controller acceptance, and real-time headroom remain unverified.
+
+Non-audible validation uses rustc 1.97.1 (8bab26f4f, LLVM 22.1.6), native
+AArch64. Formatting, locked checks, the normal all-target/all-feature suite
+(346 passed, 35 ignored), and focused live/schema/control regressions pass.
+SHR's normal suite passes 1,128 tests with 14 historical cases ignored. The
+additional held-key and topology regressions run in the focused live suite.
+No opt-in historical renderers or release build ran for this integration.
+
+## 2026-09-04 Pressure Chain research and isolated listening gate
+
+Research into the Behringer TD-3-SB is recorded in
+`docs/ACID_CHAIN_RESEARCH.md`. `SB` is the Strawberry/red colour variant of the
+ordinary TD-3 (`SR` is silver), not a separate synth architecture.
+Manufacturer documentation establishes the broad monophonic chain: one
+selectable reverse-saw/pulse VCO, resonant
+four-pole low-pass, envelope-controlled filter motion, amplitude control,
+accent and slide sequencing, then switchable output distortion. Roland and
+Robin Whittle sources clarify the more important performance behavior: accent
+couples brightness and loudness through a stateful sweep, while slide slews
+pitch under a held gate rather than behaving as an ordinary retrigger. Tim
+Stinchcombe's filter analysis supports treating the reference ladder as a
+four-stage system despite conflicting 18/24 dB shorthand.
+
+The resulting **Pressure Chain** experiment preserves only that causal idea.
+Its PolyBLEP falling-ramp/variable-pulse source, causal nonlinear filter cells,
+coefficient/range choices, pressure-memory state, and three routings are
+independently authored. `DeepCascade` uses all four cells serially; `BodyTap`
+recombines a protected two-cell body with the four-cell edge; `CrossFeed`
+returns bounded differentiated stage-two energy through one-sample-delayed
+cross paths. This is not a TD-3/TB-303 circuit, preset, sequencer, compatibility
+mode, or product identity, and no third-party source, values, diagrams,
+patterns, prose, or audio were copied.
+
+The exact timbral surface is `SOURCE`, `SHAPE`, `CUTOFF`, `RESONANCE`, `SWEEP`,
+`DECAY`, `PRESSURE`, and `BITE`, followed by Moj Sint's normal amp ADSR. A
+trigger refreshes the filter sweep without forcing a discontinuous oscillator
+restart; a slide slews pitch without restarting either contour. Velocity
+charges pressure memory, close high-velocity events accumulate it, and it
+jointly affects cutoff, pulse asymmetry, and colour before relaxing.
+
+The isolated public module and `pressure-chain-lab` are not reachable from
+`Engine`, presets, the factory catalog, or SHR-DAW. The lab presents the three
+genuinely different routings under one identical 56-step note, velocity,
+slide, and cutoff score. Focused contracts prove eight distinct controls,
+distinct topology output, deterministic finite dual-mono rendering, a 0.94
+bound, allocation-free note/control/sample/reset paths, non-retriggering slide,
+stateful pressure, exact release silence, deterministic lab output, and a
+maximum adjacent-sample jump below 0.90. The generated files peak from
+0.891432 to 0.919852 with RMS 0.383755 to 0.431874 and absolute DC below
+0.005727.
+
+The WAV-generating CLI contract is development-only and ignored in the normal
+suite now that its deterministic evidence is recorded. Run it on demand with
+`cargo test --test pressure_chain_cli -- --ignored` when its renderer,
+presentation score, output contract, or recorded evidence changes.
+
+The conservative 48/384 kHz fitted residual diagnostic ranges from -15.683015
+to -1.709247 dB across MIDI 36/60/84. It deliberately conflates nonlinear
+transfer, filter phase/time response, and foldback, so it is engineering
+evidence rather than an aliasing or sound-quality acceptance claim. Human
+listening, live integration, Raspberry Pi load, JACK/ALSA/MIDI, and hardware
+testing remain open. Do not add a preset/schema/Engine/SHR route until the
+owner chooses a topology or asks for further development.
+
+## 2026-08-28 stale release-host repair
+
+SHR's source catalog already discovered all 21 cleared Moj presets, including
+the five strict schema-8 Dual Filter sounds, but the configured
+`target/release/moj-sint` artifact had last been built before schema 8. Loading
+a Dual Filter sound therefore exited immediately with `unsupported preset
+schema version 8`, after which SHR correctly restored the prior synth. This was
+an executable/source mismatch, not a preset or private-configuration defect.
+
+The release executable is refreshed from current source. All 21 cleared
+presets pass that exact executable's offline validator. Two one-second
+production renders of Dual Filter Counter Growl at the same note, velocity,
+rate, and duration are byte-identical (SHA-256
+`862404947e81fd5edaee233588b58507d5026d2c88513f3c20bca86014dc515b`).
+Formatting, the complete normal all-target/all-feature suite, warning-denied
+Clippy, the release build, `cargo audit`, and `cargo deny check` pass; the
+normal suite's historical/audition/benchmark cases remained intentionally
+ignored. No JACK, synth process, MIDI, playback, hardware, or audible test was
+started or changed by the agent.
+
+## 2026-08-28 SHR 3×5 host-surface integration
+
+SHR's controller correction makes that host surface direction-only: the master
+and all fifteen mapped rotaries must emit Relative 1 or Relative 2 steps.
+Positional 0–127 rotary modes are no longer learned, stored, decoded, or
+presented as a supported controller option. Moj Sint's MIDI CC and preset
+contracts are unchanged; SHR carries its current parameter value and sends the
+resulting CC update to Moj. The old MiniLab 3 positional parameter knobs are no
+longer bundled as a valid performance mapping.
+
+SHR-DAW's 15-rotary performance surface now has one explicit 3×5 contract.
+Dual Filter's existing schema-8 host integration remains a full fifteen synth
+controls on CC20–34. The five older Moj models retain their settled twelve
+continuous synth controls; SHR owns physical slots 13–15 outside Moj Sint and
+uses them for the current Project's AUX 1, AUX 2, and AUX 3 send levels. Those
+messages are consumed by SHR and are not translated or forwarded to this
+engine, so Moj's older preset schemas and DSP contracts do not change.
+
+The SHR Player and FT2 parameter child render older Moj models as twelve synth
+values plus three aux sends, while Dual Filter renders all fifteen synthesis
+values. SHR expands its bounded wet-aux graph to three buses and Project format
+18. Moj Sint source and preset files are unchanged by this host-side work.
+SHR formatting and whitespace checks passed; its standing combined-pass gate
+means no Cargo compilation/tests or live MIDI/JACK/audio/controller acceptance
+has yet run for this integration.
 
 ## 2026-08-27 dual-filter/envelope controller exercise
 

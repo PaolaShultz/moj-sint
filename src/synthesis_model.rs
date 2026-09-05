@@ -5,6 +5,9 @@ use crate::engine::EngineError;
 use crate::micro_machine::{CompiledMicroMachine, MicroMachineGraph, SwarmControls};
 use crate::model_d::voice::{ModelDDiagnostics, ModelDPatch, ModelDVoice};
 use crate::preset::{DualFilterPatchId, ModelDPatchId, ModelPatchId, SynthesisModelId};
+use crate::pressure_chain::{
+    PressureArticulation, PressureChainControls, PressureChainTopology, PressureChainVoice,
+};
 use crate::six_op_pm::live::LiveSixOpVoice;
 use crate::strange::{StrangeControls, StrangeInstrument};
 
@@ -160,6 +163,7 @@ pub(crate) enum VoiceModel {
     SwarmMachine(LiveSwarmVoice),
     BassMatrix(BassMatrixVoice),
     DualFilter(DualFilterInstrument),
+    PressureChain(LivePressureVoice),
 }
 
 impl VoiceModel {
@@ -209,6 +213,9 @@ impl VoiceModel {
                     .map(Self::DualFilter)
                     .map_err(|_| EngineError::InvalidSampleRate)
             }
+            (SynthesisModelId::PressureChain, ModelPatchId::PressureChain(topology)) => {
+                LivePressureVoice::new(sample_rate, topology).map(Self::PressureChain)
+            }
             _ => Err(EngineError::InvalidModelPatch),
         }
     }
@@ -230,6 +237,14 @@ impl VoiceModel {
                 model.set_controls(BassMatrixControls::from_macro_values(timbral));
             }
             Self::DualFilter(model) => model.set_controls(ConceptControls::clamped(values)),
+            Self::PressureChain(model) => {
+                model
+                    .voice
+                    .set_controls(PressureChainControls::clamped(timbral));
+                model.voice.set_adsr(crate::engine::envelope_config(
+                    values[8], values[9], values[10], values[11],
+                ));
+            }
         }
     }
 
@@ -245,16 +260,18 @@ impl VoiceModel {
             Self::SwarmMachine(model) => model.note_on(note, velocity),
             Self::BassMatrix(model) => model.note_on(note, velocity),
             Self::DualFilter(model) => model.note_on(note, velocity),
+            Self::PressureChain(model) => model.note_on(note, velocity),
         }
     }
 
-    pub(crate) fn note_off(&mut self) {
+    pub(crate) fn note_off(&mut self, note: u8) {
         match self {
             Self::ModelD(model) => model.note_off(),
             Self::SixOpPm(model) => model.note_off(),
             Self::StrangeOscillator(_) => {}
             Self::SwarmMachine(_) | Self::BassMatrix(_) => {}
             Self::DualFilter(model) => model.note_off(),
+            Self::PressureChain(model) => model.note_off(note),
         }
     }
 
@@ -272,6 +289,7 @@ impl VoiceModel {
             Self::StrangeOscillator(model) => model.sample(),
             Self::SwarmMachine(model) => model.sample(),
             Self::BassMatrix(model) => model.sample(),
+            Self::PressureChain(model) => model.voice.sample(),
             Self::DualFilter(model) => {
                 let sample = model.sample();
                 [sample, sample]
@@ -287,12 +305,17 @@ impl VoiceModel {
             Self::SwarmMachine(model) => model.reset(),
             Self::BassMatrix(model) => model.reset(),
             Self::DualFilter(model) => model.reset(),
+            Self::PressureChain(model) => {
+                model.len = 0;
+                model.voice.reset();
+            }
         }
     }
 
     pub(crate) fn is_idle(&self) -> bool {
         match self {
             Self::DualFilter(model) => model.is_idle(),
+            Self::PressureChain(model) => model.voice.is_idle(),
             _ => false,
         }
     }
@@ -306,6 +329,65 @@ impl VoiceModel {
     pub(crate) fn toggle_dual_filter_core(&mut self) {
         if let Self::DualFilter(model) = self {
             model.toggle_core();
+        }
+    }
+}
+
+/// Bounded last-note priority. Returning to a still-held note slides; release
+/// tails do not turn a later detached note into a legato event.
+#[derive(Debug)]
+pub(crate) struct LivePressureVoice {
+    voice: PressureChainVoice,
+    held: [(u8, f32); 128],
+    len: usize,
+}
+impl LivePressureVoice {
+    fn new(sample_rate: f32, topology: PressureChainTopology) -> Result<Self, EngineError> {
+        Ok(Self {
+            voice: PressureChainVoice::new(
+                sample_rate,
+                topology,
+                PressureChainControls::START,
+                crate::engine::envelope_config(0.1, 0.4, 0.66, 0.48),
+            )
+            .map_err(|_| EngineError::InvalidSampleRate)?,
+            held: [(0, 0.0); 128],
+            len: 0,
+        })
+    }
+    fn note_on(&mut self, note: u8, velocity: f32) {
+        let note = note.min(127);
+        let articulation = if self.len == 0 {
+            PressureArticulation::Trigger
+        } else {
+            PressureArticulation::Slide
+        };
+        if let Some(index) = self.held[..self.len]
+            .iter()
+            .position(|entry| entry.0 == note)
+        {
+            self.held.copy_within(index + 1..self.len, index);
+            self.len -= 1;
+        }
+        self.held[self.len] = (note, velocity);
+        self.len += 1;
+        self.voice.note_on(note, velocity, articulation);
+    }
+    fn note_off(&mut self, note: u8) {
+        if let Some(index) = self.held[..self.len]
+            .iter()
+            .position(|entry| entry.0 == note)
+        {
+            let latest = index + 1 == self.len;
+            self.held.copy_within(index + 1..self.len, index);
+            self.len -= 1;
+            if self.len == 0 {
+                self.voice.note_off();
+            } else if latest {
+                let (note, velocity) = self.held[self.len - 1];
+                self.voice
+                    .note_on(note, velocity, PressureArticulation::Slide);
+            }
         }
     }
 }

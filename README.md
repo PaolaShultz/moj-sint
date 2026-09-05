@@ -5,13 +5,13 @@ for SHR-DAW. Its library keeps DSP independent of JACK, ALSA, files, processes,
 and clocks; the binary provides strict preset validation, deterministic offline
 rendering, and the live JACK/ALSA host.
 
-The current experimental catalog contains six synthesis models: circuit-
+The current experimental catalog contains seven synthesis models: circuit-
 informed Model D, Six-Op PM, Strange Oscillator, the typed-graph Swarm Machine,
-Bass Matrix, and Dual Filter. The first five models expose twelve normalized
+Bass Matrix, Dual Filter, and monophonic Pressure Chain. The first five models expose twelve normalized
 engine controls. Dual Filter uses 15: two cutoff/resonance/envelope-depth
 blocks, continuous `STRUCTURE`, filter ADSR, and amp ADSR. Its separate synth
 rotary click crossfades between INDUSTRIAL and COUNTER cores without
-retriggering a held note. The 21 factory starts are playable research outcomes
+retriggering a held note. The 24 factory starts are playable research outcomes
 and starting points, not a production-release claim.
 
 ## Usage
@@ -28,7 +28,8 @@ cargo run -- --client-name shs-moj-sint --preset presets/reference.mojsint
 The factory catalog contains seven Model D starts, six Six-Op PM starts, one
 Strange Oscillator start, one Swarm Machine warm pad, one Bass Matrix
 transformer, and five Dual Filter starts derived from the approved lead and
-four bass directions. These are editable live starting points, not 21 claims
+four bass directions, plus three Pressure Chain topologies. These are editable
+live starting points, not 24 claims
 of separate synthesis families.
 
 The live process publishes one ALSA Sequencer input named `input` and exactly

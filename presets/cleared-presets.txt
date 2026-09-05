@@ -19,3 +19,6 @@ reference.mojsint
 19-dual-filter-counter-growl.mojsint
 20-dual-filter-envelope-punch.mojsint
 21-dual-filter-topology-motion.mojsint
+22-pressure-chain-deep-cascade.mojsint
+23-pressure-chain-body-tap.mojsint
+24-pressure-chain-cross-feed.mojsint

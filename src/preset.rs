@@ -1,8 +1,9 @@
 use crate::control::{MacroId, Normalized};
+use crate::pressure_chain::PressureChainTopology;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub const PRESET_SCHEMA_VERSION: u32 = 8;
+pub const PRESET_SCHEMA_VERSION: u32 = 9;
 pub const MAX_VOICES: usize = 64;
 
 #[derive(Debug, Error)]
@@ -90,6 +91,7 @@ pub enum ModelPatchId {
     SwarmMachine(SwarmPatchId),
     BassMatrix(BassMatrixPatchId),
     DualFilter(DualFilterPatchId),
+    PressureChain(PressureChainTopology),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -101,6 +103,7 @@ pub enum SynthesisModelId {
     SwarmMachine,
     BassMatrix,
     DualFilter,
+    PressureChain,
 }
 
 impl SynthesisModelId {
@@ -112,6 +115,7 @@ impl SynthesisModelId {
             Self::SwarmMachine => "swarm_machine",
             Self::BassMatrix => "bass_matrix",
             Self::DualFilter => "dual_filter",
+            Self::PressureChain => "pressure_chain",
         }
     }
 
@@ -123,6 +127,7 @@ impl SynthesisModelId {
             Self::SwarmMachine => "Swarm Machine",
             Self::BassMatrix => "Bass Matrix",
             Self::DualFilter => "Dual Filter",
+            Self::PressureChain => "Pressure Chain",
         }
     }
 }
@@ -193,7 +198,8 @@ impl Preset {
             .and_then(|version| u32::try_from(version).ok())
             .ok_or(PresetError::UnsupportedVersion(0))?;
         let preset = match version {
-            PRESET_SCHEMA_VERSION => VersionEightPreset::parse(source)?,
+            PRESET_SCHEMA_VERSION => VersionNinePreset::parse(source)?,
+            8 => VersionEightPreset::parse_for(source, 8)?,
             7 => VersionSevenPreset::parse(source)?,
             6 => VersionSixPreset::parse(source)?,
             5 => VersionFivePreset::parse(source)?,
@@ -213,7 +219,9 @@ impl Preset {
         if self.name.trim().is_empty() {
             return Err(PresetError::EmptyName);
         }
-        if !(1..=MAX_VOICES).contains(&self.voices) {
+        if !(1..=MAX_VOICES).contains(&self.voices)
+            || (self.model == SynthesisModelId::PressureChain && self.voices != 1)
+        {
             return Err(PresetError::InvalidVoiceCount);
         }
         if !self.output_gain.is_finite() || !(0.0..=1.0).contains(&self.output_gain) {
@@ -233,6 +241,10 @@ impl Preset {
                 )
                 | (SynthesisModelId::BassMatrix, ModelPatchId::BassMatrix(_))
                 | (SynthesisModelId::DualFilter, ModelPatchId::DualFilter(_))
+                | (
+                    SynthesisModelId::PressureChain,
+                    ModelPatchId::PressureChain(_)
+                )
         ) {
             return Err(PresetError::InvalidPatch);
         }
@@ -240,7 +252,7 @@ impl Preset {
     }
 
     /// Encode the current preset as the strict public schema. Older presets
-    /// are migrated by `parse`, so saving always publishes schema 8 with the
+    /// are migrated by `parse`, so saving always publishes schema 9 with the
     /// exact model-specific patch and macro field names.
     pub fn to_toml(&self) -> Result<String, PresetError> {
         let preset = self.clone().validate()?;
@@ -302,6 +314,18 @@ impl Preset {
                     instrument_volume: preset.instrument_volume,
                     model: SynthesisModelId::BassMatrix,
                     bass_matrix_patch,
+                    macros: preset.macros.into(),
+                })?)
+            }
+            ModelPatchId::PressureChain(pressure_chain_topology) => {
+                Ok(toml::to_string_pretty(&VersionNinePressurePreset {
+                    schema_version: PRESET_SCHEMA_VERSION,
+                    name: preset.name,
+                    voices: preset.voices,
+                    output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
+                    model: SynthesisModelId::PressureChain,
+                    pressure_chain_topology,
                     macros: preset.macros.into(),
                 })?)
             }
@@ -548,6 +572,96 @@ impl From<MacroValues> for SwarmMacroValues {
 
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+struct PressureMacroValues {
+    source: Normalized,
+    shape: Normalized,
+    cutoff: Normalized,
+    resonance: Normalized,
+    sweep: Normalized,
+    filter_decay: Normalized,
+    pressure: Normalized,
+    bite: Normalized,
+    attack: Normalized,
+    decay: Normalized,
+    sustain: Normalized,
+    release: Normalized,
+}
+
+impl From<PressureMacroValues> for MacroValues {
+    fn from(v: PressureMacroValues) -> Self {
+        Self {
+            evolve: v.source,
+            shape: v.shape,
+            color: v.cutoff,
+            edge: v.resonance,
+            couple: v.sweep,
+            motion: v.filter_decay,
+            depth: v.pressure,
+            space: v.bite,
+            attack: v.attack,
+            decay: v.decay,
+            sustain: v.sustain,
+            release: v.release,
+            control_13: midpoint(),
+            control_14: midpoint(),
+            control_15: midpoint(),
+        }
+    }
+}
+
+impl From<MacroValues> for PressureMacroValues {
+    fn from(v: MacroValues) -> Self {
+        Self {
+            source: v.evolve,
+            shape: v.shape,
+            cutoff: v.color,
+            resonance: v.edge,
+            sweep: v.couple,
+            filter_decay: v.motion,
+            pressure: v.depth,
+            bite: v.space,
+            attack: v.attack,
+            decay: v.decay,
+            sustain: v.sustain,
+            release: v.release,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct VersionNinePressurePreset {
+    schema_version: u32,
+    name: String,
+    voices: usize,
+    output_gain: f32,
+    instrument_volume: Normalized,
+    model: SynthesisModelId,
+    pressure_chain_topology: PressureChainTopology,
+    macros: PressureMacroValues,
+}
+struct VersionNinePreset;
+impl VersionNinePreset {
+    fn parse(source: &str) -> Result<Preset, PresetError> {
+        let value: toml::Value = toml::from_str(source)?;
+        if value.get("model").and_then(toml::Value::as_str) != Some("pressure_chain") {
+            return VersionEightPreset::parse_for(source, 9);
+        }
+        let p: VersionNinePressurePreset = toml::from_str(source)?;
+        Ok(Preset {
+            schema_version: p.schema_version,
+            name: p.name,
+            voices: p.voices,
+            output_gain: p.output_gain,
+            instrument_volume: p.instrument_volume,
+            model: p.model,
+            model_patch: ModelPatchId::PressureChain(p.pressure_chain_topology),
+            macros: p.macros.into(),
+        })
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct BassMacroValues {
     body: Normalized,
     growl: Normalized,
@@ -710,7 +824,7 @@ struct VersionEightDualFilterPreset {
 struct VersionEightPreset;
 
 impl VersionEightPreset {
-    fn parse(source: &str) -> Result<Preset, PresetError> {
+    fn parse_for(source: &str, version: u32) -> Result<Preset, PresetError> {
         let value: toml::Value = toml::from_str(source)?;
         match value
             .get("model")
@@ -719,9 +833,7 @@ impl VersionEightPreset {
         {
             "dual_filter" => {
                 let p: VersionEightDualFilterPreset = toml::from_str(source)?;
-                if p.schema_version != PRESET_SCHEMA_VERSION
-                    || p.model != SynthesisModelId::DualFilter
-                {
+                if p.schema_version != version || p.model != SynthesisModelId::DualFilter {
                     return Err(PresetError::InvalidModel);
                 }
                 Ok(Preset {
@@ -737,9 +849,7 @@ impl VersionEightPreset {
             }
             "swarm_machine" => {
                 let p: VersionSevenSwarmPreset = toml::from_str(source)?;
-                if p.schema_version != PRESET_SCHEMA_VERSION
-                    || p.model != SynthesisModelId::SwarmMachine
-                {
+                if p.schema_version != version || p.model != SynthesisModelId::SwarmMachine {
                     return Err(PresetError::InvalidModel);
                 }
                 Ok(Preset {
@@ -755,9 +865,7 @@ impl VersionEightPreset {
             }
             "bass_matrix" => {
                 let p: VersionSevenBassPreset = toml::from_str(source)?;
-                if p.schema_version != PRESET_SCHEMA_VERSION
-                    || p.model != SynthesisModelId::BassMatrix
-                {
+                if p.schema_version != version || p.model != SynthesisModelId::BassMatrix {
                     return Err(PresetError::InvalidModel);
                 }
                 Ok(Preset {
@@ -771,7 +879,7 @@ impl VersionEightPreset {
                     macros: p.macros.into(),
                 })
             }
-            _ => VersionSixPreset::parse_for(source, PRESET_SCHEMA_VERSION),
+            _ => VersionSixPreset::parse_for(source, version),
         }
     }
 }
@@ -1272,6 +1380,9 @@ release = 0.4
             include_str!("../presets/19-dual-filter-counter-growl.mojsint"),
             include_str!("../presets/20-dual-filter-envelope-punch.mojsint"),
             include_str!("../presets/21-dual-filter-topology-motion.mojsint"),
+            include_str!("../presets/22-pressure-chain-deep-cascade.mojsint"),
+            include_str!("../presets/23-pressure-chain-body-tap.mojsint"),
+            include_str!("../presets/24-pressure-chain-cross-feed.mojsint"),
         ];
         let presets = sources.map(|source| Preset::parse(source).unwrap());
         let mut names = presets
@@ -1280,7 +1391,7 @@ release = 0.4
             .collect::<Vec<_>>();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 21);
+        assert_eq!(names.len(), 24);
         assert!(
             presets[..7]
                 .iter()
@@ -1295,9 +1406,14 @@ release = 0.4
         assert_eq!(presets[14].model, SynthesisModelId::SwarmMachine);
         assert_eq!(presets[15].model, SynthesisModelId::BassMatrix);
         assert!(
-            presets[16..]
+            presets[16..21]
                 .iter()
                 .all(|preset| preset.model == SynthesisModelId::DualFilter)
+        );
+        assert!(
+            presets[21..]
+                .iter()
+                .all(|preset| preset.model == SynthesisModelId::PressureChain)
         );
         assert_eq!(
             presets[0].model_patch,
@@ -1357,7 +1473,7 @@ release = 0.4
         let preset = Preset::parse(VALID).unwrap();
         let encoded = preset.to_toml().unwrap();
 
-        assert!(encoded.contains("schema_version = 8"));
+        assert!(encoded.contains("schema_version = 9"));
         assert!(encoded.contains("model = \"model_d\""));
         assert!(encoded.contains("model_d_patch = \"bass\""));
         assert!(!encoded.contains("six_op_patch"));
@@ -1370,7 +1486,7 @@ release = 0.4
             Preset::parse(include_str!("../presets/08-six-op-bell-metal.mojsint")).unwrap();
         let encoded = preset.to_toml().unwrap();
 
-        assert!(encoded.contains("schema_version = 8"));
+        assert!(encoded.contains("schema_version = 9"));
         assert!(encoded.contains("model = \"six_op_pm\""));
         assert!(encoded.contains("six_op_patch = \"bell_metal\""));
         for field in [
@@ -1411,7 +1527,7 @@ release = 0.4
             let preset = Preset::parse(source).unwrap();
             assert_eq!(preset.model, model);
             let encoded = preset.to_toml().unwrap();
-            assert!(encoded.contains("schema_version = 8"));
+            assert!(encoded.contains("schema_version = 9"));
             assert!(encoded.contains("instrument_volume = 1.0"));
             assert!(encoded.contains(patch_field));
             assert_eq!(Preset::parse(&encoded).unwrap(), preset);
@@ -1470,7 +1586,7 @@ release = 0.4
         );
         assert_eq!(preset.macros.get(MacroId::Control15).get(), 0.26);
         let encoded = preset.to_toml().unwrap();
-        assert!(encoded.contains("schema_version = 8"));
+        assert!(encoded.contains("schema_version = 9"));
         assert!(encoded.contains("dual_filter_core = \"counter\""));
         assert!(encoded.contains("amp_release = 0.26"));
         assert_eq!(Preset::parse(&encoded).unwrap(), preset);

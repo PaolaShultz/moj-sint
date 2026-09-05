@@ -251,3 +251,13 @@ The first typed micro-machine slice is specified in
 is now the fourth live model, without approving runtime graph editing or a
 general graph runtime. Musical acceptance and native Pi profiling remain open.
 No SIMD or architecture-specific path should precede profiling on the Pi.
+
+## Pressure Chain live boundary
+
+The seventh model wraps the original `pressure_chain::PressureChainVoice`
+with a fixed 128-key last-note stack. One preset selects one of three
+preallocated topologies and must declare exactly one voice. Its amp ADSR and
+filter contour stay inside the renderer; Engine adds only the existing output
+gain and instrument-volume smoothing. Coefficient tables are prepared before
+rendering, and note/control/render/recovery operations allocate no storage.
+The callback does not parse presets or choose/create new synth processes.

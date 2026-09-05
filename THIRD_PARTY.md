@@ -1,6 +1,6 @@
 # Dependencies, licensing, and public presets
 
-Moj Sint source and its 21 factory `.mojsint` starts are MIT licensed. The
+Moj Sint source and its 24 factory `.mojsint` starts are MIT licensed. The
 factory starts are project-authored parameter documents; they contain no
 third-party samples, recordings, factory patches, firmware, SysEx data, source
 code, prose, diagrams, or artwork. `presets/cleared-presets.txt` is the sole
@@ -34,3 +34,8 @@ XT and VCV Fundamental sources were inspected only as architectural comparison
 material; no code, constants, presets, or text were copied. Paper/book
 provenance and the exact functional claims used are recorded in
 `docs/BASS_MATRIX.md` and `docs/BASS_IMPACT_RESEARCH.md`.
+
+Pressure Chain's oscillator, filter cells, pressure memory, topology starts,
+and live adapter are independently authored. Functional research provenance
+and the no-clone boundary are recorded in `docs/ACID_CHAIN_RESEARCH.md`.
+No third-party DSP code, patches, samples, or circuit constants are included.

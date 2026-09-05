@@ -1,0 +1,21 @@
+schema_version = 9
+name = "Pressure Chain Cross Feed"
+voices = 1
+output_gain = 0.7
+instrument_volume = 1.0
+model = "pressure_chain"
+pressure_chain_topology = "cross_feed"
+
+[macros]
+source = 0.35
+shape = 0.62
+cutoff = 0.32
+resonance = 0.68
+sweep = 0.72
+filter_decay = 0.38
+pressure = 0.70
+bite = 0.42
+attack = 0.10
+decay = 0.40
+sustain = 0.66
+release = 0.48

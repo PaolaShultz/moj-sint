@@ -28,7 +28,8 @@ The ALSA thread translates:
 
 - Note On, including velocity-zero Note On as Note Off;
 - Note Off;
-- CC 20–34 as the 15-position superset (older models retain CC 20–31);
+- CC 20–34 as the 15-position superset (Pressure Chain and older models use CC 20–31);
+- CC 7 as independently smoothed instrument volume;
 - CC 35 as the press-only Dual Filter core toggle and CC 36 as exact core state;
 - CC 120, CC 123, and Sequencer Reset as immediate All Notes Off.
 
@@ -60,3 +61,9 @@ JACK development dependency while keeping unsafe JACK ownership in one module.
 SHR-DAW readiness requires the unambiguous configured or uniquely prefixed
 client plus exactly the configured `out_l` and `out_r` ports. The host owns no
 graph connections.
+
+Pressure Chain requires schema 9 and one preallocated voice. Its bounded
+128-key last-note priority implements legato slide and held-note return inside
+the owned renderer; it still publishes exactly one stereo output pair. There
+is no layered synth process or per-topology output. All Notes Off clears its
+held-note stack as well as DSP state.

@@ -78,8 +78,11 @@ impl Voice {
         patch_id: ModelPatchId,
         voice_seed: u32,
     ) -> Result<Self, EngineError> {
-        let model = VoiceModel::new(sample_rate, model_id, patch_id, voice_seed)?;
+        let mut model = VoiceModel::new(sample_rate, model_id, patch_id, voice_seed)?;
         let initial = MacroId::ALL.map(|id| values.get(id).get());
+        if model_id == SynthesisModelId::PressureChain {
+            model.set_live_controls(initial);
+        }
         let macros = initial.map(|value| {
             Smoother::new(value, sample_rate, SMOOTH_SECONDS)
                 .map_err(|_| EngineError::InvalidSampleRate)
@@ -100,7 +103,10 @@ impl Voice {
             model,
             envelope,
             macros,
-            uses_internal_envelopes: model_id == SynthesisModelId::DualFilter,
+            uses_internal_envelopes: matches!(
+                model_id,
+                SynthesisModelId::DualFilter | SynthesisModelId::PressureChain
+            ),
         })
     }
 
@@ -155,8 +161,8 @@ impl Voice {
         }
     }
 
-    fn note_off(&mut self) {
-        self.model.note_off();
+    fn note_off(&mut self, note: u8) {
+        self.model.note_off(note);
         if !self.uses_internal_envelopes {
             self.envelope.note_off();
         }
@@ -170,7 +176,7 @@ fn envelope_seconds_rt(normalized: f32) -> f32 {
     ENVELOPE_TIMES[lower] + fraction * (ENVELOPE_TIMES[lower + 1] - ENVELOPE_TIMES[lower])
 }
 
-fn envelope_config(attack: f32, decay: f32, sustain: f32, release: f32) -> AdsrConfig {
+pub(crate) fn envelope_config(attack: f32, decay: f32, sustain: f32, release: f32) -> AdsrConfig {
     AdsrConfig {
         attack_seconds: envelope_seconds_rt(attack),
         decay_seconds: envelope_seconds_rt(decay),
@@ -191,6 +197,9 @@ impl Engine {
     pub fn new(sample_rate: f32, preset: &Preset) -> Result<Self, EngineError> {
         if !sample_rate.is_finite() || sample_rate <= 0.0 {
             return Err(EngineError::InvalidSampleRate);
+        }
+        if preset.model == SynthesisModelId::PressureChain && preset.voices != 1 {
+            return Err(EngineError::InvalidModelPatch);
         }
         let mut voices = Vec::with_capacity(preset.voices);
         for index in 0..preset.voices {
@@ -289,8 +298,10 @@ impl Engine {
             }
             Event::NoteOn { note, .. } | Event::NoteOff { note } => {
                 for voice in &mut self.voices {
-                    if voice.note == note && !voice.is_idle() {
-                        voice.note_off();
+                    if matches!(voice.model, VoiceModel::PressureChain(_))
+                        || (voice.note == note && !voice.is_idle())
+                    {
+                        voice.note_off(note);
                     }
                 }
             }
