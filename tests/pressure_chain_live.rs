@@ -3,6 +3,9 @@ use moj_sint::{
     engine::{Engine, Event, TimedEvent},
     preset::Preset,
 };
+// assert_no_alloc disables its allocator in release builds by default.
+// Normal debug tests retain the allocation guard; release targets still build.
+#[cfg(debug_assertions)]
 #[global_allocator]
 static ALLOC: assert_no_alloc::AllocDisabler = assert_no_alloc::AllocDisabler;
 

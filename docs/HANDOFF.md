@@ -27,6 +27,25 @@ measurements establish a safe voice budget.
 
 There is no UI in this repository. Control comes through MIDI and SHR-DAW.
 
+## 2026-09-05 complete non-audible build pass
+
+Exact rustc 1.97.1 (8bab26f4f, LLVM 22.1.6) on AArch64 passed formatting,
+locked all-target/all-feature checks, the normal suite (349 passed, 35 ignored),
+warning-denied Clippy, `cargo audit`, and `cargo deny check`. Deny reports the
+existing non-fatal duplicate `winnow` versions. All debug and release targets
+build. The new Pressure Chain test allocator needed `cfg(debug_assertions)`
+because assert_no_alloc disables that type in release mode; its five focused
+tests pass in both profiles, with allocation guarding retained in debug.
+
+The refreshed release host validates all 24 cleared presets. Two one-second
+release renders of each Pressure Chain topology at MIDI 40/velocity 0.85 are
+byte-identical; temporary WAVs were deleted after comparison. SHR's normal
+suite passes 1,128 tests with 14 ignored, plus 40 hardware-free helper checks;
+its debug and release targets also build. No live host, JACK, MIDI, playback,
+recording, or hardware test was started. Already running processes retain their
+loaded executable until the owner's normal restart. Real-time headroom and
+listening remain unverified. Historical/audition/exhaustive tests stayed ignored.
+
 ## 2026-09-05 Pressure Chain live integration
 
 The owner requested yesterday's model in SHR-DAW. Pressure Chain now enters
