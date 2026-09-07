@@ -61,13 +61,21 @@ three.
 
 ## Live control and polyphony contract
 
-SHR-DAW exposes twelve continuous controls for the first five models. Model D
+The first five models retain twelve normalized timbre/ADSR values. Model D
 implements `EVOLVE`, `SHAPE`, `COLOR`, `EDGE`, `COUPLE`, `MOTION`, `DEPTH`,
 and `SPACE`. Six-Op PM implements `INDEX`, `RATIO`, `FEEDBACK`, `OP DECAY`,
 `BALANCE`, `KEY SCALE`, `VELOCITY`, and `MOTION`. Strange Oscillator implements
 `TYPE`, `FORM`, `WARP`, `COUPLE`, `MOTION`, `CHAOS`, `COLOR`, and `SPACE`.
-Those models append `ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. Dual Filter
-uses 15 positions: two cutoff/resonance/envelope-depth blocks, STRUCTURE,
+Those models append `ATTACK`, `DECAY`, `SUSTAIN`, and `RELEASE`. In SHR's
+physical surface, position 5 instead controls independent instrument volume
+(CC7); the historical fifth timbre macro remains in the schema and MIDI
+interface for compatibility. Thus these models expose seven timbre controls,
+volume, and ADSR on twelve physical positions. Pressure Chain retains all
+eight timbre controls plus amp ADSR, including SWEEP at position 5. See the
+[preset and control schema](PRESET_SCHEMA.md) for the exact mappings. SHR owns
+positions 13–15 as Project AUX sends for these twelve-position models.
+
+Dual Filter uses 15 positions: two cutoff/resonance/envelope-depth blocks, STRUCTURE,
 filter ADSR, and amp ADSR. Its dedicated synth click toggles only the backstage
 INDUSTRIAL/COUNTER core; the master encoder remains SHR navigation.
 `WIDTH` was removed because this Model D engine has no supported width
@@ -75,11 +83,11 @@ experiment. There is no hidden page or master-encoder takeover.
 
 The catalog preserves seven authored Model D audition starting points, six
 accepted Six-Op PM listening starts, one Strange Oscillator start, one Swarm
-Machine start, one Bass Matrix start, and five Dual Filter starts.
-Model D contains
-three full bass/lead/filter-articulation patches and four matched bass
+Machine start, one Bass Matrix start, five Dual Filter starts, and three
+Pressure Chain starts: 24 cleared factory presets in total.
+Model D contains three full bass/lead/filter-articulation patches and four matched bass
 diagnostics. They are selectable states of one modeled instrument, not separate
-synthesis families. The eight timbral controls expose oscillator
+synthesis families. The eight engine timbral values describe oscillator
 character/drift, source balance, cutoff, mixer nonlinearity, feedback, filter
 motion, ladder nonlinearity, and resonance from every start. EVOLVE uses 0 for
 idealized oscillators, 0.5 for authored static character without drift, and 1
@@ -92,9 +100,11 @@ particular structural or coefficient-heavy parameter may be applied only to
 the next note when evidence shows that is necessary, but next-note-only
 behavior is not a global engine constraint.
 
-Production voice count is also unresolved. Native Raspberry Pi tests must
-measure 1/2/4/8 voices in the real SHR/JACK workload. Four voices is a valid
-possible product result; eight has no special status and is not required.
+Whole-system voice budgets for polyphonic models remain unresolved. Native
+Raspberry Pi tests must measure 1/2/4/8 voices in the real SHR/JACK workload;
+earlier foundation-engine simulations do not establish every model's budget.
+Four voices is a valid possible result; eight is not required. Pressure Chain
+is explicitly monophonic and rejects presets requesting more than one voice.
 
 ## Modules
 

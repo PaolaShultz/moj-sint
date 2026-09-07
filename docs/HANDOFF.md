@@ -1,16 +1,34 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-09-05, Europe/Zagreb.
+Last updated: 2026-09-07, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
 workspace. Update it at meaningful checkpoints so later sessions do not have
 to reconstruct decisions from chat history.
 
+## Current documentation authority
+
+The current [documentation index](README.md), [preset/control schema](PRESET_SCHEMA.md),
+and [host contract](HOST_CONTRACT.md) describe the implemented seven-model,
+schema-9 engine and 24 cleared factory starts. The first five models expose
+seven timbre controls, independent volume at physical position 5, and ADSR in
+SHR. Pressure Chain exposes eight timbre controls plus amp ADSR, with SWEEP at
+position 5. Dual Filter uses all fifteen positions and its dedicated core click.
+The master encoder remains navigation; non-Dual-Filter positions 13–15 are
+SHR Project AUX sends.
+
+Entries below are dated evidence and historical decisions, not simultaneous
+current contracts. In particular, earlier twelve-control-only, unimplemented
+host, isolated Swarm, and smaller-catalog descriptions are superseded. The
+September 7 documentation reconciliation changes no engine, preset, runtime,
+or hardware state. Current deployment evidence distinguishes historical
+callback simulations from the later connected debug/release defect acceptance.
+
 ## Goal
 
 Build a low-level, headless Rust synthesizer focused on sophisticated,
-deliberately modified oscillators and genuinely unfamiliar sounds. It will be
+deliberately modified oscillators and genuinely unfamiliar sounds. It is
 one of several software instruments managed by SHR-DAW, not a standalone DAW
 and not a replacement or compatibility disguise for synthv1.
 
