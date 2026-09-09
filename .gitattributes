@@ -1,0 +1,2 @@
+# Preserve reviewed vendor formatting and the byte-identical Ooura source/notices.
+vendor/open303/** -whitespace

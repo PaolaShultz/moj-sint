@@ -8,7 +8,7 @@ A historical foundation-engine Raspberry Pi 5 callback simulation tested eight
 voices at 48 kHz/64 frames. Its corrected ten-minute rapid-control soak used
 3.992% of the period at p99.9 and 9.751% at maximum, with zero deadline misses,
 finite output, flat RSS, and no new throttling. That evidence applies to the
-measured engine revision and workload, not all seven current synthesis models.
+measured engine revision and workload, not all eight current synthesis models.
 
 The live host has since been used in connected SHR/JACK. On August 1, native
 Player listening exposed artifacts at two Model D notes and four Six-Op PM
@@ -65,7 +65,12 @@ JACK headers are not required because the host loads `libjack.so.0` dynamically.
 JACK/PipeWire services and hardware remain outside installation scope; the host
 will fail rather than start or reconfigure a server.
 
-Install the validated binary and the 24 public factory presets named by
+Install the validated binary and the 28 public factory presets named by
 `presets/cleared-presets.txt` with the commands in the repository README. The
 binary belongs in the user's Cargo `bin` directory; `.mojsint` files belong
 under the configured data root, never under ignored repository `artifacts/`.
+
+Default builds now include the reviewed Open303 C++ core and require a C++17
+compiler plus its system standard library. The core is prepared outside the
+callback. `--no-default-features` omits this model implementation; it cannot
+render Open303 presets. See [the integration contract](OPEN303_INTEGRATION.md).

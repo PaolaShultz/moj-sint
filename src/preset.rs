@@ -3,7 +3,7 @@ use crate::pressure_chain::PressureChainTopology;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub const PRESET_SCHEMA_VERSION: u32 = 9;
+pub const PRESET_SCHEMA_VERSION: u32 = 10;
 pub const MAX_VOICES: usize = 64;
 
 #[derive(Debug, Error)]
@@ -92,6 +92,7 @@ pub enum ModelPatchId {
     BassMatrix(BassMatrixPatchId),
     DualFilter(DualFilterPatchId),
     PressureChain(PressureChainTopology),
+    Open303(Open303PatchId),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -104,6 +105,7 @@ pub enum SynthesisModelId {
     BassMatrix,
     DualFilter,
     PressureChain,
+    Open303,
 }
 
 impl SynthesisModelId {
@@ -116,6 +118,7 @@ impl SynthesisModelId {
             Self::BassMatrix => "bass_matrix",
             Self::DualFilter => "dual_filter",
             Self::PressureChain => "pressure_chain",
+            Self::Open303 => "open303",
         }
     }
 
@@ -128,6 +131,7 @@ impl SynthesisModelId {
             Self::BassMatrix => "Bass Matrix",
             Self::DualFilter => "Dual Filter",
             Self::PressureChain => "Pressure Chain",
+            Self::Open303 => "Open303",
         }
     }
 }
@@ -198,7 +202,8 @@ impl Preset {
             .and_then(|version| u32::try_from(version).ok())
             .ok_or(PresetError::UnsupportedVersion(0))?;
         let preset = match version {
-            PRESET_SCHEMA_VERSION => VersionNinePreset::parse(source)?,
+            PRESET_SCHEMA_VERSION => VersionTenPreset::parse(source)?,
+            9 => VersionNinePreset::parse(source)?,
             8 => VersionEightPreset::parse_for(source, 8)?,
             7 => VersionSevenPreset::parse(source)?,
             6 => VersionSixPreset::parse(source)?,
@@ -220,7 +225,10 @@ impl Preset {
             return Err(PresetError::EmptyName);
         }
         if !(1..=MAX_VOICES).contains(&self.voices)
-            || (self.model == SynthesisModelId::PressureChain && self.voices != 1)
+            || (matches!(
+                self.model,
+                SynthesisModelId::PressureChain | SynthesisModelId::Open303
+            ) && self.voices != 1)
         {
             return Err(PresetError::InvalidVoiceCount);
         }
@@ -239,6 +247,7 @@ impl Preset {
                     SynthesisModelId::SwarmMachine,
                     ModelPatchId::SwarmMachine(_)
                 )
+                | (SynthesisModelId::Open303, ModelPatchId::Open303(_))
                 | (SynthesisModelId::BassMatrix, ModelPatchId::BassMatrix(_))
                 | (SynthesisModelId::DualFilter, ModelPatchId::DualFilter(_))
                 | (
@@ -252,7 +261,7 @@ impl Preset {
     }
 
     /// Encode the current preset as the strict public schema. Older presets
-    /// are migrated by `parse`, so saving always publishes schema 9 with the
+    /// are migrated by `parse`, so saving always publishes schema 10 with the
     /// exact model-specific patch and macro field names.
     pub fn to_toml(&self) -> Result<String, PresetError> {
         let preset = self.clone().validate()?;
@@ -314,6 +323,18 @@ impl Preset {
                     instrument_volume: preset.instrument_volume,
                     model: SynthesisModelId::BassMatrix,
                     bass_matrix_patch,
+                    macros: preset.macros.into(),
+                })?)
+            }
+            ModelPatchId::Open303(open303_filter) => {
+                Ok(toml::to_string_pretty(&VersionTenOpen303Preset {
+                    schema_version: PRESET_SCHEMA_VERSION,
+                    name: preset.name,
+                    voices: preset.voices,
+                    output_gain: preset.output_gain,
+                    instrument_volume: preset.instrument_volume,
+                    model: SynthesisModelId::Open303,
+                    open303_filter,
                     macros: preset.macros.into(),
                 })?)
             }
@@ -649,7 +670,7 @@ impl VersionNinePreset {
         }
         let p: VersionNinePressurePreset = toml::from_str(source)?;
         Ok(Preset {
-            schema_version: p.schema_version,
+            schema_version: PRESET_SCHEMA_VERSION,
             name: p.name,
             voices: p.voices,
             output_gain: p.output_gain,
@@ -1383,6 +1404,10 @@ release = 0.4
             include_str!("../presets/22-pressure-chain-deep-cascade.mojsint"),
             include_str!("../presets/23-pressure-chain-body-tap.mojsint"),
             include_str!("../presets/24-pressure-chain-cross-feed.mojsint"),
+            include_str!("../presets/25-open303-rubber-bass.mojsint"),
+            include_str!("../presets/26-open303-accent-wire.mojsint"),
+            include_str!("../presets/27-open303-hollow-slide.mojsint"),
+            include_str!("../presets/28-open303-soft-pluck.mojsint"),
         ];
         let presets = sources.map(|source| Preset::parse(source).unwrap());
         let mut names = presets
@@ -1391,7 +1416,7 @@ release = 0.4
             .collect::<Vec<_>>();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 24);
+        assert_eq!(names.len(), 28);
         assert!(
             presets[..7]
                 .iter()
@@ -1411,7 +1436,7 @@ release = 0.4
                 .all(|preset| preset.model == SynthesisModelId::DualFilter)
         );
         assert!(
-            presets[21..]
+            presets[21..24]
                 .iter()
                 .all(|preset| preset.model == SynthesisModelId::PressureChain)
         );
@@ -1473,7 +1498,7 @@ release = 0.4
         let preset = Preset::parse(VALID).unwrap();
         let encoded = preset.to_toml().unwrap();
 
-        assert!(encoded.contains("schema_version = 9"));
+        assert!(encoded.contains("schema_version = 10"));
         assert!(encoded.contains("model = \"model_d\""));
         assert!(encoded.contains("model_d_patch = \"bass\""));
         assert!(!encoded.contains("six_op_patch"));
@@ -1486,7 +1511,7 @@ release = 0.4
             Preset::parse(include_str!("../presets/08-six-op-bell-metal.mojsint")).unwrap();
         let encoded = preset.to_toml().unwrap();
 
-        assert!(encoded.contains("schema_version = 9"));
+        assert!(encoded.contains("schema_version = 10"));
         assert!(encoded.contains("model = \"six_op_pm\""));
         assert!(encoded.contains("six_op_patch = \"bell_metal\""));
         for field in [
@@ -1527,7 +1552,7 @@ release = 0.4
             let preset = Preset::parse(source).unwrap();
             assert_eq!(preset.model, model);
             let encoded = preset.to_toml().unwrap();
-            assert!(encoded.contains("schema_version = 9"));
+            assert!(encoded.contains("schema_version = 10"));
             assert!(encoded.contains("instrument_volume = 1.0"));
             assert!(encoded.contains(patch_field));
             assert_eq!(Preset::parse(&encoded).unwrap(), preset);
@@ -1586,9 +1611,103 @@ release = 0.4
         );
         assert_eq!(preset.macros.get(MacroId::Control15).get(), 0.26);
         let encoded = preset.to_toml().unwrap();
-        assert!(encoded.contains("schema_version = 9"));
+        assert!(encoded.contains("schema_version = 10"));
         assert!(encoded.contains("dual_filter_core = \"counter\""));
         assert!(encoded.contains("amp_release = 0.26"));
         assert_eq!(Preset::parse(&encoded).unwrap(), preset);
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Open303PatchId {
+    Tb303,
+    Lowpass18,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct VersionTenOpen303Preset {
+    schema_version: u32,
+    name: String,
+    voices: usize,
+    output_gain: f32,
+    instrument_volume: Normalized,
+    model: SynthesisModelId,
+    open303_filter: Open303PatchId,
+    macros: Open303MacroValues,
+}
+struct VersionTenPreset;
+impl VersionTenPreset {
+    fn parse(source: &str) -> Result<Preset, PresetError> {
+        let mut value: toml::Value = toml::from_str(source)?;
+        if value.get("model").and_then(toml::Value::as_str) != Some("open303") {
+            value["schema_version"] = toml::Value::Integer(9);
+            return VersionNinePreset::parse(&toml::to_string(&value)?);
+        }
+        let p: VersionTenOpen303Preset = toml::from_str(source)?;
+        Ok(Preset {
+            schema_version: PRESET_SCHEMA_VERSION,
+            name: p.name,
+            voices: p.voices,
+            output_gain: p.output_gain,
+            instrument_volume: p.instrument_volume,
+            model: p.model,
+            model_patch: ModelPatchId::Open303(p.open303_filter),
+            macros: p.macros.into(),
+        })
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct Open303MacroValues {
+    waveform: Normalized,
+    cutoff: Normalized,
+    resonance: Normalized,
+    env_mod: Normalized,
+    filter_decay: Normalized,
+    accent: Normalized,
+    slide: Normalized,
+    normal_attack: Normalized,
+    accent_attack: Normalized,
+    accent_decay: Normalized,
+    amp_decay: Normalized,
+}
+impl From<Open303MacroValues> for MacroValues {
+    fn from(v: Open303MacroValues) -> Self {
+        Self {
+            evolve: v.waveform,
+            shape: v.cutoff,
+            color: v.resonance,
+            edge: v.env_mod,
+            couple: midpoint(),
+            motion: v.filter_decay,
+            depth: v.accent,
+            space: v.slide,
+            attack: v.normal_attack,
+            decay: v.accent_attack,
+            sustain: v.accent_decay,
+            release: v.amp_decay,
+            control_13: midpoint(),
+            control_14: midpoint(),
+            control_15: midpoint(),
+        }
+    }
+}
+impl From<MacroValues> for Open303MacroValues {
+    fn from(v: MacroValues) -> Self {
+        Self {
+            waveform: v.evolve,
+            cutoff: v.shape,
+            resonance: v.color,
+            env_mod: v.edge,
+            filter_decay: v.motion,
+            accent: v.depth,
+            slide: v.space,
+            normal_attack: v.attack,
+            accent_attack: v.decay,
+            accent_decay: v.sustain,
+            amp_decay: v.release,
+        }
     }
 }

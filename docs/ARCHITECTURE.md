@@ -84,7 +84,7 @@ experiment. There is no hidden page or master-encoder takeover.
 The catalog preserves seven authored Model D audition starting points, six
 accepted Six-Op PM listening starts, one Strange Oscillator start, one Swarm
 Machine start, one Bass Matrix start, five Dual Filter starts, and three
-Pressure Chain starts: 24 cleared factory presets in total.
+Pressure Chain starts, and four Open303 starts: 28 cleared factory presets in total.
 Model D contains three full bass/lead/filter-articulation patches and four matched bass
 diagnostics. They are selectable states of one modeled instrument, not separate
 synthesis families. The eight engine timbral values describe oscillator
@@ -271,3 +271,9 @@ filter contour stay inside the renderer; Engine adds only the existing output
 gain and instrument-volume smoothing. Coefficient tables are prepared before
 rendering, and note/control/render/recovery operations allocate no storage.
 The callback does not parse presets or choose/create new synth processes.
+
+Open303 is a monophonic native voice behind the reviewed C ABI. Its allocation
+and table preparation happen before rendering. Engine smoothing feeds cached
+control setup every 32 samples, and exact note offsets use the native fixed
+note stack. It owns its envelope interaction; the generic ADSR is bypassed.
+See [Open303 integration](OPEN303_INTEGRATION.md) for the explicit control map.

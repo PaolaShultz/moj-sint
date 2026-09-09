@@ -22,3 +22,7 @@ reference.mojsint
 22-pressure-chain-deep-cascade.mojsint
 23-pressure-chain-body-tap.mojsint
 24-pressure-chain-cross-feed.mojsint
+25-open303-rubber-bass.mojsint
+26-open303-accent-wire.mojsint
+27-open303-hollow-slide.mojsint
+28-open303-soft-pluck.mojsint

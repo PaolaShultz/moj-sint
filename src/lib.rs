@@ -25,6 +25,8 @@ pub mod model_d;
 pub mod model_d_lab;
 pub mod native_bench;
 pub mod offline;
+#[cfg(feature = "open303")]
+pub mod open303;
 pub mod preset;
 pub mod pressure_chain;
 pub mod research;
@@ -33,3 +35,6 @@ pub mod strange;
 pub mod strange_lab;
 pub mod struck_object;
 mod synthesis_model;
+
+#[cfg(feature = "open303")]
+mod open303_live;

@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-09-07, Europe/Zagreb.
+Last updated: 2026-09-09, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -10,8 +10,8 @@ to reconstruct decisions from chat history.
 ## Current documentation authority
 
 The current [documentation index](README.md), [preset/control schema](PRESET_SCHEMA.md),
-and [host contract](HOST_CONTRACT.md) describe the implemented seven-model,
-schema-9 engine and 24 cleared factory starts. The first five models expose
+and [host contract](HOST_CONTRACT.md) describe the implemented eight-model,
+schema-10 engine and 28 cleared factory starts. The first five models expose
 seven timbre controls, independent volume at physical position 5, and ADSR in
 SHR. Pressure Chain exposes eight timbre controls plus amp ADSR, with SWEEP at
 position 5. Dual Filter uses all fifteen positions and its dedicated core click.
@@ -24,6 +24,121 @@ host, isolated Swarm, and smaller-catalog descriptions are superseded. The
 September 7 documentation reconciliation changes no engine, preset, runtime,
 or hardware state. Current deployment evidence distinguishes historical
 callback simulations from the later connected debug/release defect acceptance.
+
+## 2026-09-09 Open303 live integration
+
+The owner requested Open303 integration into SHR-DAW and a few presets.
+Open303 is now a distinct eighth Moj model (`open303`), enabled in default
+builds, monophonic, with fixed-per-preset TB_303 or LP_18 filter identity.
+Schema 10 adds its strict native control vocabulary; schemas 1–9 still migrate.
+The four authored starts are Rubber Bass, Accent Wire, Hollow Slide, and Soft
+Pluck, bringing the cleared catalog to 28. They are ordinary requested factory
+presets, not preserved experimental renders.
+
+The live adapter prepares one core outside rendering, receives all note-offs
+through its bounded last-note stack, and uses inherited envelopes/slide/accent.
+The Engine's 10 ms smoothers feed cached native controls every 32 samples;
+note-on applies current values immediately. Native normal/accent attack,
+accent decay and amp decay have explicit bounded setters; accent decay updates
+held accented notes. No additional generic ADSR is multiplied onto the voice.
+Position 5 remains volume, 9–12 are native envelope timings, and 13–15 stay SHR
+AUX. There is no new mode button or live filter switch.
+
+SHR source adds catalog identity A01–A04, exact load/save/reset support, the
+native control labels, mono marker, and installer license-notice retention.
+Its incremental-build gate requires an explicit combined build/test request;
+source preparation does not imply the running or installed SHR binary changed.
+See [Open303 integration](OPEN303_INTEGRATION.md) for controls and evidence.
+
+The normal all-target/all-feature suite passed (359 tests, 36 ignored), followed
+by all three focused live-integration tests in debug and release, including
+the subsequently added all-control-effect regression. ASan/UBSan and native
+C++ allocation guards passed with the articulation setters; the six opt-in
+oscillator spectral measurements match the previous evidence. All 28 presets
+validate; paired one-second release renders at MIDI 40/velocity .85 are exact.
+Open303 peaks for that probe are .3172, .3155, .1914, and .1393 respectively.
+Formatting, warning-denied Clippy, release build, audit/deny, and minimal-feature
+library checks passed. Historical unrelated renderers/benchmarks stayed ignored.
+
+
+## 2026-09-09 isolated Open303 candidate
+
+The owner authorized proceeding with the repaired C++ candidate. The optional,
+default-off `open303` feature now builds a pinned, license-reviewed Open303
+core behind `native/open303` and a safe owning Rust API. `open303-lab` renders
+an authored sequence through TB_303 and LP_18 into a new offline output folder.
+The production Engine, seven models, schema, presets, physical controls, and
+SHR/JACK integration are unchanged. No playback or hardware work was performed.
+
+[Candidate contract and validation](OPEN303_CANDIDATE.md) owns the build/run
+commands, bounded note/control behavior, output ceiling, tests, and remaining
+integration gates. [Vendor provenance](../vendor/open303/README.md) records the
+exact source selection, upstream hashes, local repairs, and separate MIT/Ooura
+notices. This supersedes the earlier research-only/no-import state below.
+
+The candidate fixes reproduced array bounds defects, allocating note storage,
+initialization/rate inconsistencies, held-note tuning/accent restoration,
+shared preparation scratch, unsafe exponent extraction, and idle/reset state.
+It preserves the inherited oscillator/filter flow; filter mode is fixed at
+preparation. Creation/destruction stay outside rendering. Controls are applied
+at call boundaries with cached unchanged values; smoothing and live event-rate
+budgeting remain future integration work. A counted ±0.999 output ceiling and
+sticky nonfinite fault-to-silence boundary are explicit adapter behavior.
+This is software reuse evidence, not hardware fidelity or sound acceptance.
+
+Software validation passed the final normal all-target/all-feature suite
+(356 passed, 36 intentionally ignored), focused candidate tests in debug and release,
+ASan/UBSan native bounds/state/C-ABI/allocation/fault checks, FFT roundtrip,
+and the six opt-in oscillator spectral measurements. Formatting, warning-denied
+all-target/all-feature Clippy, release build, audit/deny, exact vendor manifest,
+and knowledge validation passed. The default build checks successfully with an
+unusable CXX path and excludes the optional C++ build crates. All 24 production
+presets validate and yield byte-identical paired one-second release renders.
+The candidate repeats exactly within each profile; debug/release sample delta
+is at most 3.7253e-9 for the authored phrase. Both modes end idle with no ceiling
+hits. Unrelated historical/benchmark ignored tests were intentionally skipped.
+
+## 2026-09-09 Open303 engine analysis
+
+The owner selected Open303 for a deep source and integration assessment.
+[Open303 engine analysis](OPEN303_ANALYSIS.md) owns the pinned source audit,
+license/dependency review, reconstructed signal flow, note/control semantics,
+JC-303 comparison, offline probes, and proposed integration boundary.
+
+The recommendation is to retain the Open303 C++ DSP behind a narrow C ABI in
+an isolated candidate, with a bounded note adapter and explicit preparation.
+This avoids rewriting its oscillator/filter/envelope interactions. It is not
+ready for the live callback: confirmed issues include constructor and table
+bounds errors, allocating note storage, inconsistent initialization, tuning
+loss on held-note return, shared table-generation scratch, and no idle return.
+The default TB_303 filter path is linear in audio amplitude; the original VST
+initializes LP_18 instead. Do not describe it as a validated nonlinear circuit
+replica or silently replace Pressure Chain with it.
+
+A core-only AArch64 build succeeded with missing standard headers supplied.
+After repairing only the constructor array overrun in a disposable copy,
+sanitized bounded probes ran; direct C++ and Rust/C-ABI rendering produced
+identical samples for one declared sequence. Functional, allocation, finite,
+control-motion, and oscillator spectral evidence is in the report. There was
+no JACK, audio playback, SHR change, native performance claim, or production
+integration. Temporary source/probe/render outputs are disposable; only the
+research conclusions and reproduction methods belong in durable docs.
+
+## 2026-09-09 open-source analog modeling knowledge base
+
+The owner asked that future modeling start by studying prior implementations
+and useful device signal flows. [The analog modeling knowledge base](OPEN_SOURCE_ANALOG_MODELING.md)
+records a primary-source survey, project authorship and license pointers,
+implementation entry points, limitations, and a prioritized map to Moj Sint.
+Consult it before proposing a new analog topology or rebuilding a known DSP
+mechanism. Preserve the reference flow and control interactions in a baseline,
+then vary one meaningful mechanism with a stated musical purpose.
+
+This is research guidance, not selection or integration of a new model. No
+third-party code/content was imported and no DSP, controls, presets, hardware,
+or runtime behavior changed. Documentation/link checks and local knowledge
+validation apply; production and opt-in audio tests are unnecessary for this
+documentation-only change. Sound fidelity and Pi cost were not evaluated.
 
 ## Goal
 

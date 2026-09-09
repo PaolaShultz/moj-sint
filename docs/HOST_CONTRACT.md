@@ -67,3 +67,8 @@ Pressure Chain requires schema 9 and one preallocated voice. Its bounded
 the owned renderer; it still publishes exactly one stereo output pair. There
 is no layered synth process or per-topology output. All Notes Off clears its
 held-note stack as well as DSP state.
+
+Open303 requires schema 10, one voice, and a default-feature build. It uses the
+same managed process and stereo return, with exact native filter identity kept
+in the preset. CC7 is volume, CC20–23 and CC25–31 are its native controls;
+CC24 is unused. See [the integration contract](OPEN303_INTEGRATION.md).

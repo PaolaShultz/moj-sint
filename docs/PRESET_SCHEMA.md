@@ -1,6 +1,6 @@
 # Preset and Control Schema
 
-`.mojsint` is strict TOML. Schema version 9 adds monophonic Pressure Chain and its explicit topology while retaining the existing model-specific
+`.mojsint` is strict TOML. Schema version 10 adds monophonic Open303 and its explicit filter identity while retaining the existing model-specific
 identity and independent `instrument_volume`. Every preset has
 `schema_version`, `name`, `voices`, `output_gain`, `instrument_volume`,
 `model`, one matching patch/core field, and one exact `macros` or `controls`
@@ -8,7 +8,7 @@ table. Unknown,
 mixed-model, or missing fields fail validation. Names must be non-empty,
 voices are 1–64, and all gain, volume, and macro values are finite in `0..=1`.
 
-The seven model identities are:
+The eight model identities are:
 
 | Model | Patch field and accepted IDs |
 | --- | --- |
@@ -18,6 +18,7 @@ The seven model identities are:
 | `swarm_machine` | `swarm_patch = "warm_pad"` |
 | `bass_matrix` | `bass_matrix_patch = "transformer"` |
 | `dual_filter` | `dual_filter_core`: `industrial`, `counter` |
+| `open303` | `open303_filter`: `tb303`, `lowpass18`; `voices = 1` only |
 | `pressure_chain` | `pressure_chain_topology`: `deep_cascade`, `body_tap`, `cross_feed`; `voices = 1` only |
 
 ```toml
@@ -44,9 +45,9 @@ sustain = 0.82
 release = 0.15
 ```
 
-Schemas 1–8 remain readable through strict migrations. Older presets gain
+Schemas 1–9 remain readable through strict migrations. Older presets gain
 `instrument_volume = 1.0`, so their previous full-level behavior and timbre
-remain unchanged. The serializer always writes schema 9 and retains the exact
+remain unchanged. The serializer always writes schema 10 and retains the exact
 model-specific patch and macro vocabulary.
 
 ## Physical positions
@@ -93,7 +94,7 @@ All live controls use the bounded event path. Timbre and ADSR use the existing
 SHR re-arms pickup against the loaded values.
 
 The tracked catalog contains seven Model D, six Six-Op PM, one Strange
-Oscillator, one Swarm Machine, one Bass Matrix, five Dual Filter starts, and three Pressure Chain starts. The graph description
+Oscillator, one Swarm Machine, one Bass Matrix, five Dual Filter starts, three Pressure Chain starts, and four Open303 starts. The graph description
 in `experiments/swarm-micro-machine-v1.toml` remains a strict authoring input;
 the live `swarm_machine` model compiles that graph before audio rendering and
 never parses or allocates in the callback.
@@ -112,3 +113,13 @@ gain. Overlapping notes slide without retriggering either contour; releasing
 the latest note returns to the most recently held note. A detached note
 retriggers both contours, and PANIC clears held keys and voice state. This
 model owns its amp envelope internally, so Engine applies no second ADSR.
+
+## Open303 native surface
+
+Open303 has eleven normalized macro fields and independent instrument volume.
+Its twelve physical positions are Waveform, Cutoff, Resonance, Env Mod, Volume,
+Filter Decay, Accent, Slide, Normal Attack, Accent Attack, Accent Decay, and
+Amp Decay. CCs are 20–23, 7, and 25–31 respectively; CC24 is unused. Positions
+13–15 remain SHR AUX sends. The last four controls are native envelope timings,
+not ADSR. Exact fields/ranges and the four starts are in
+[Open303 integration](OPEN303_INTEGRATION.md). Filter identity is preset-owned.

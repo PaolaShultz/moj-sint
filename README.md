@@ -5,9 +5,9 @@ for SHR-DAW. Its library keeps DSP independent of JACK, ALSA, files, processes,
 and clocks; the binary provides strict preset validation, deterministic offline
 rendering, and the live JACK/ALSA host.
 
-The current experimental catalog contains seven synthesis models: circuit-
+The current experimental catalog contains eight synthesis models: circuit-
 informed Model D, Six-Op PM, Strange Oscillator, the typed-graph Swarm Machine,
-Bass Matrix, Dual Filter, and monophonic Pressure Chain. The first five models
+Bass Matrix, Dual Filter, monophonic Pressure Chain, and Open303. The first five models
 retain twelve normalized engine controls; SHR exposes seven timbre values,
 independent volume at position 5, and ADSR. Pressure Chain exposes eight timbre
 values plus amp ADSR, with SWEEP at position 5. Dual Filter uses 15: two
@@ -15,10 +15,13 @@ cutoff/resonance/envelope-depth blocks, continuous `STRUCTURE`, filter ADSR,
 and amp ADSR. Its separate synth rotary click crossfades between INDUSTRIAL
 and COUNTER cores without retriggering a held note. The
 [preset and control schema](docs/PRESET_SCHEMA.md) owns the exact mappings.
-The 24 factory starts are playable research outcomes and starting points,
+The 28 factory starts are playable research outcomes and starting points,
 not a production-release claim.
 
 ## Usage
+
+The default Open303 model requires a C++17 compiler. Its [native controls and
+four presets](docs/OPEN303_INTEGRATION.md) preserve acid accent/slide behavior.
 
 ```sh
 # Validate or render without JACK
@@ -32,8 +35,8 @@ cargo run -- --client-name shs-moj-sint --preset presets/reference.mojsint
 The factory catalog contains seven Model D starts, six Six-Op PM starts, one
 Strange Oscillator start, one Swarm Machine warm pad, one Bass Matrix
 transformer, and five Dual Filter starts derived from the approved lead and
-four bass directions, plus three Pressure Chain topologies. These are editable
-live starting points, not 24 claims
+four bass directions, three Pressure Chain topologies, and four Open303 starts. These are editable
+live starting points, not 28 claims
 of separate synthesis families.
 
 The live process publishes one ALSA Sequencer input named `input` and exactly

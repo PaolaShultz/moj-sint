@@ -164,6 +164,8 @@ pub(crate) enum VoiceModel {
     BassMatrix(BassMatrixVoice),
     DualFilter(DualFilterInstrument),
     PressureChain(LivePressureVoice),
+    #[cfg(feature = "open303")]
+    Open303(crate::open303_live::LiveOpen303),
 }
 
 impl VoiceModel {
@@ -216,6 +218,10 @@ impl VoiceModel {
             (SynthesisModelId::PressureChain, ModelPatchId::PressureChain(topology)) => {
                 LivePressureVoice::new(sample_rate, topology).map(Self::PressureChain)
             }
+            #[cfg(feature = "open303")]
+            (SynthesisModelId::Open303, ModelPatchId::Open303(patch)) => {
+                crate::open303_live::LiveOpen303::new(sample_rate, patch).map(Self::Open303)
+            }
             _ => Err(EngineError::InvalidModelPatch),
         }
     }
@@ -226,6 +232,9 @@ impl VoiceModel {
             values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7],
         ];
         match self {
+            #[cfg(feature = "open303")]
+            Self::Open303(model) => model.set_controls(values),
+
             Self::ModelD(model) => model.set_live_controls(
                 values[0], values[1], values[2], values[3], values[4], values[5], values[6],
                 values[7],
@@ -250,6 +259,9 @@ impl VoiceModel {
 
     pub(crate) fn note_on(&mut self, note: u8, velocity: f32) {
         match self {
+            #[cfg(feature = "open303")]
+            Self::Open303(model) => model.note_on(note, velocity),
+
             Self::ModelD(model) => model.note_on(note, velocity),
             Self::SixOpPm(model) => {
                 if model.note_on(note, velocity).is_err() {
@@ -266,6 +278,9 @@ impl VoiceModel {
 
     pub(crate) fn note_off(&mut self, note: u8) {
         match self {
+            #[cfg(feature = "open303")]
+            Self::Open303(model) => model.note_off(note),
+
             Self::ModelD(model) => model.note_off(),
             Self::SixOpPm(model) => model.note_off(),
             Self::StrangeOscillator(_) => {}
@@ -278,6 +293,9 @@ impl VoiceModel {
     #[inline]
     pub(crate) fn sample(&mut self) -> [f32; 2] {
         match self {
+            #[cfg(feature = "open303")]
+            Self::Open303(model) => model.sample(),
+
             Self::ModelD(model) => {
                 let sample = model.sample();
                 [sample, sample]
@@ -299,6 +317,9 @@ impl VoiceModel {
 
     pub(crate) fn reset(&mut self) {
         match self {
+            #[cfg(feature = "open303")]
+            Self::Open303(model) => model.reset(),
+
             Self::ModelD(model) => model.reset(),
             Self::SixOpPm(model) => model.reset(),
             Self::StrangeOscillator(model) => model.reset(),
@@ -314,8 +335,20 @@ impl VoiceModel {
 
     pub(crate) fn is_idle(&self) -> bool {
         match self {
+            #[cfg(feature = "open303")]
+            Self::Open303(model) => model.is_idle(),
+
             Self::DualFilter(model) => model.is_idle(),
             Self::PressureChain(model) => model.voice.is_idle(),
+            _ => false,
+        }
+    }
+
+    pub(crate) fn has_note_stack(&self) -> bool {
+        match self {
+            Self::PressureChain(_) => true,
+            #[cfg(feature = "open303")]
+            Self::Open303(_) => true,
             _ => false,
         }
     }

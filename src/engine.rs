@@ -80,7 +80,10 @@ impl Voice {
     ) -> Result<Self, EngineError> {
         let mut model = VoiceModel::new(sample_rate, model_id, patch_id, voice_seed)?;
         let initial = MacroId::ALL.map(|id| values.get(id).get());
-        if model_id == SynthesisModelId::PressureChain {
+        if matches!(
+            model_id,
+            SynthesisModelId::PressureChain | SynthesisModelId::Open303
+        ) {
             model.set_live_controls(initial);
         }
         let macros = initial.map(|value| {
@@ -105,7 +108,9 @@ impl Voice {
             macros,
             uses_internal_envelopes: matches!(
                 model_id,
-                SynthesisModelId::DualFilter | SynthesisModelId::PressureChain
+                SynthesisModelId::DualFilter
+                    | SynthesisModelId::PressureChain
+                    | SynthesisModelId::Open303
             ),
         })
     }
@@ -198,7 +203,11 @@ impl Engine {
         if !sample_rate.is_finite() || sample_rate <= 0.0 {
             return Err(EngineError::InvalidSampleRate);
         }
-        if preset.model == SynthesisModelId::PressureChain && preset.voices != 1 {
+        if matches!(
+            preset.model,
+            SynthesisModelId::PressureChain | SynthesisModelId::Open303
+        ) && preset.voices != 1
+        {
             return Err(EngineError::InvalidModelPatch);
         }
         let mut voices = Vec::with_capacity(preset.voices);
@@ -298,9 +307,7 @@ impl Engine {
             }
             Event::NoteOn { note, .. } | Event::NoteOff { note } => {
                 for voice in &mut self.voices {
-                    if matches!(voice.model, VoiceModel::PressureChain(_))
-                        || (voice.note == note && !voice.is_idle())
-                    {
+                    if voice.model.has_note_stack() || (voice.note == note && !voice.is_idle()) {
                         voice.note_off(note);
                     }
                 }

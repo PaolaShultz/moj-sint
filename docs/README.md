@@ -6,18 +6,21 @@ those contracts from research records, proposals, and dated session evidence.
 
 ## Current contracts
 
+- [Open303 integration](OPEN303_INTEGRATION.md) describes the eighth model,
+  native controls, four starts, and SHR behavior.
+
 - [Architecture](ARCHITECTURE.md) covers engine, model, callback, and offline
   tool boundaries.
 - [Live host contract](HOST_CONTRACT.md) defines process arguments, ALSA/JACK
   ports, event timing, overflow behavior, shutdown, and failure ownership.
-- [Preset and control schema](PRESET_SCHEMA.md) defines schema 9, model
+- [Preset and control schema](PRESET_SCHEMA.md) defines schema 10, model
   identities, exact fields, MIDI CCs, physical positions, and migrations.
 - [Portability and deployment](PORTABILITY.md) records toolchain, dependency,
   platform, and evidence limits.
 - [Bass Matrix](BASS_MATRIX.md) records the current model design and automated
   evidence.
 - [Dependencies, licensing, and public presets](../THIRD_PARTY.md) owns the
-  public 24-preset boundary and dependency review.
+  public 28-preset boundary and dependency review.
 
 SHR-DAW starts Moj Sint as an external managed process. Moj Sint owns synthesis,
 preset validation, ALSA input, and stereo JACK output. SHR-DAW owns its exact
@@ -25,6 +28,18 @@ dependency pin, configuration, process lifecycle, routes, replacement recovery,
 Project state, and private preset storage.
 
 ## Research and dated evidence
+
+- [Isolated Open303 candidate](OPEN303_CANDIDATE.md) documents the optional
+  repaired C++/Rust engine, offline audition command, provenance, and checks.
+  It has no production model or live-host integration.
+
+- [Open303 engine analysis](OPEN303_ANALYSIS.md) traces a pinned C++ core,
+  confirms integration defects and offline reuse feasibility, and specifies
+  a candidate boundary. It does not add or approve a production model.
+
+- [Open-source analog modeling knowledge base](OPEN_SOURCE_ANALOG_MODELING.md)
+  maps prior synth implementations, authors, licenses, and study priorities.
+  Start here before proposing a new analog topology.
 
 - [Research](RESEARCH.md) is the long-form source, experiment, rejection, and
   measurement record.

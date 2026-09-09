@@ -1,13 +1,13 @@
 # Dependencies, licensing, and public presets
 
-Moj Sint source and its 24 factory `.mojsint` starts are MIT licensed. The
+Moj Sint source and its 28 factory `.mojsint` starts are MIT licensed. The
 factory starts are project-authored parameter documents; they contain no
 third-party samples, recordings, factory patches, firmware, SysEx data, source
 code, prose, diagrams, or artwork. `presets/cleared-presets.txt` is the sole
 public installation allowlist. Ignored `artifacts/` and private user presets
 are never installable content.
 
-The production dependency graph uses permissively licensed Rust crates:
+The default production dependency graph uses permissively licensed Rust crates:
 
 | Crate | Purpose | Declared licence |
 | --- | --- | --- |
@@ -39,3 +39,15 @@ Pressure Chain's oscillator, filter cells, pressure memory, topology starts,
 and live adapter are independently authored. Functional research provenance
 and the no-clone boundary are recorded in `docs/ACID_CHAIN_RESEARCH.md`.
 No third-party DSP code, patches, samples, or circuit constants are included.
+
+The default-enabled `open303` feature imports Robin Schmidt's MIT Open303 C++
+core for the monophonic Open303 model. It adds the permissive `cc` build
+crate (MIT OR Apache-2.0) and a system C++ standard library requirement.
+[Vendor provenance](vendor/open303/README.md) owns the exact revision/file
+manifests, retained MIT notice, separately authored Takuya Ooura FFT permission,
+and local repairs. Ooura's file is not relabeled MIT. The GPL JC-303 plugin
+wrapper, VST SDK, presets, and samples are not imported. Cargo's license checks
+cover crates; the vendored source has this separate manual review.
+The [candidate contract](docs/OPEN303_CANDIDATE.md) records its scope and limits;
+the subsequent [production integration](docs/OPEN303_INTEGRATION.md) adds four
+project-authored parameter presets. They contain no third-party factory patches.

@@ -5,6 +5,25 @@ Equations and described topologies may guide an independent implementation;
 third-party source code, presets, and samples must not be copied without a
 separate license review.
 
+## Open303 source and integration assessment
+
+The subsequent [isolated candidate](OPEN303_CANDIDATE.md) implements the
+reviewed core import and bounded repairs behind an optional C++/Rust boundary.
+Its contract and vendor ledger supersede the initial no-import state.
+
+The [Open303 engine analysis](OPEN303_ANALYSIS.md) contains the pinned source
+trace, license/provenance review, JC-303 delta, executable offline evidence,
+and recommendation to reuse the C++ core after bounded safety/state repairs.
+The initial Rust/C-ABI proof preserves one sequence byte-for-byte; it does not
+establish callback readiness, listening acceptance, or native headroom.
+
+## Open-source analog modeling reference map
+
+The [analog modeling knowledge base](OPEN_SOURCE_ANALOG_MODELING.md) surveys
+prior implementations and maps them to Moj Sint's models. It records authors,
+primary links, license declarations, study entry points, and known limitations.
+Use it before rebuilding a known mechanism or proposing a device-flow model.
+
 ## 2026-07-23 composite-machine discovery
 
 The complete reconstruction, exact pitch inventory, corrected delayed-launch

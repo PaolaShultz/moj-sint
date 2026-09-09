@@ -15,6 +15,18 @@ name = "moj_sint"
 name = "moj-sint"
 path = "src/main.rs"
 
+[[bin]]
+name = "open303-lab"
+path = "src/bin/open303-lab.rs"
+required-features = ["open303"]
+
+[features]
+default = ["open303"]
+open303 = ["dep:cc"]
+
+[build-dependencies]
+cc = { version = "1.4", optional = true }
+
 [dependencies]
 alsa = "0.7.1"
 anyhow = "1"
