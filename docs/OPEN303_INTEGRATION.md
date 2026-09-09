@@ -46,9 +46,9 @@ The counted ±.999 ceiling/fault guard remains outside the inherited DSP.
 
 The requested factory starts are project-authored parameter documents:
 
-- **A01 Rubber Bass:** TB_303, saw, moderate sweep and short slide.
-- **A02 Accent Wire:** TB_303, brighter resonance and stronger accent sweep.
-- **A03 Hollow Slide:** LP_18, square, longer decay and slide.
+- **A03 Rubber Bass:** TB_303, saw, moderate sweep and short slide.
+- **A01 Accent Wire:** TB_303, brighter resonance and stronger accent sweep.
+- **A02 Hollow Slide:** LP_18, square, longer decay and slide.
 - **A04 Soft Pluck:** LP_18, softer resonance and short decay.
 
 SHR discovers these through its configured Moj catalog. Project routes,
@@ -66,5 +66,7 @@ bounded and allocation-free at 44.1/48/96 kHz. Native ASan/UBSan, C++ allocation
 guards, and the existing six spectral checks pass. All 28 factory presets
 validate and paired one-second release renders match exactly. Formatting,
 Clippy with warnings denied, release build, audit/deny, and the minimal-feature
-library check pass. SHR source compilation remains separately gated by its
-explicit combined-build instruction until the owner authorizes that pass.
+library check pass. The subsequent authorized combined pass built all debug/release targets in
+both projects. SHR passed 1,141 normal tests (14 historical tests ignored),
+and its fresh release discovered all four starts in an isolated catalog.
+Normal exit/reopen loads the refreshed app; no audio or JACK restart was run.

@@ -25,6 +25,27 @@ September 7 documentation reconciliation changes no engine, preset, runtime,
 or hardware state. Current deployment evidence distinguishes historical
 callback simulations from the later connected debug/release defect acceptance.
 
+## 2026-09-09 authorized combined build
+
+The owner authorized building all after the Open303 integration. Exact rustc
+1.97.1 (8bab26f4f, LLVM 22.1.6), AArch64, built every debug and release target
+in both Moj Sint (all features) and SHR-DAW. SHR's locked check passed; its
+normal suite passed 1,141 tests with 14 historical tests intentionally ignored.
+One existing routing-recovery assertion expected obsolete status text; the
+correction checks the current save-error prefix while preserving all direct
+draft, selected-row, layout, and cancellation assertions. No routing behavior
+changed. Existing SHR compiler warnings remain.
+
+All 28 Moj factory presets validate, and repeated one-second release renders
+of the four Open303 starts are byte-identical. The unchanged engine's prior
+359-test/sanitizer/spectral evidence remains applicable; unrelated historical
+renderers were not rerun. Vendor hashes and formatting checks passed.
+The fresh SHR release discovers all four starts in an isolated, hardware-free
+catalog. Existing local launch configuration already selects the checkout
+release host and public preset directory; no configuration or private sounds
+needed changing. Normal exit/reopen loads the new SHR binary. No interactive application,
+JACK server, live engine, MIDI transmission, or audible test was started/restarted.
+
 ## 2026-09-09 Open303 live integration
 
 The owner requested Open303 integration into SHR-DAW and a few presets.
@@ -46,8 +67,8 @@ AUX. There is no new mode button or live filter switch.
 
 SHR source adds catalog identity A01–A04, exact load/save/reset support, the
 native control labels, mono marker, and installer license-notice retention.
-Its incremental-build gate requires an explicit combined build/test request;
-source preparation does not imply the running or installed SHR binary changed.
+The owner subsequently authorized the combined build; the build record above
+owns its completed software checks and normal-reopen boundary.
 See [Open303 integration](OPEN303_INTEGRATION.md) for controls and evidence.
 
 The normal all-target/all-feature suite passed (359 tests, 36 ignored), followed
