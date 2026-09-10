@@ -40,9 +40,17 @@ remain in place. Open303's ordinary candidate/native note API retains its
 original legato default; only the explicit live API requests retriggering.
 No preset schema, control, oscillator, or filter algorithm changes. Focused
 Rust/native regressions cover both contours, glide, repeat, priority, release,
-finite output, and allocation boundaries. This incremental change has source
-review and formatting only; compilation and test execution await the next
-explicit combined pass. No audio or hardware validation has occurred.
+finite output, and allocation boundaries.
+
+The authorized ordinary development pass used exact Rust 1.97.1 on AArch64
+with one compile job shared serially with SHR-DAW. Locked checking, formatting,
+seven focused retrigger-related tests, six active Open303 contracts, and the
+normal all-target suite passed: 362 tests, zero failures, and 36 intentionally
+ignored historical cases. The normal suite took 309.95 seconds including lock
+wait; warning-denied all-target Clippy also passed. All debug and release
+binaries build, and both fresh host binaries pass their existing `--help`
+smoke check. Package version remains 0.2.3. No source correction was needed
+during validation, and no live host, audio, MIDI, or hardware action occurred.
 
 ## 2026-09-09 authorized combined build
 
