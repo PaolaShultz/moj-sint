@@ -226,8 +226,9 @@ namespace rosic
     //-----------------------------------------------------------------------------------------------
     // event handling:
 
-    /** Accepts note-on events (note offs are also handled here as note ons with velocity zero). */ 
-    void noteOn(int noteNumber, int velocity, double detune);
+    /** Accepts note events; zero velocity releases. Optional live retrigger refreshes
+    contours on each press while preserving overlap glide and held-note return. */
+    void noteOn(int noteNumber, int velocity, double detune, bool retrigger = false);
 
     /** Turns all possibly running notes off. */
     void allNotesOff();

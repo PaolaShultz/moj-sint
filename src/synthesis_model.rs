@@ -366,8 +366,9 @@ impl VoiceModel {
     }
 }
 
-/// Bounded last-note priority. Returning to a still-held note slides; release
-/// tails do not turn a later detached note into a legato event.
+/// Bounded last-note priority. Each press retriggers the contours, retaining
+/// glide on overlap. Returning to a still-held note slides without a retrigger;
+/// release tails do not turn a later detached note into a glide event.
 #[derive(Debug)]
 pub(crate) struct LivePressureVoice {
     voice: PressureChainVoice,
@@ -393,7 +394,7 @@ impl LivePressureVoice {
         let articulation = if self.len == 0 {
             PressureArticulation::Trigger
         } else {
-            PressureArticulation::Slide
+            PressureArticulation::RetriggerSlide
         };
         if let Some(index) = self.held[..self.len]
             .iter()
@@ -422,5 +423,78 @@ impl LivePressureVoice {
                     .note_on(note, velocity, PressureArticulation::Slide);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pressure_live_presses_retrigger_but_held_returns_and_stale_releases_do_not() {
+        fn advance(model: &mut LivePressureVoice, frames: usize) {
+            for _ in 0..frames {
+                let sample = model.voice.sample();
+                assert!(sample.iter().all(|s| s.is_finite() && s.abs() <= 0.94));
+            }
+        }
+        let mut model =
+            LivePressureVoice::new(48_000.0, PressureChainTopology::DeepCascade).unwrap();
+        model
+            .voice
+            .set_adsr(crate::envelope::AdsrConfig::new(0.010, 0.020, 0.2, 0.050).unwrap());
+        model.note_on(36, 0.8);
+        for _ in 0..2 {
+            advance(&mut model, 2_400);
+            let level = model.voice.amp_level();
+            let frequency = model.voice.current_frequency_hz();
+            model.note_on(48, 0.8); // second iteration is a repeated held key
+            assert_eq!(model.len, 2);
+            assert_eq!(model.held[1].0, 48);
+            assert_eq!(model.voice.current_frequency_hz(), frequency);
+            assert_eq!(model.voice.amp_level(), level);
+            advance(&mut model, 1);
+            assert!(model.voice.amp_level() > level);
+        }
+        advance(&mut model, 600); // the new attack has entered decay
+        let level = model.voice.amp_level();
+        let frequency = model.voice.current_frequency_hz();
+        model.note_off(48);
+        assert_eq!(model.len, 1);
+        assert_eq!(model.held[0].0, 36);
+        assert_eq!(model.voice.amp_level(), level);
+        assert_eq!(model.voice.current_frequency_hz(), frequency);
+        advance(&mut model, 1);
+        assert!(model.voice.amp_level() < level);
+        assert!(model.voice.current_frequency_hz() < frequency);
+
+        model.note_on(48, 0.8);
+        let level = model.voice.amp_level();
+        let target = model.voice.target_frequency_hz();
+        for note in [36, 36, 72] {
+            // older held key, repeated release, unknown key
+            model.note_off(note);
+            assert_eq!(model.len, 1);
+            assert_eq!(model.held[0].0, 48);
+            assert_eq!(model.voice.amp_level(), level);
+            assert_eq!(model.voice.target_frequency_hz(), target);
+        }
+        model.note_off(48);
+        advance(&mut model, 240);
+        assert_eq!(model.len, 0);
+        assert!(!model.voice.is_idle());
+        let level = model.voice.amp_level();
+        model.note_on(60, 0.8); // detached press during the old release tail
+        assert_eq!(
+            model.voice.current_frequency_hz(),
+            model.voice.target_frequency_hz()
+        );
+        assert_eq!(model.voice.amp_level(), level);
+        advance(&mut model, 1);
+        assert!(model.voice.amp_level() > level);
+        model.note_off(60);
+        advance(&mut model, 2_401);
+        assert!(model.voice.is_idle());
+        assert_eq!(model.voice.sample(), [0.0; 2]);
     }
 }

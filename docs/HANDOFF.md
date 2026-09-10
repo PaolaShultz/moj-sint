@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-09-09, Europe/Zagreb.
+Last updated: 2026-09-10, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -24,6 +24,25 @@ host, isolated Swarm, and smaller-catalog descriptions are superseded. The
 September 7 documentation reconciliation changes no engine, preset, runtime,
 or hardware state. Current deployment evidence distinguishes historical
 callback simulations from the later connected debug/release defect acceptance.
+
+## 2026-09-10 live monophonic note articulation
+
+The owner reported that new notes changed pitch without refreshing the
+envelope. Both live mono adapters treated every overlapping or repeated held
+NoteOn as legato. Pressure Chain and Open303 now retrigger their filter and
+amp contours on each positive live NoteOn, including repeated keys. The amp
+attack starts from its current level; overlapping pitch still glides. A
+release-driven return to an older held note remains a non-retriggering slide,
+and detached notes retrigger even during the previous release tail.
+
+The bounded note stacks, stale-release handling, accent/pressure, and panic
+remain in place. Open303's ordinary candidate/native note API retains its
+original legato default; only the explicit live API requests retriggering.
+No preset schema, control, oscillator, or filter algorithm changes. Focused
+Rust/native regressions cover both contours, glide, repeat, priority, release,
+finite output, and allocation boundaries. This incremental change has source
+review and formatting only; compilation and test execution await the next
+explicit combined pass. No audio or hardware validation has occurred.
 
 ## 2026-09-09 authorized combined build
 

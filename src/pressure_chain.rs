@@ -129,8 +129,12 @@ impl PressureChainTopology {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PressureArticulation {
+    /// Refresh both contours and start at the new pitch.
     Trigger,
+    /// Preserve contours while gliding to a held note.
     Slide,
+    /// Refresh both contours from the current amp level while retaining pitch glide.
+    RetriggerSlide,
 }
 
 #[derive(Clone, Copy, Debug, Error, PartialEq)]
@@ -293,10 +297,13 @@ impl PressureChainVoice {
         let strike = ((velocity - 0.35) / 0.65).clamp(0.0, 1.0) * pressure_control;
         self.pressure = (self.pressure * 0.80 + strike * 0.72).min(1.0);
         self.velocity = velocity;
-        if articulation == PressureArticulation::Trigger || self.amp.is_idle() {
+        let was_idle = self.amp.is_idle();
+        if articulation == PressureArticulation::Trigger || was_idle {
             self.current_frequency_hz = self.target_frequency_hz;
             self.oscillator
                 .set_frequency(self.current_frequency_hz, self.sample_rate);
+        }
+        if articulation != PressureArticulation::Slide || was_idle {
             self.filter_envelope = 1.0;
             self.amp.note_on();
         }
@@ -578,4 +585,51 @@ pub fn measure_high_rate_residual(
         reference_samples.push(high);
     }
     Ok(fitted_residual_db(&target_samples, &reference_samples))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retrigger_slide_refreshes_both_contours_without_resetting_pitch_or_phase() {
+        for topology in PressureChainTopology::ALL {
+            let mut voice = PressureChainVoice::new(
+                48_000.0,
+                topology,
+                PressureChainControls::START,
+                AdsrConfig::new(0.010, 0.020, 0.2, 0.050).unwrap(),
+            )
+            .unwrap();
+            voice.note_on(40, 0.8, PressureArticulation::Trigger);
+            for note in [52, 52] {
+                for _ in 0..2_400 {
+                    let sample = voice.sample();
+                    assert!(sample.iter().all(|s| s.is_finite() && s.abs() <= 0.94));
+                }
+                let frequency = voice.current_frequency_hz;
+                let phase = voice.oscillator.phase;
+                let level = voice.amp.level();
+                assert!((level - 0.2).abs() < 1e-6);
+                assert!(voice.filter_envelope < 1.0);
+
+                voice.note_on(note, 0.8, PressureArticulation::RetriggerSlide);
+                assert_eq!(voice.filter_envelope, 1.0);
+                assert_eq!(voice.amp.level(), level);
+                assert_eq!(voice.oscillator.phase, phase);
+                assert_eq!(voice.current_frequency_hz, frequency);
+                voice.sample();
+                assert!(voice.amp.level() > level);
+                assert!(voice.current_frequency_hz >= frequency);
+                assert!(voice.current_frequency_hz < voice.target_frequency_hz);
+            }
+            let filter = voice.filter_envelope;
+            let amp = voice.amp;
+            voice.note_on(40, 0.8, PressureArticulation::Slide);
+            assert_eq!(voice.filter_envelope, filter);
+            let mut expected_amp = amp;
+            voice.sample();
+            assert_eq!(voice.amp.level(), expected_amp.advance());
+        }
+    }
 }

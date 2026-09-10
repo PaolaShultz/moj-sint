@@ -97,6 +97,7 @@ unsafe extern "C" {
     fn moj_open303_destroy(voice: *mut c_void);
     fn moj_open303_controls(voice: *mut c_void, controls: *const Controls) -> i32;
     fn moj_open303_note(voice: *mut c_void, key: i32, velocity: i32) -> i32;
+    fn moj_open303_retrigger_note(voice: *mut c_void, key: i32, velocity: i32) -> i32;
     fn moj_open303_articulation(
         voice: *mut c_void,
         normal: f64,
@@ -185,6 +186,20 @@ impl Open303 {
         // SAFETY: live exclusively borrowed object and bounded scalar MIDI values.
         unsafe {
             moj_open303_note(self.native.as_ptr(), i32::from(key), i32::from(velocity));
+        }
+        Ok(())
+    }
+
+    /// Retrigger both native contours on each press while preserving overlap glide.
+    /// Zero velocity releases; held-note fallback retains its non-retriggering slide.
+    pub fn note_on_retrigger(&mut self, key: u8, velocity: u8) -> Result<(), Open303Error> {
+        if key > 127 || velocity > 127 {
+            return Err(Open303Error::InvalidNote);
+        }
+        // SAFETY: exclusive live ownership and validated scalar MIDI values;
+        // the native event updates only prepared state and never allocates.
+        unsafe {
+            moj_open303_retrigger_note(self.native.as_ptr(), i32::from(key), i32::from(velocity));
         }
         Ok(())
     }

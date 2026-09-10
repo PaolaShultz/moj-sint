@@ -79,6 +79,114 @@ void spectrum() {
     }
 }
 
+void live_retrigger_contract() {
+    // Inspect copies of the existing embedded DSP objects. Advancing these
+    // copies cannot alter the core or require a production test interface.
+    struct Contours {
+        rosic::AnalogEnvelope amp;
+        rosic::DecayEnvelope filter;
+        rosic::LeakyIntegrator pitch;
+    };
+    const MojOpen303Controls controls{0.5, 700, 40, 35, 500, 60, -24, 440, 60};
+    for (bool retrigger : {false, true}) {
+        auto* voice = moj_open303_create(48000, 0, &controls);
+        assert(voice);
+        const auto note = retrigger ? moj_open303_retrigger_note : moj_open303_note;
+        auto snapshot = [&]() {
+            return Contours{voice->core.ampEnv, voice->core.mainEnv,
+                            voice->core.pitchSlewLimiter};
+        };
+        auto render_decay = [&]() {
+            float samples[512];
+            for (int block = 0; block < 8; ++block) {
+                moj_open303_render(voice, samples, 512);
+                for (float sample : samples)
+                    assert(std::isfinite(sample) && std::abs(sample) <= 0.999f);
+            }
+            assert(!moj_open303_status(voice).faulted);
+        };
+        auto check_glide = [&](rosic::LeakyIntegrator previous, int target_key) {
+            const double target = pitchToFreq(target_key, controls.tuning_hz);
+            auto actual = voice->core.pitchSlewLimiter;
+            assert(actual.getSample(target) == previous.getSample(target));
+            // Rendering also proves the actual core uses the new target pitch.
+            float sample;
+            moj_open303_render(voice, &sample, 1);
+            assert(std::isfinite(sample) && std::abs(sample) <= 0.999f);
+            actual = voice->core.pitchSlewLimiter;
+            assert(actual.getSample(target) == previous.getSample(target));
+        };
+        auto check_no_retrigger = [&](Contours before, int key, int target_key) {
+            assert(note(voice, key, 0));
+            auto after = snapshot();
+            assert(after.amp.getSample() == before.amp.getSample());
+            assert(after.filter.getSample() == before.filter.getSample());
+            assert(voice->core.ampEnv.isNoteOn());
+            check_glide(before.pitch, target_key);
+        };
+
+        allocations = frees = 0;
+        guarded = true;
+        assert(!note(nullptr, 36, 80));
+        assert(!note(voice, -1, 80));
+        assert(!note(voice, 128, 80));
+        assert(!note(voice, 36, -1));
+        assert(!note(voice, 36, 128));
+        assert(note(voice, 36, 0)); // stale release before the first note
+        assert(moj_open303_idle(voice));
+        assert(note(voice, 36, 80));
+        render_decay();
+
+        for (int key : {48, 48}) { // a different held key, then a repeated key
+            auto before = snapshot();
+            auto expected_amp = before.amp;
+            auto expected_filter = before.filter;
+            if (retrigger) {
+                expected_amp.noteOn(true, key, 64);
+                expected_filter.trigger();
+            }
+            assert(note(voice, key, 80));
+            auto after = snapshot();
+            const double amp = after.amp.getSample();
+            const double filter = after.filter.getSample();
+            assert(amp == expected_amp.getSample());
+            assert(filter == expected_filter.getSample());
+            if (retrigger) {
+                assert(amp > before.amp.getSample() + 0.001);
+                assert(filter > before.filter.getSample() + 0.001);
+            }
+            check_glide(before.pitch, key);
+            render_decay();
+        }
+
+        check_no_retrigger(snapshot(), 36, 48); // release a nonlatest held key
+        assert(note(voice, 43, 80));
+        render_decay();
+        check_no_retrigger(snapshot(), 43, 48); // fallback to the older key
+        check_no_retrigger(snapshot(), 43, 48); // stale duplicate release
+
+        assert(note(voice, 48, 0));
+        assert(!voice->core.ampEnv.isNoteOn());
+        assert(!moj_open303_idle(voice)); // detached note during a release tail
+        assert(note(voice, 60, 80));
+        auto detached = snapshot();
+        assert(detached.amp.getSample() == 1.0);
+        assert(std::abs(detached.filter.getSample() - 1.0) < 1e-12);
+        const double target = pitchToFreq(60, controls.tuning_hz);
+        assert(detached.pitch.getSample(target) == target);
+        render_decay();
+        moj_open303_release_all(voice);
+        moj_open303_reset(voice);
+        float silence[16];
+        moj_open303_render(voice, silence, 16);
+        for (float sample : silence) assert(sample == 0.0f);
+        assert(moj_open303_idle(voice));
+        guarded = false;
+        assert(allocations == 0 && frees == 0);
+        moj_open303_destroy(voice);
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc > 1 && std::strcmp(argv[1], "spectrum") == 0) { spectrum(); return 0; }
     auto s = std::make_unique<Inspect>();
@@ -176,5 +284,6 @@ int main(int argc, char** argv) {
     guarded = false;
     assert(allocations == 0 && frees == 0);
     moj_open303_destroy(bridge);
+    live_retrigger_contract();
     std::puts("Open303 native bounds/state/C-ABI/allocation regressions passed");
 }

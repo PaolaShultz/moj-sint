@@ -109,10 +109,12 @@ controls independent instrument volume at the MIDI host boundary. SHR's last
 three performance slots are Project AUX sends, outside the synth.
 
 The three topology presets use the same controls and conservative 0.7 output
-gain. Overlapping notes slide without retriggering either contour; releasing
-the latest note returns to the most recently held note. A detached note
-retriggers both contours, and PANIC clears held keys and voice state. This
-model owns its amp envelope internally, so Engine applies no second ADSR.
+gain. Each positive live NoteOn retriggers both contours, including repeated
+held keys. The amp attack begins at its current level, and overlapping pitches
+still glide. Releasing the latest note returns to the most recently held note
+without retriggering. Detached notes start at the new pitch even during the
+previous release tail. PANIC clears held keys and voice state. This model owns
+its amp envelope internally, so Engine applies no second ADSR.
 
 ## Open303 native surface
 

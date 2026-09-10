@@ -15,6 +15,7 @@ struct MojOpen303* moj_open303_create(double rate, int mode, const struct MojOpe
 void moj_open303_destroy(struct MojOpen303* voice);
 int moj_open303_controls(struct MojOpen303* voice, const struct MojOpen303Controls* controls);
 int moj_open303_note(struct MojOpen303* voice, int key, int velocity);
+int moj_open303_retrigger_note(struct MojOpen303* voice, int key, int velocity);
 int moj_open303_articulation(struct MojOpen303* voice, double normal_attack, double accent_attack, double accent_decay, double amp_decay);
 void moj_open303_release_all(struct MojOpen303* voice);
 void moj_open303_reset(struct MojOpen303* voice);

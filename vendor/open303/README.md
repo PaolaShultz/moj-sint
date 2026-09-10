@@ -61,3 +61,10 @@ Integration repair: `setAccentDecay` now updates an active accented main
 envelope without retriggering. The C boundary validates/caches four native
 articulation setters used by the live adapter. This extends the reviewed
 interface without changing the oscillator/filter algorithms.
+
+Live articulation repair: an explicit retrigger option on `noteOn` refreshes
+both native contours for overlapping/repeated presses without resetting the
+pitch slew or sounding oscillator/filter state. Amp attack starts at its
+current level. Held-note return and the ordinary candidate/native API retain
+their non-retriggering legato behavior. The C boundary exposes a separate
+validated live-note function; no schema, controls, or DSP algorithms change.

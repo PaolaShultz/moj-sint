@@ -32,6 +32,8 @@ fn rejects_invalid_configuration_without_changing_the_voice() {
     }
     assert!(voice.note_on(128, 80).is_err());
     assert!(voice.note_on(36, 128).is_err());
+    assert!(voice.note_on_retrigger(128, 80).is_err());
+    assert!(voice.note_on_retrigger(36, 128).is_err());
     assert!(voice.is_idle());
 }
 
@@ -45,6 +47,7 @@ fn note_render_control_and_reset_paths_do_not_allocate_rust_storage() {
         assert!(block.iter().all(|x| *x == 0.0));
         for key in 0..128 {
             voice.note_on(key, 110).unwrap();
+            voice.note_on_retrigger(key, 110).unwrap();
             voice.render(&mut block);
             assert!(block.iter().all(|x| x.is_finite() && x.abs() <= 0.999));
         }

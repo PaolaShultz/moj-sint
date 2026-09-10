@@ -62,7 +62,7 @@ impl LiveOpen303 {
         self.apply_controls();
         // Keep zero-velocity handling in Engine; positive notes remain at least velocity 1.
         let vel = (velocity.clamp(0.0, 1.0) * 127.0).round().clamp(1.0, 127.0) as u8;
-        if self.core.note_on(note, vel).is_err() {
+        if self.core.note_on_retrigger(note, vel).is_err() {
             self.core.reset();
         }
     }
@@ -81,5 +81,43 @@ impl LiveOpen303 {
     }
     pub fn is_idle(&self) -> bool {
         self.core.is_idle()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn live_note_presses_use_retrigger_while_the_candidate_keeps_legato() {
+        for patch in [Open303PatchId::Tb303, Open303PatchId::Lowpass18] {
+            for next_note in [36, 48] {
+                let mut live = LiveOpen303::new(48_000.0, patch).unwrap();
+                let mut legato = LiveOpen303::new(48_000.0, patch).unwrap();
+                live.note_on(36, 0.8);
+                legato.note_on(36, 0.8);
+                for _ in 0..12_000 {
+                    assert_eq!(live.sample(), legato.sample());
+                }
+                live.note_on(next_note, 0.8);
+                legato.apply_controls();
+                legato.core.note_on(next_note, 102).unwrap();
+                let mut difference = 0.0;
+                for _ in 0..2_048 {
+                    let a = live.sample();
+                    let b = legato.sample();
+                    assert!(
+                        a.into_iter()
+                            .chain(b)
+                            .all(|s| s.is_finite() && s.abs() <= 0.999)
+                    );
+                    difference += (a[0] - b[0]).abs();
+                }
+                assert!(
+                    difference > 0.001,
+                    "press did not refresh the live contours"
+                );
+            }
+        }
     }
 }

@@ -37,8 +37,13 @@ No table construction, allocation, locking, or I/O occurs on this path.
 Inherited audio-rate cutoff modulation remains audio-rate. No new oscillator
 or filter algorithm is introduced by this adapter.
 
-MIDI velocity 100–127 selects accent; overlap slides and the last held key
-wins. Releasing a newer key returns to the older held pitch and accent.
+MIDI velocity 100–127 selects accent; the last held key wins. Every positive
+live NoteOn, including a repeated held key, retriggers the filter and amp
+contours. The amp attack starts at its current level, and overlap retains the
+configured pitch slide. Releasing a newer key returns to the older held pitch
+and accent without retriggering. Detached notes start at their target pitch
+and retrigger even while an earlier release tail is sounding. The isolated
+candidate's ordinary note API keeps its original non-retriggering legato policy.
 All Notes Off resets to silence. Native amp gate/release behavior is preserved;
 the amp-decay control does not turn the engine into a sustain/ADSR synth.
 Native output gain is fixed at −18 dB; each authored start uses .8 output gain.

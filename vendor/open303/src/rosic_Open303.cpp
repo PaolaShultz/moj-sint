@@ -155,7 +155,7 @@ void Open303::setPitchBend(double newPitchBend)
 //------------------------------------------------------------------------------------------------------------
 // others:
 
-void Open303::noteOn(int noteNumber, int velocity, double /*detune*/)
+void Open303::noteOn(int noteNumber, int velocity, double /*detune*/, bool retrigger)
 {
   if (noteNumber < 0 || noteNumber > 127 || velocity < 0 || velocity > 127)
     return;
@@ -174,8 +174,13 @@ void Open303::noteOn(int noteNumber, int velocity, double /*detune*/)
     heldNotes[numHeldNotes++] = {noteNumber, velocity};
     currentNote = noteNumber;
     currentVel = velocity;
-    if (hadNotes) slideToNote(noteNumber, velocity >= 100);
-    else triggerNote(noteNumber, velocity >= 100);
+    if (hadNotes) {
+      slideToNote(noteNumber, velocity >= 100);
+      if (retrigger) {
+        mainEnv.trigger();
+        ampEnv.noteOn(true, noteNumber, 64);
+      }
+    } else triggerNote(noteNumber, velocity >= 100);
   } else if (numHeldNotes == 0) {
     currentNote = -1;
     currentVel = 0;

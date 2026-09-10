@@ -61,6 +61,11 @@ int moj_open303_note(MojOpen303* v, int key, int velocity) {
     if (!v->status.faulted) v->core.noteOn(key, velocity, 0);
     return 1;
 }
+int moj_open303_retrigger_note(MojOpen303* v, int key, int velocity) {
+    if (!v || key < 0 || key > 127 || velocity < 0 || velocity > 127) return 0;
+    if (!v->status.faulted) v->core.noteOn(key, velocity, 0, true);
+    return 1;
+}
 int moj_open303_articulation(MojOpen303* v, double normal, double attack, double decay, double amp) {
     if (!v || !in_range(normal, .3, 30) || !in_range(attack, .3, 30)
         || !in_range(decay, 30, 3000) || !in_range(amp, 16, 3000)) return 0;

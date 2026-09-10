@@ -66,6 +66,13 @@ clears note/audio/envelope/fault state to silence and retains controls/tables.
 The patched core returns to idle after 64 quiet samples below 1e-9 once the
 amplitude gate is off and no keys remain.
 
+The production live adapter explicitly uses `note_on_retrigger` instead of
+the candidate's ordinary `note_on`: each positive press refreshes both native
+contours while preserving overlapping pitch glide. The amp starts from its
+current level; release-driven held-note fallback still slides without a new
+trigger. This opt-in articulation does not change the lab's default legato
+sequence or the native oscillator/filter algorithms.
+
 Render, note events, reset, and control calls have no dynamic allocation in
 the tested boundary. There is no I/O, synchronization, or host access in the
 DSP adapter. Controls apply when called; tuning, accent amount, and normal

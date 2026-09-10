@@ -63,10 +63,11 @@ client plus exactly the configured `out_l` and `out_r` ports. The host owns no
 graph connections.
 
 Pressure Chain requires schema 9 and one preallocated voice. Its bounded
-128-key last-note priority implements legato slide and held-note return inside
-the owned renderer; it still publishes exactly one stereo output pair. There
-is no layered synth process or per-topology output. All Notes Off clears its
-held-note stack as well as DSP state.
+128-key last-note priority retriggers contours on each press while preserving
+overlap glide; returning to an older held note slides without retriggering.
+It still publishes exactly one stereo output pair. There is no layered synth
+process or per-topology output. All Notes Off clears its held-note stack as
+well as DSP state.
 
 Open303 requires schema 10, one voice, and a default-feature build. It uses the
 same managed process and stereo return, with exact native filter identity kept
