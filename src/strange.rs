@@ -157,6 +157,7 @@ pub struct StrangeVoice {
 
 #[derive(Debug)]
 pub struct StrangeInstrument {
+    pitch_ratio: f32,
     current_type: StrangeType,
     current: StrangeVoice,
     incoming: Option<(StrangeType, StrangeVoice)>,
@@ -179,6 +180,7 @@ impl StrangeInstrument {
         let current_type = StrangeType::from_normalized(type_normalized);
         let current = StrangeVoice::new(current_type, sample_rate, frequency_hz, seed, controls)?;
         Ok(Self {
+            pitch_ratio: 1.0,
             current_type,
             current,
             incoming: None,
@@ -189,6 +191,14 @@ impl StrangeInstrument {
             seed,
             controls: controls.sanitized(),
         })
+    }
+
+    pub(crate) fn set_pitch_ratio(&mut self, ratio: f32) {
+        self.pitch_ratio = ratio;
+        self.current.set_pitch_ratio(ratio);
+        if let Some((_, incoming)) = &mut self.incoming {
+            incoming.set_pitch_ratio(ratio);
+        }
     }
 
     pub fn set_type_normalized(&mut self, value: f32) -> Result<StrangeType, StrangeError> {
@@ -208,13 +218,14 @@ impl StrangeInstrument {
         {
             return Ok(());
         }
-        let voice = StrangeVoice::new(
+        let mut voice = StrangeVoice::new(
             kind,
             self.sample_rate,
             self.frequency_hz,
             self.seed ^ ((kind as u32 + 1) * 0x1020_3041),
             self.controls,
         )?;
+        voice.set_pitch_ratio(self.pitch_ratio);
         self.incoming = Some((kind, voice));
         self.transition_sample = 0;
         Ok(())
@@ -344,6 +355,16 @@ impl StrangeVoice {
             left: (0.78 * left).clamp(-1.0, 1.0),
             right: (0.78 * right).clamp(-1.0, 1.0),
         }
+    }
+
+    fn set_pitch_ratio(&mut self, ratio: f32) {
+        self.state.set_pitch_ratio(ratio);
+        self.structural.coupler_left.set_pitch_ratio(ratio);
+        self.structural.coupler_right.set_pitch_ratio(ratio);
+        self.structural.color_left.set_pitch_ratio(ratio);
+        self.structural.color_right.set_pitch_ratio(ratio);
+        self.structural.bright_left.set_pitch_ratio(ratio);
+        self.structural.bright_right.set_pitch_ratio(ratio);
     }
 
     pub fn reset(&mut self) {
@@ -520,6 +541,26 @@ enum StrangeState {
 }
 
 impl StrangeState {
+    fn set_pitch_ratio(&mut self, ratio: f32) {
+        match self {
+            Self::Classic(s) => {
+                s.pitch_ratio = ratio;
+                s.saw_left.set_pitch_ratio(ratio);
+                s.saw_right.set_pitch_ratio(ratio);
+            }
+            Self::Modulated(s) => {
+                s.carrier_left.set_pitch_ratio(ratio);
+                s.carrier_right.set_pitch_ratio(ratio);
+                s.modal_left.set_pitch_ratio(ratio);
+                s.modal_right.set_pitch_ratio(ratio);
+            }
+            Self::Loop(s) => s.pitch_ratio = ratio,
+            Self::Stochastic(s) => s.pitch_ratio = ratio,
+            Self::Scanned(s) => s.pitch_ratio = ratio,
+            Self::Register(s) => s.pitch_ratio = ratio,
+        }
+    }
+
     #[inline]
     fn sample(&mut self) -> StrangeFrame {
         match self {
@@ -557,6 +598,7 @@ impl StrangeState {
 
 #[derive(Debug)]
 struct ClassicState {
+    pitch_ratio: f32,
     kind: StrangeType,
     saw_left: BandlimitedOscillator,
     saw_right: BandlimitedOscillator,
@@ -591,6 +633,7 @@ impl ClassicState {
         saw_left.set_frequency(frequency_hz / detune.sqrt());
         saw_right.set_frequency(frequency_hz * detune.sqrt());
         Ok(Self {
+            pitch_ratio: 1.0,
             kind,
             saw_left,
             saw_right,
@@ -633,11 +676,17 @@ impl ClassicState {
             StrangeType::Triangle => {
                 let phase = if left {
                     let phase = self.phase_left;
-                    self.phase_left = advance(self.phase_left, self.increment_left);
+                    self.phase_left = advance(
+                        self.phase_left,
+                        (self.increment_left * self.pitch_ratio).min(0.5),
+                    );
                     phase
                 } else {
                     let phase = self.phase_right;
-                    self.phase_right = advance(self.phase_right, self.increment_right);
+                    self.phase_right = advance(
+                        self.phase_right,
+                        (self.increment_right * self.pitch_ratio).min(0.5),
+                    );
                     phase
                 };
                 let moving_form = (self.controls.form + 0.28 * movement).clamp(0.0, 1.0);
@@ -789,6 +838,7 @@ impl ModulatedState {
 
 #[derive(Debug)]
 struct LoopState {
+    pitch_ratio: f32,
     phase: f32,
     increment: f32,
     movement_phase: f32,
@@ -808,6 +858,7 @@ impl LoopState {
         let irregular_x = [1.0, 0.18, -0.72, -0.12, -1.0, -0.31, 0.66, 0.38];
         let regular_x = [1.0, 0.71, 0.0, -0.71, -1.0, -0.71, 0.0, 0.71];
         Self {
+            pitch_ratio: 1.0,
             phase: 0.0,
             increment: frequency_hz / sample_rate,
             movement_phase: 0.0,
@@ -833,7 +884,7 @@ impl LoopState {
         let chaos_amount = ((self.controls.chaos - 0.5) * 2.0).max(0.0);
         let perturb =
             (2.0 * self.controls.warp - 1.0) * self.previous + 0.35 * chaos_amount * random;
-        let step = self.increment * (1.0 + 0.62 * perturb).clamp(0.2, 1.8);
+        let step = self.increment * self.pitch_ratio * (1.0 + 0.62 * perturb).clamp(0.2, 1.8);
         self.phase = advance(self.phase, step);
         let y = closed_cubic(&self.y_points, self.phase);
         let x = closed_cubic(
@@ -860,6 +911,7 @@ impl LoopState {
 
 #[derive(Debug)]
 struct StochasticState {
+    pitch_ratio: f32,
     phase: f32,
     increment: f32,
     amplitudes_left: [f32; STOCHASTIC_POINTS],
@@ -885,6 +937,7 @@ impl StochasticState {
         });
         let initial_right = initial_left;
         Self {
+            pitch_ratio: 1.0,
             phase: 0.0,
             increment: frequency_hz / sample_rate,
             amplitudes_left: initial_left,
@@ -902,7 +955,7 @@ impl StochasticState {
     #[inline]
     fn sample(&mut self) -> StrangeFrame {
         let old_phase = self.phase;
-        self.phase = advance(self.phase, self.increment);
+        self.phase = advance(self.phase, (self.increment * self.pitch_ratio).min(0.5));
         if self.phase < old_phase {
             self.cycles = self.cycles.wrapping_add(1);
             let interval = 1 + (5.0 * (1.0 - self.controls.motion)).round() as u8;
@@ -966,6 +1019,7 @@ fn breakpoint_sample(points: &[f32; STOCHASTIC_POINTS], phase: f32, warp: f32) -
 
 #[derive(Debug)]
 struct ScannedState {
+    pitch_ratio: f32,
     position: [f32; SCANNED_POINTS],
     velocity: [f32; SCANNED_POINTS],
     initial_position: [f32; SCANNED_POINTS],
@@ -987,6 +1041,7 @@ impl ScannedState {
             mix(fundamental, knot, controls.form)
         });
         Self {
+            pitch_ratio: 1.0,
             position: initial_position,
             velocity: [0.0; SCANNED_POINTS],
             initial_position,
@@ -1002,7 +1057,10 @@ impl ScannedState {
 
     #[inline]
     fn sample(&mut self) -> StrangeFrame {
-        self.phase = advance(self.phase, self.phase_increment);
+        self.phase = advance(
+            self.phase,
+            (self.phase_increment * self.pitch_ratio).min(0.5),
+        );
         let old_haptic = self.haptic_phase;
         self.haptic_phase = advance(self.haptic_phase, self.haptic_increment);
         if self.haptic_phase < old_haptic {
@@ -1056,6 +1114,7 @@ fn scan_points(points: &[f32; SCANNED_POINTS], phase: f32) -> f32 {
 
 #[derive(Debug)]
 struct RegisterState {
+    pitch_ratio: f32,
     width: u8,
     mask: u16,
     phase: u16,
@@ -1080,6 +1139,7 @@ impl RegisterState {
             .clamp(1.0, modulus - 1.0) as u16;
         let initial_state = ((seed as u16) & mask).max(1);
         Self {
+            pitch_ratio: 1.0,
             width,
             mask,
             phase: 0,
@@ -1096,7 +1156,10 @@ impl RegisterState {
         self.counter = self.counter.wrapping_add(1);
         let update_divisor = 1 + (5.0 * (1.0 - self.controls.motion)).round() as u8;
         if self.counter % update_divisor == 0 {
-            let total = u32::from(self.phase) + u32::from(self.increment);
+            let total = u32::from(self.phase)
+                + (f32::from(self.increment) * self.pitch_ratio)
+                    .round()
+                    .clamp(1.0, f32::from(self.mask)) as u32;
             let carry = total > u32::from(self.mask);
             let old_phase = self.phase;
             self.phase = total as u16 & self.mask;
@@ -1306,6 +1369,35 @@ const fn rotate_width(value: u16, amount: u8, width: u8) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_strange_source_retunes_without_allocations_and_keeps_type_crossfades() {
+        for kind in StrangeType::ALL {
+            let mut instrument = StrangeInstrument::new(
+                48_000.0,
+                220.0,
+                1234,
+                kind as u8 as f32 / 7.0,
+                StrangeControls::MIDPOINT,
+            )
+            .unwrap();
+            assert_no_alloc::assert_no_alloc(|| {
+                for pitch in [-2.5, 0.0, 2.5] {
+                    instrument.set_pitch_ratio(crate::performance::ratio(pitch));
+                    for _ in 0..1024 {
+                        let sample = instrument.sample();
+                        assert!(sample.left.is_finite() && sample.right.is_finite());
+                    }
+                }
+                instrument.set_type(StrangeType::Saw).unwrap();
+                instrument.set_pitch_ratio(crate::performance::ratio(-2.5));
+                for _ in 0..1024 {
+                    let sample = instrument.sample();
+                    assert!(sample.left.is_finite() && sample.right.is_finite());
+                }
+            });
+        }
+    }
 
     #[test]
     fn reset_replays_every_type_exactly() {

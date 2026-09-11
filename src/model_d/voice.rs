@@ -424,6 +424,12 @@ impl ModelDVoice {
 
     /// Start or retrigger the monophonic note. Velocity is bounded to 0–1;
     /// non-finite or non-positive values leave the voice safely idle.
+    pub(crate) fn set_pitch_ratio(&mut self, ratio: f32) {
+        for vco in &mut self.vcos {
+            vco.set_pitch_ratio(ratio);
+        }
+    }
+
     pub fn note_on(&mut self, note: u8, velocity: f32) {
         if !velocity.is_finite() || velocity <= 0.0 {
             self.reset();

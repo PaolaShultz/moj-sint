@@ -59,6 +59,7 @@ impl BassMatrixControls {
 pub struct BassMatrixVoice {
     sample_rate: f32,
     frequency_hz: f32,
+    performance_pitch: f32,
     controls: BassMatrixControls,
     velocity: f32,
     main_phase: f32,
@@ -88,6 +89,7 @@ impl BassMatrixVoice {
         Some(Self {
             sample_rate,
             frequency_hz: 110.0,
+            performance_pitch: 1.0,
             controls: BassMatrixControls::START,
             velocity: 0.0,
             main_phase: 0.0,
@@ -112,6 +114,10 @@ impl BassMatrixVoice {
 
     pub fn set_controls(&mut self, controls: BassMatrixControls) {
         self.controls = controls.bounded();
+    }
+
+    pub(crate) fn set_pitch_ratio(&mut self, ratio: f32) {
+        self.performance_pitch = ratio;
     }
 
     pub fn note_on(&mut self, note: u8, velocity: f32) {
@@ -152,7 +158,8 @@ impl BassMatrixVoice {
         let c = self.controls;
         let pitch_amount = 24.0 * c.punch * c.punch;
         let pitch_ratio = fast_positive_exp(pitch_amount * self.punch_envelope * (LN_2 / 12.0));
-        let main_increment = (self.frequency_hz * pitch_ratio / self.sample_rate).min(0.24);
+        let main_increment =
+            (self.frequency_hz * pitch_ratio * self.performance_pitch / self.sample_rate).min(0.24);
         let sub_increment = 0.5 * main_increment;
         let metal_ratio = 1.5 + 0.914_213_54 * c.metal;
         let metal_increment = (main_increment * metal_ratio).min(0.31);

@@ -306,6 +306,7 @@ pub struct SixOpVoice {
     output_gain: f32,
     live_index_scale: f32,
     live_ratio_spread: f32,
+    performance_pitch: f32,
     live_feedback_scale: f32,
     live_decay_color: f32,
     live_balance: f32,
@@ -402,6 +403,7 @@ impl SixOpVoice {
             output_gain: patch.output_gain,
             live_index_scale: 1.0,
             live_ratio_spread: 0.0,
+            performance_pitch: 1.0,
             live_feedback_scale: 1.0,
             live_decay_color: 0.0,
             live_balance: 0.0,
@@ -411,6 +413,11 @@ impl SixOpVoice {
             non_finite_seen: false,
             clamp_contacts: 0,
         })
+    }
+
+    #[inline]
+    pub(crate) fn set_pitch_ratio(&mut self, ratio: f32) {
+        self.performance_pitch = ratio;
     }
 
     #[inline]
@@ -427,7 +434,7 @@ impl SixOpVoice {
         let pitch_multiplier = if pitch_envelope_finite && lfo_multiplier_finite {
             let envelope_motion = 1.0 + (pitch_envelope - 1.0) * self.live_motion_scale;
             let lfo_motion = 1.0 + (lfo_multiplier - 1.0) * self.live_motion_scale;
-            envelope_motion * lfo_motion
+            envelope_motion * lfo_motion * self.performance_pitch
         } else {
             1.0
         };

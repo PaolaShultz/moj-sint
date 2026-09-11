@@ -30,8 +30,21 @@ The ALSA thread translates:
 - Note Off;
 - CC 20–34 as the 15-position superset (Pressure Chain and older models use CC 20–31);
 - CC 7 as independently smoothed instrument volume;
+- 14-bit Pitch Bend as ±2 semitones, centered at zero;
+- CC 1 as vibrato depth, from none to ±50 cents at 5 Hz;
+- CC 121 as a smoothed return of bend and vibrato to neutral;
 - CC 35 as the press-only Dual Filter core toggle and CC 36 as exact core state;
 - CC 120, CC 123, and Sequencer Reset as immediate All Notes Off.
+
+All eight models apply wheels to already-held and subsequent notes without
+retriggering envelopes or rewriting preset macros. They are transient,
+instrument-wide controls in this single-instrument, omni-input host; this is
+not per-channel MPE. New engines start centered with vibrato off. CC 120/123
+silence notes but retain the wheel position. Wheel targets use 10 ms smoothing;
+pitch updates reach model oscillators every 32 samples, preserving their phase,
+mono glide, and held-note priority. Strange Oscillator retains its intentionally
+quantized Register Machine source. No new surface slots or preset fields are used.
+CC 1 follows the [MIDI controller assignment](https://midi.org/midi-1-0-control-change-messages).
 
 It writes fixed-size events into a 1,024-slot SPSC queue. A full queue drops the
 new event, increments an atomic overflow counter, and never blocks. Queue and
@@ -49,7 +62,9 @@ orders the bounded per-period batch by offset, and passes it to
 The callback uses caller-owned JACK buffers, preallocated engine voices, a
 fixed 256-event period array, and the lock-free queue. It performs no allocation
 or free, locks, file I/O, logging, formatting, process work, waiting, or
-trigonometric/exponential coefficient setup. Model D cutoff and filter
+per-sample trigonometric/exponential wheel setup. Wheel retuning is bounded
+to one update per 32 samples; sine rotations and the native Open303 bend
+factor are updated at that cadence only when changed. Model D cutoff and filter
 coefficients are prepared before activation; macro smoothing and runtime
 mappings use bounded scalar arithmetic.
 

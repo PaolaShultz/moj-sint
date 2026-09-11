@@ -105,6 +105,7 @@ unsafe extern "C" {
         decay: f64,
         amp: f64,
     ) -> i32;
+    fn moj_open303_pitch_bend(voice: *mut c_void, semitones: f64) -> i32;
     fn moj_open303_release_all(voice: *mut c_void);
     fn moj_open303_reset(voice: *mut c_void);
     fn moj_open303_idle(voice: *const c_void) -> i32;
@@ -125,6 +126,13 @@ pub struct Open303 {
 unsafe impl Send for Open303 {}
 
 impl Open303 {
+    pub(crate) fn set_pitch_bend(&mut self, semitones: f32) {
+        // SAFETY: exclusively owned live core; the bridge validates the bounded value.
+        unsafe {
+            moj_open303_pitch_bend(self.native.as_ptr(), f64::from(semitones));
+        }
+    }
+
     pub fn new(
         sample_rate: f64,
         mode: FilterMode,

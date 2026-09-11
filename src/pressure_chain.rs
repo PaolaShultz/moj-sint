@@ -209,6 +209,7 @@ pub struct PressureChainVoice {
     pressure: f32,
     pressure_decay: f32,
     current_frequency_hz: f32,
+    performance_pitch: f32,
     target_frequency_hz: f32,
     glide_coefficient: f32,
 }
@@ -260,6 +261,7 @@ impl PressureChainVoice {
             pressure: 0.0,
             pressure_decay: (-1.0 / (sample_rate * PRESSURE_RELAX_SECONDS)).exp(),
             current_frequency_hz: 0.0,
+            performance_pitch: 1.0,
             target_frequency_hz: 0.0,
             glide_coefficient: 1.0 - (-1.0 / (sample_rate * GLIDE_SECONDS)).exp(),
         })
@@ -300,8 +302,10 @@ impl PressureChainVoice {
         let was_idle = self.amp.is_idle();
         if articulation == PressureArticulation::Trigger || was_idle {
             self.current_frequency_hz = self.target_frequency_hz;
-            self.oscillator
-                .set_frequency(self.current_frequency_hz, self.sample_rate);
+            self.oscillator.set_frequency(
+                self.current_frequency_hz * self.performance_pitch,
+                self.sample_rate,
+            );
         }
         if articulation != PressureArticulation::Slide || was_idle {
             self.filter_envelope = 1.0;
@@ -323,6 +327,10 @@ impl PressureChainVoice {
 
     pub const fn amp_level(&self) -> f32 {
         self.amp.level()
+    }
+
+    pub(crate) fn set_pitch_ratio(&mut self, ratio: f32) {
+        self.performance_pitch = ratio;
     }
 
     pub const fn current_frequency_hz(&self) -> f32 {
@@ -363,8 +371,10 @@ impl PressureChainVoice {
 
         self.current_frequency_hz +=
             (self.target_frequency_hz - self.current_frequency_hz) * self.glide_coefficient;
-        self.oscillator
-            .set_frequency(self.current_frequency_hz, self.sample_rate);
+        self.oscillator.set_frequency(
+            self.current_frequency_hz * self.performance_pitch,
+            self.sample_rate,
+        );
 
         let source_blend = self.value(PressureChainControl::Source);
         let shape = self.value(PressureChainControl::Shape);

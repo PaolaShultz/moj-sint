@@ -104,6 +104,12 @@ impl DualFilterInstrument {
         self.counter.set_controls(controls);
     }
 
+    pub(crate) fn set_pitch_ratio(&mut self, ratio: f32) {
+        self.industrial_serial.set_pitch_ratio(ratio);
+        self.industrial_parallel.set_pitch_ratio(ratio);
+        self.counter.set_pitch_ratio(ratio);
+    }
+
     pub fn note_on(&mut self, note: u8, velocity: f32) {
         self.industrial_serial.note_on(note, velocity);
         self.industrial_parallel.note_on(note, velocity);

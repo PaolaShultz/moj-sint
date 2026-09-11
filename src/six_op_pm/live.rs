@@ -55,6 +55,10 @@ impl LiveSixOpVoice {
         Ok(())
     }
 
+    pub(crate) fn set_pitch_ratio(&mut self, ratio: f32) {
+        self.voice.set_pitch_ratio(ratio);
+    }
+
     pub fn note_off(&mut self) {
         self.voice.note_off();
     }

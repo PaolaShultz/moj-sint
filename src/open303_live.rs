@@ -10,6 +10,7 @@ pub(crate) struct LiveOpen303 {
     core: Open303,
     values: [f32; 15],
     until_control: u8,
+    pitch_bend: f32,
 }
 impl LiveOpen303 {
     pub fn new(rate: f32, patch: Open303PatchId) -> Result<Self, EngineError> {
@@ -22,7 +23,14 @@ impl LiveOpen303 {
                 .map_err(|_| EngineError::InvalidSampleRate)?,
             values: [0.5; 15],
             until_control: 0,
+            pitch_bend: 0.0,
         })
+    }
+    pub fn set_pitch_bend(&mut self, semitones: f32) {
+        if self.pitch_bend != semitones {
+            self.pitch_bend = semitones;
+            self.core.set_pitch_bend(semitones);
+        }
     }
     pub fn set_controls(&mut self, values: [f32; 15]) {
         self.values = values;

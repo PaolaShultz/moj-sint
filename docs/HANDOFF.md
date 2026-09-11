@@ -25,6 +25,21 @@ September 7 documentation reconciliation changes no engine, preset, runtime,
 or hardware state. Current deployment evidence distinguishes historical
 callback simulations from the later connected debug/release defect acceptance.
 
+## 2026-09-11 performance wheels (source implementation)
+
+All eight production models now receive 14-bit pitch bend (±2 semitones),
+CC1 vibrato (5 Hz, up to ±50 cents), and CC121 controller reset. The shared
+10 ms smoothing and 32-sample pitch updates preserve note gates, oscillator
+phase, preset timbre, and mono glide. The existing omni host applies wheels
+instrument-wide; this is not MPE. New engines start neutral. The native
+Open303 adapter exposes its existing bend setter without vendor changes.
+
+Focused MIDI, oscillator-phase/bounds, wheel-range/reset, and all-model
+finite/allocation regressions were added. Only formatting and source checks
+are authorized in this incremental pass: compilation, test execution,
+spectral measurements, binary refresh, listening, and hardware acceptance
+remain pending the owner's combined build-and-test pass.
+
 ## 2026-09-10 live monophonic note articulation
 
 The owner reported that new notes changed pitch without refreshing the

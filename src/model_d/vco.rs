@@ -340,6 +340,7 @@ pub struct ModelDVco {
     phase: f32,
     reset_phase: f32,
     base_increment: f32,
+    pitch_ratio: f32,
     static_ratio: f32,
     authored_static_ratio: f32,
     #[cfg(test)]
@@ -410,6 +411,7 @@ impl ModelDVco {
             phase: reset_phase,
             reset_phase,
             base_increment: 0.0,
+            pitch_ratio: 1.0,
             static_ratio,
             authored_static_ratio: static_ratio,
             #[cfg(test)]
@@ -459,6 +461,10 @@ impl ModelDVco {
         self.pulse_width =
             (self.base_pulse_width + 0.25 * self.asymmetry).clamp(MIN_PULSE_WIDTH, MAX_PULSE_WIDTH);
         self.level = 1.0 + static_amount * (self.authored_level - 1.0);
+    }
+
+    pub(crate) fn set_pitch_ratio(&mut self, ratio: f32) {
+        self.pitch_ratio = ratio;
     }
 
     pub fn set_note(&mut self, note: u8) {
@@ -521,7 +527,8 @@ impl ModelDVco {
         } else {
             1.0 - bounded_drift_signal * self.drift_down_scale
         };
-        self.base_increment * self.static_ratio * drift_ratio
+        (self.base_increment * self.static_ratio * drift_ratio * self.pitch_ratio)
+            .min(MAX_PHASE_INCREMENT)
     }
 
     #[inline]

@@ -28,6 +28,9 @@ pub enum Event {
     SetVolume { value: Normalized },
     SetDualFilterCore { core: DualFilterCore },
     ToggleDualFilterCore,
+    PitchBend { value: i16 },
+    Modulation { value: u8 },
+    ResetControllers,
     AllNotesOff,
 }
 
@@ -196,6 +199,8 @@ pub struct Engine {
     output_gain: f32,
     instrument_volume: Smoother,
     note_age: u64,
+    performance: crate::performance::Performance,
+    pitch_until_update: u8,
 }
 
 impl Engine {
@@ -230,6 +235,8 @@ impl Engine {
             )
             .map_err(|_| EngineError::InvalidSampleRate)?,
             note_age: 0,
+            performance: crate::performance::Performance::new(sample_rate),
+            pitch_until_update: 0,
         })
     }
 
@@ -261,6 +268,15 @@ impl Engine {
                 self.apply_event(events[event_index].event);
                 event_index += 1;
             }
+            let semitones = self.performance.advance();
+            if self.pitch_until_update == 0 {
+                let ratio = crate::performance::ratio(semitones);
+                for voice in &mut self.voices {
+                    voice.model.set_performance_pitch(ratio, semitones);
+                }
+                self.pitch_until_update = 32;
+            }
+            self.pitch_until_update -= 1;
             let mut mixed = [0.0, 0.0];
             for voice in &mut self.voices {
                 let sample = voice.next();
@@ -276,6 +292,9 @@ impl Engine {
 
     fn apply_event(&mut self, event: Event) {
         match event {
+            Event::PitchBend { value } => self.performance.bend(value),
+            Event::Modulation { value } => self.performance.modulation(value),
+            Event::ResetControllers => self.performance.reset(),
             Event::SetMacro { id, value } => {
                 for voice in &mut self.voices {
                     voice.set_macro_target(id, value);
@@ -293,6 +312,7 @@ impl Engine {
                 }
             }
             Event::NoteOn { note, velocity } if velocity > 0.0 => {
+                self.pitch_until_update = 0;
                 self.note_age = self.note_age.wrapping_add(1);
                 let index = self.voices.iter().position(Voice::is_idle).or_else(|| {
                     self.voices
@@ -344,6 +364,68 @@ mod tests {
                 .replace("voices = 8", &format!("voices = {voices}")),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn performance_wheels_change_held_notes_in_every_model_without_allocating() {
+        for source in [
+            include_str!("../presets/01-full-bass.mojsint"),
+            include_str!("../presets/08-six-op-bell-metal.mojsint"),
+            include_str!("../presets/14-strange-oscillator.mojsint"),
+            include_str!("../presets/15-swarm-warm-pad.mojsint"),
+            include_str!("../presets/16-bass-matrix.mojsint"),
+            include_str!("../presets/17-dual-filter-industrial-lead.mojsint"),
+            include_str!("../presets/22-pressure-chain-deep-cascade.mojsint"),
+            #[cfg(feature = "open303")]
+            include_str!("../presets/25-open303-rubber-bass.mojsint"),
+        ] {
+            let preset = Preset::parse(source).unwrap();
+            for wheel in [
+                Event::PitchBend { value: 8191 },
+                Event::Modulation { value: 127 },
+            ] {
+                let mut plain = Engine::new(48_000.0, &preset).unwrap();
+                let mut bent = Engine::new(48_000.0, &preset).unwrap();
+                let note = Event::NoteOn {
+                    note: 48,
+                    velocity: 0.9,
+                };
+                plain.apply_event(note);
+                bent.apply_event(note);
+                let mut left = [0.0; 4096];
+                let mut right = [0.0; 4096];
+                let mut expected = [0.0; 4096];
+                plain.render_block(&[], &mut expected, &mut right).unwrap();
+                bent.render_block(&[], &mut left, &mut right).unwrap();
+                assert_eq!(left, expected);
+                assert_no_alloc(|| {
+                    bent.apply_event(wheel);
+                    bent.render_block(&[], &mut left, &mut right).unwrap();
+                });
+                assert!(left.iter().chain(&right).all(|v| v.is_finite()));
+                plain.render_block(&[], &mut expected, &mut right).unwrap();
+                assert!(
+                    left.iter().zip(expected).any(|(a, b)| (a - b).abs() > 1e-6),
+                    "{:?} {wheel:?}",
+                    preset.model
+                );
+                assert_eq!(bent.note_age, 1);
+                assert_no_alloc(|| {
+                    bent.apply_event(Event::AllNotesOff);
+                    bent.apply_event(Event::PitchBend { value: -8192 });
+                    bent.apply_event(Event::Modulation { value: 127 });
+                    bent.apply_event(Event::NoteOn {
+                        note: 120,
+                        velocity: 1.0,
+                    });
+                    bent.render_block(&[], &mut left, &mut right).unwrap();
+                    bent.apply_event(Event::NoteOff { note: 120 });
+                    bent.apply_event(Event::ResetControllers);
+                    bent.render_block(&[], &mut left, &mut right).unwrap();
+                });
+                assert!(left.iter().chain(&right).all(|v| v.is_finite()));
+            }
+        }
     }
 
     fn render_with(id: MacroId, value: f32) -> Vec<f32> {

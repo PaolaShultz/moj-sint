@@ -16,6 +16,7 @@ const SWARM_GRAPH: &str = include_str!("../experiments/swarm-micro-machine-v1.to
 #[derive(Debug)]
 pub(crate) struct LiveSwarmVoice {
     machine: CompiledMicroMachine,
+    frequency: f32,
     velocity: f32,
 }
 
@@ -28,6 +29,7 @@ impl LiveSwarmVoice {
             .map_err(|_| EngineError::InvalidSampleRate)?;
         Ok(Self {
             machine,
+            frequency: 440.0,
             velocity: 0.0,
         })
     }
@@ -50,6 +52,7 @@ impl LiveSwarmVoice {
 
     fn note_on(&mut self, note: u8, velocity: f32) {
         let frequency = 440.0 * 2.0_f32.powf((f32::from(note) - 69.0) / 12.0);
+        self.frequency = frequency;
         if self.machine.set_frequency(frequency).is_err() {
             self.reset();
             return;
@@ -169,6 +172,22 @@ pub(crate) enum VoiceModel {
 }
 
 impl VoiceModel {
+    pub(crate) fn set_performance_pitch(&mut self, ratio: f32, _semitones: f32) {
+        match self {
+            Self::ModelD(model) => model.set_pitch_ratio(ratio),
+            Self::SixOpPm(model) => model.set_pitch_ratio(ratio),
+            Self::StrangeOscillator(model) => model.instrument.set_pitch_ratio(ratio),
+            Self::SwarmMachine(model) => {
+                let _ = model.machine.set_frequency(model.frequency * ratio);
+            }
+            Self::BassMatrix(model) => model.set_pitch_ratio(ratio),
+            Self::DualFilter(model) => model.set_pitch_ratio(ratio),
+            Self::PressureChain(model) => model.voice.set_pitch_ratio(ratio),
+            #[cfg(feature = "open303")]
+            Self::Open303(model) => model.set_pitch_bend(_semitones),
+        }
+    }
+
     pub(crate) fn new(
         sample_rate: f32,
         model_id: SynthesisModelId,

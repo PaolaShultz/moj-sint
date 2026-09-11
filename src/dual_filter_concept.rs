@@ -439,6 +439,12 @@ impl DualFilterConceptVoice {
         ));
     }
 
+    pub(crate) fn set_pitch_ratio(&mut self, ratio: f32) {
+        for oscillator in &mut self.oscillators {
+            oscillator.set_pitch_ratio(ratio);
+        }
+    }
+
     pub fn note_on(&mut self, note: u8, velocity: f32) {
         let note = note.min(127);
         let frequency = midi_frequency(note);

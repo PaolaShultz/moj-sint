@@ -77,6 +77,11 @@ int moj_open303_articulation(MojOpen303* v, double normal, double attack, double
     old[0] = normal; old[1] = attack; old[2] = decay; old[3] = amp;
     return 1;
 }
+int moj_open303_pitch_bend(MojOpen303* v, double semitones) {
+    if (!v || !in_range(semitones, -2.5, 2.5)) return 0;
+    v->core.setPitchBend(semitones);
+    return 1;
+}
 void moj_open303_release_all(MojOpen303* v) { v->core.allNotesOff(); }
 void moj_open303_reset(MojOpen303* v) { v->core.reset(); v->status = {}; }
 int moj_open303_idle(const MojOpen303* v) { return v->core.isIdle(); }

@@ -20,11 +20,23 @@ pub fn translate(event: &AlsaEvent<'_>) -> Option<Event> {
             let note = event.get_data::<EvNote>()?;
             Some(Event::NoteOff { note: note.note })
         }
+        EventType::Pitchbend => {
+            let control = event.get_data::<EvCtrl>()?;
+            Some(Event::PitchBend {
+                value: control.value.clamp(-8192, 8191) as i16,
+            })
+        }
         EventType::Controller => {
             let control = event.get_data::<EvCtrl>()?;
             let cc = u8::try_from(control.param).ok()?;
             if cc == 120 || cc == 123 {
                 Some(Event::AllNotesOff)
+            } else if cc == 1 {
+                Some(Event::Modulation {
+                    value: control.value.clamp(0, 127) as u8,
+                })
+            } else if cc == 121 {
+                Some(Event::ResetControllers)
             } else if cc == 7 {
                 Some(Event::SetVolume {
                     value: Normalized::new((control.value.clamp(0, 127) as f32) / 127.0)
@@ -57,6 +69,41 @@ pub fn translate(event: &AlsaEvent<'_>) -> Option<Event> {
 mod tests {
     use super::*;
     use alsa::seq::{EvCtrl, EvNote};
+
+    #[test]
+    fn translates_performance_wheels_and_controller_reset() {
+        for value in [-8192, 0, 8191] {
+            let control = EvCtrl {
+                value,
+                ..EvCtrl::default()
+            };
+            assert_eq!(
+                translate(&AlsaEvent::new(EventType::Pitchbend, &control)),
+                Some(Event::PitchBend {
+                    value: value as i16
+                })
+            );
+        }
+        for value in [0, 64, 127] {
+            let control = EvCtrl {
+                param: 1,
+                value,
+                ..EvCtrl::default()
+            };
+            assert_eq!(
+                translate(&AlsaEvent::new(EventType::Controller, &control)),
+                Some(Event::Modulation { value: value as u8 })
+            );
+        }
+        let reset = EvCtrl {
+            param: 121,
+            ..EvCtrl::default()
+        };
+        assert_eq!(
+            translate(&AlsaEvent::new(EventType::Controller, &reset)),
+            Some(Event::ResetControllers)
+        );
+    }
 
     #[test]
     fn translates_notes_zero_velocity_macros_and_panic() {
