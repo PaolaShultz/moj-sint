@@ -15,8 +15,22 @@ voices, then released voices in note-on order, then the oldest held voice only
 when all voices are held. The voice budget is unchanged. A Swarm regression
 covers reverse release order, velocity-zero release, held-note protection,
 full-held fallback, stale note-off, panic/reuse, finite output and allocation
-guarding. Compilation and tests await the owner-authorized combined pass.
-No executable, running host or hardware was changed.
+guarding. The owner-authorized end-of-day pass used exact rustc 1.97.1
+(8bab26f4f, LLVM 22.1.6), AArch64. Formatting, locked all-target/all-feature
+checking, the focused regression and 368 normal tests passed; 36 historical
+cases stayed intentionally ignored. Warning-denied Clippy, audit and deny
+passed, retaining the known non-fatal duplicate winnow warning. All DEV/REL
+targets built and both host help checks passed. All 28 cleared presets validate
+and paired one-second 48 kHz release renders (note 48, velocity 0.85) are exact
+and finite; allowlist-order concatenated WAV SHA256 remains
+
+`68c2c6c323ac122844283ceec504ac6e0ccca74942063d3311b2a66d5ced729c`.
+
+SHR passed 1,200 normal tests (14 historical cases ignored), 20 Python helper
+tests and 31 isolated audio-policy cases. Its locked checks, Clippy with
+existing warnings, DEV/REL builds and version/help checks passed. No live
+process, JACK, MIDI, audio playback, recording or hardware was changed by this
+pass. Normal exit/reopen loads the rebuilt checkout binaries.
 
 ## Current documentation authority
 
