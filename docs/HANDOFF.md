@@ -7,6 +7,17 @@ This is the durable starting point for a fresh Codex session in
 workspace. Update it at meaningful checkpoints so later sessions do not have
 to reconstruct decisions from chat history.
 
+## 2026-09-11 held bass voice protection
+
+Swarm Warm Pad exposed shared oldest-voice stealing that could cut a held bass
+while released high notes still occupied voices. Allocation now chooses idle
+voices, then released voices in note-on order, then the oldest held voice only
+when all voices are held. The voice budget is unchanged. A Swarm regression
+covers reverse release order, velocity-zero release, held-note protection,
+full-held fallback, stale note-off, panic/reuse, finite output and allocation
+guarding. Compilation and tests await the owner-authorized combined pass.
+No executable, running host or hardware was changed.
+
 ## Current documentation authority
 
 The current [documentation index](README.md), [preset/control schema](PRESET_SCHEMA.md),

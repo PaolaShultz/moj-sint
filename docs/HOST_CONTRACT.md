@@ -57,6 +57,11 @@ period offsets, applies late events at offset zero, retains one future event,
 orders the bounded per-period batch by offset, and passes it to
 `Engine::render_block`.
 
+Polyphonic allocation uses an idle voice first, then the oldest released voice
+(by note-on order), then the oldest held voice only when every voice is held.
+Release tails cannot displace a held bass while a released voice is available.
+The preset voice count is unchanged.
+
 ## Real-time boundary
 
 The callback uses caller-owned JACK buffers, preallocated engine voices, a

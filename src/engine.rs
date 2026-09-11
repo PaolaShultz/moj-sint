@@ -67,6 +67,7 @@ pub enum EngineError {
 struct Voice {
     note: u8,
     age: u64,
+    held: bool,
     model: VoiceModel,
     envelope: Adsr,
     macros: [Smoother; 15],
@@ -106,6 +107,7 @@ impl Voice {
         Ok(Self {
             note: 0,
             age: 0,
+            held: false,
             model,
             envelope,
             macros,
@@ -121,6 +123,7 @@ impl Voice {
     fn start(&mut self, note: u8, velocity: f32, age: u64) {
         self.note = note;
         self.age = age;
+        self.held = true;
         self.model.note_on(note, velocity);
         if !self.uses_internal_envelopes {
             self.envelope.restart();
@@ -157,6 +160,7 @@ impl Voice {
     }
 
     fn panic(&mut self) {
+        self.held = false;
         self.envelope.reset();
         self.model.reset();
     }
@@ -170,6 +174,7 @@ impl Voice {
     }
 
     fn note_off(&mut self, note: u8) {
+        self.held = false;
         self.model.note_off(note);
         if !self.uses_internal_envelopes {
             self.envelope.note_off();
@@ -314,11 +319,13 @@ impl Engine {
             Event::NoteOn { note, velocity } if velocity > 0.0 => {
                 self.pitch_until_update = 0;
                 self.note_age = self.note_age.wrapping_add(1);
+                // Prefer silence, then the oldest released tail. Steal a held
+                // key only when every voice is held; keep the fixed voice budget.
                 let index = self.voices.iter().position(Voice::is_idle).or_else(|| {
                     self.voices
                         .iter()
                         .enumerate()
-                        .min_by_key(|(_, voice)| voice.age)
+                        .min_by_key(|(_, voice)| (voice.held, voice.age))
                         .map(|(index, _)| index)
                 });
                 if let Some(index) = index {
@@ -364,6 +371,61 @@ mod tests {
                 .replace("voices = 8", &format!("voices = {voices}")),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn swarm_reuses_oldest_released_voice_before_held_bass_without_allocating() {
+        let preset = Preset::parse(include_str!("../presets/15-swarm-warm-pad.mojsint")).unwrap();
+        let mut engine = Engine::new(48_000.0, &preset).unwrap();
+        let mut left = [0.0; 64];
+        let mut right = [0.0; 64];
+        assert_no_alloc(|| {
+            for note in [36, 72, 74, 76] {
+                engine.apply_event(Event::NoteOn {
+                    note,
+                    velocity: 0.8,
+                });
+            }
+            engine.render_block(&[], &mut left, &mut right).unwrap();
+            // Release in reverse order: age means original note-on order.
+            engine.apply_event(Event::NoteOff { note: 74 });
+            engine.apply_event(Event::NoteOn {
+                note: 72,
+                velocity: 0.0,
+            });
+            engine.apply_event(Event::NoteOn {
+                note: 79,
+                velocity: 0.8,
+            });
+            assert_eq!(
+                std::array::from_fn::<_, 4, _>(|i| engine.voices[i].note),
+                [36, 79, 74, 76]
+            );
+            engine.apply_event(Event::NoteOn {
+                note: 81,
+                velocity: 0.8,
+            });
+            assert_eq!(engine.voices[2].note, 81);
+            engine.render_block(&[], &mut left, &mut right).unwrap();
+            assert!(left.iter().chain(&right).all(|sample| sample.is_finite()));
+            // All four keys held: retain the bounded oldest-held fallback.
+            engine.apply_event(Event::NoteOn {
+                note: 83,
+                velocity: 0.8,
+            });
+            assert_eq!(engine.voices[0].note, 83);
+            // A stale release for the stolen bass must not release its replacement.
+            engine.apply_event(Event::NoteOff { note: 36 });
+            assert!(engine.voices[0].held);
+            engine.apply_event(Event::AllNotesOff);
+            assert!(engine.voices.iter().all(|v| !v.held && v.is_idle()));
+            engine.apply_event(Event::NoteOn {
+                note: 40,
+                velocity: 0.8,
+            });
+            assert_eq!(engine.voices[0].note, 40);
+            assert!(engine.voices[0].held);
+        });
     }
 
     #[test]
