@@ -1,6 +1,6 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-09-10, Europe/Zagreb.
+Last updated: 2026-09-11, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
@@ -11,12 +11,14 @@ to reconstruct decisions from chat history.
 
 The current [documentation index](README.md), [preset/control schema](PRESET_SCHEMA.md),
 and [host contract](HOST_CONTRACT.md) describe the implemented eight-model,
-schema-10 engine and 28 cleared factory starts. The first five models expose
-seven timbre controls, independent volume at physical position 5, and ADSR in
-SHR. Pressure Chain exposes eight timbre controls plus amp ADSR, with SWEEP at
-position 5. Dual Filter uses all fifteen positions and its dedicated core click.
-The master encoder remains navigation; non-Dual-Filter positions 13–15 are
-SHR Project AUX sends.
+schema-10 engine and 28 cleared factory starts. SHR now owns a shared 4×4
+surface: eight tone slots, four envelope slots,
+then Volume and three AUX sends. Rotary 1 edits parameter 1 until clicked into
+visible NAV. Previously displaced timbre controls return; Dual Filter's amp
+ADSR stays on row 3, with filter attack/sustain/release retained as preset-owned
+detail. Native engine CCs and schema fields remain independent of physical
+positions; the linked SHR instrument guide in `docs/PRESET_SCHEMA.md` owns the
+complete current mapping.
 
 Entries below are dated evidence and historical decisions, not simultaneous
 current contracts. In particular, earlier twelve-control-only, unimplemented
@@ -25,7 +27,7 @@ September 7 documentation reconciliation changes no engine, preset, runtime,
 or hardware state. Current deployment evidence distinguishes historical
 callback simulations from the later connected debug/release defect acceptance.
 
-## 2026-09-11 performance wheels (source implementation)
+## 2026-09-11 performance wheels and combined validation
 
 All eight production models now receive 14-bit pitch bend (±2 semitones),
 CC1 vibrato (5 Hz, up to ±50 cents), and CC121 controller reset. The shared
@@ -34,11 +36,29 @@ phase, preset timbre, and mono glide. The existing omni host applies wheels
 instrument-wide; this is not MPE. New engines start neutral. The native
 Open303 adapter exposes its existing bend setter without vendor changes.
 
-Focused MIDI, oscillator-phase/bounds, wheel-range/reset, and all-model
-finite/allocation regressions were added. Only formatting and source checks
-are authorized in this incremental pass: compilation, test execution,
-spectral measurements, binary refresh, listening, and hardware acceptance
-remain pending the owner's combined build-and-test pass.
+The authorized combined pass used exact rustc 1.97.1 (8bab26f4f, LLVM 22.1.6)
+on AArch64, with compilation serialized across the two checkouts. Locked
+all-target/all-feature checking, formatting, the normal suite (367 passed,
+36 historical cases intentionally ignored), warning-denied all-target Clippy,
+`cargo audit`, and `cargo deny check` passed. Deny retains its non-fatal duplicate
+`winnow` warning. The passing suite includes MIDI wheel decoding, pitch range
+and reset, oscillator phase/bounds, and all-model finite/allocation regressions.
+
+All DEV and REL binaries build, and both host binaries pass `--help`. All 28
+cleared presets validate. Two one-second release renders of each preset at
+48 kHz, MIDI 48 and velocity 0.85 are byte-identical and finite. The concatenated
+allowlist-order WAV SHA256 is
+`68c2c6c323ac122844283ceec504ac6e0ccca74942063d3311b2a66d5ced729c`.
+Temporary WAVs were removed. No JACK, live host, MIDI transmission, playback,
+recording or hardware acceptance was started. Existing processes retain their
+loaded executable until normal exit/reopen.
+
+SHR's companion validation passed 1,189 normal Rust tests with 14 historical cases
+ignored, plus 20 Python helper and 31 isolated audio-policy cases. Both SHR
+profiles build and pass version/help checks. Its only validation correction
+was a render-test fixture that asserted AUX labels without an active instrument.
+Current 4×4 control-surface documentation now separates SHR physical slots
+from Moj native macro/CC order; no Moj DSP or preset data changed in this pass.
 
 ## 2026-09-10 live monophonic note articulation
 

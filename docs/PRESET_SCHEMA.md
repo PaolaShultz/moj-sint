@@ -50,34 +50,40 @@ Schemas 1–9 remain readable through strict migrations. Older presets gain
 remain unchanged. The serializer always writes schema 10 and retains the exact
 model-specific patch and macro vocabulary.
 
-## Physical positions
+## Native controls and SHR positions
 
-Position 5 is instrument volume for the first five models. Moj Sint receives it as MIDI
-CC 7 and smooths the linear gain over 10 ms after synthesis, so it changes
-level without changing tone. The other seven timbre positions and four ADSR
-positions remain model-specific:
+SHR owns the physical surface: four rows of four, with tone controls on rows
+1–2, envelopes on row 3, and Volume/AUX 1/AUX 2/AUX 3 on row 4. Rotary 1 edits
+parameter 1; click toggles visible NAV for menu-page selection. The complete
+mapping is maintained in
+[SHR's instrument guide](https://github.com/PaolaShultz/shr-daw/blob/main/docs/INSTRUMENTS_AND_DRUMS.md#moj-sint-sounds).
 
-| Position | Model D | Six-Op PM | Strange | Swarm | Bass Matrix |
+Moj receives volume independently as CC7 and smooths linear gain over 10 ms
+after synthesis. The following table describes native macro order (CC20–31),
+not physical rotary positions:
+
+| Native slot | Model D | Six-Op PM | Strange | Swarm | Bass Matrix |
 | ---: | --- | --- | --- | --- | --- |
 | 1 | `EVOLVE` | `INDEX` | `TYPE` | `MASS` | `BODY` |
 | 2 | `SHAPE` | `RATIO` | `FORM` | `DETUNE` | `GROWL` |
 | 3 | `COLOR` | `FEEDBACK` | `WARP` | `SPREAD` | `METAL` |
 | 4 | `EDGE` | `OP DECAY` | `COUPLE` | `SHAPE` | `PUNCH` |
-| 5 | `VOLUME` | `VOLUME` | `VOLUME` | `VOLUME` | `VOLUME` |
+| 5 | `COUPLE` | `BALANCE` | `MOTION` | `BITE` | `CHARACTER` (preset-only) |
 | 6 | `MOTION` | `KEY SCALE` | `CHAOS` | `MOTION` | `DRIVE` |
 | 7 | `DEPTH` | `VELOCITY` | `COLOR` | `COLOR` | `FILTER` |
 | 8 | `SPACE` | `MOTION` | `SPACE` | `SPACE` | `UNSTABLE` |
 | 9–12 | `ATTACK`, `DECAY`, `SUSTAIN`, `RELEASE` | same | same | same | same |
 
-The schema retains the historical fifth timbre macro (`couple`, `balance`,
-`motion`, `bite`, or `character`) so old automation and exact sound identity
-remain loadable. The SHR surface no longer assigns that slot to position 5;
-new physical performance uses the separate `instrument_volume` field.
+SHR restores Model D feedback, Six-Op balance, Strange motion and Swarm bite
+on the surface. Bass Matrix retains `character` for preset compatibility but
+its live macro path ignores that field; SHR leaves the spare cell empty.
 
-Dual Filter alone uses all 15 positions and owns both its filter and amp
-envelopes internally:
+Dual Filter owns fifteen native controls plus independent CC7 volume. SHR
+keeps both filters' cutoff/resonance/envelope amount, structure, filter decay
+and amp ADSR on its main surface. Filter attack/sustain/release remain saved
+preset detail rather than a second AMP/FILTER page.
 
-| Position | Dual Filter |
+| Native slot | Dual Filter |
 | ---: | --- |
 | 1–3 | `FILTER A CUTOFF`, `FILTER A RESONANCE`, `FILTER A ENVELOPE DEPTH` |
 | 4–6 | `FILTER B CUTOFF`, `FILTER B RESONANCE`, `FILTER B ENVELOPE DEPTH` |
@@ -85,9 +91,9 @@ envelopes internally:
 | 8–11 | filter `ATTACK`, `DECAY`, `SUSTAIN`, `RELEASE` |
 | 12–15 | amp `ATTACK`, `DECAY`, `SUSTAIN`, `RELEASE` |
 
-MIDI CC20–34 carry those positions. CC35 is a press-only reversible core
+MIDI CC20–34 carry those native controls. CC35 is a press-only reversible core
 toggle; CC36 restores exact core state (`0` INDUSTRIAL, `127` COUNTER). Current
-positions are preserved across the internal 30 ms held-note crossfade.
+values are preserved across the internal 30 ms held-note crossfade.
 
 All live controls use the bounded event path. Timbre and ADSR use the existing
 10 ms macro smoothers; volume has its own 10 ms smoother. Loading or RESET in
@@ -104,9 +110,8 @@ never parses or allocates in the callback.
 Schema 9's `macros` are `source`, `shape`, `cutoff`, `resonance`, `sweep`,
 `filter_decay`, `pressure`, `bite`, `attack`, `decay`, `sustain`, `release`.
 Those twelve values map in order to CC20–31. SHR displays F DECAY separately
-from amp DECAY; physical position 5 remains SWEEP for this model. CC7 still
-controls independent instrument volume at the MIDI host boundary. SHR's last
-three performance slots are Project AUX sends, outside the synth.
+from amp DECAY; physical rotary 5 is SWEEP and rotary 13 is Volume. The final
+three rotaries are SHR Project AUX sends, outside the synth.
 
 The three topology presets use the same controls and conservative 0.7 output
 gain. Each positive live NoteOn retriggers both contours, including repeated
@@ -119,9 +124,10 @@ its amp envelope internally, so Engine applies no second ADSR.
 ## Open303 native surface
 
 Open303 has eleven normalized macro fields and independent instrument volume.
-Its twelve physical positions are Waveform, Cutoff, Resonance, Env Mod, Volume,
-Filter Decay, Accent, Slide, Normal Attack, Accent Attack, Accent Decay, and
-Amp Decay. CCs are 20–23, 7, and 25–31 respectively; CC24 is unused. Positions
-13–15 remain SHR AUX sends. The last four controls are native envelope timings,
+Its native controls are Waveform, Cutoff, Resonance, Env Mod, Filter Decay,
+Accent, Slide, Normal Attack, Accent Attack, Accent Decay, and Amp Decay.
+CCs are 20–23 and 25–31 respectively; CC24 is unused and CC7 is Volume.
+SHR places Filter Attack, Filter Decay, Accent Decay and Amp Decay on row 3,
+then Volume and three AUX sends on row 4. These are native envelope timings,
 not ADSR. Exact fields/ranges and the four starts are in
 [Open303 integration](OPEN303_INTEGRATION.md). Filter identity is preset-owned.

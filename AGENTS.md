@@ -18,12 +18,12 @@
   allocation checks; oscillator/nonlinear changes need aliasing measurements.
 - The live callback may not allocate/deallocate, lock, perform I/O, log, format,
   panic, spawn, or perform avoidable per-sample transcendental setup.
-- Preserve the model-specific physical surface in `docs/PRESET_SCHEMA.md`:
-  the first five models use seven timbre controls, volume at position 5, and
-  ADSR; Pressure Chain uses eight timbre controls plus amp ADSR; Dual Filter
-  uses fifteen values and its dedicated core click. SHR owns AUX sends at
-  positions 13–15 for the twelve-position models. Do not invent another
-  button, mode, or master-encoder takeover.
+- Preserve native controls and the SHR-owned physical surface linked from
+  `docs/PRESET_SCHEMA.md`: a 4×4 grid with envelopes on row 3 and Volume plus
+  three AUX sends on row 4. Rotary 1 edits parameter 1; its click toggles NAV.
+  Dual Filter retains all fifteen native values and its dedicated core click,
+  including preset-owned controls outside the physical surface. Do not invent
+  additional buttons or modes without an explicit product request.
 - Follow SHR-DAW's actual live-control path. Permission to apply a value on the
   next note is an implementation option, not a product constraint; defer a
   parameter only when its safe implementation genuinely requires it.
