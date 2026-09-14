@@ -54,7 +54,7 @@ pub fn run(client_name: &str, preset: &Preset) -> Result<()> {
                     Ok(pending) if pending > 0 => match input.event_input() {
                         Ok(event) => {
                             if let Some(event) = midi::translate(&event) {
-                                producer.push(timing.schedule(event));
+                                enqueue_midi_event(&producer, timing.schedule(event), &midi_stop);
                             }
                         }
                         Err(_) => {
@@ -84,7 +84,7 @@ pub fn run(client_name: &str, preset: &Preset) -> Result<()> {
         thread::sleep(Duration::from_millis(100));
         let current = callback_overflow.load(Ordering::Relaxed);
         if current != last_overflow {
-            eprintln!("Moj Sint callback event overflow count: {current}");
+            eprintln!("Moj Sint callback event deferral count: {current}");
             last_overflow = current;
         }
     }
@@ -93,7 +93,9 @@ pub fn run(client_name: &str, preset: &Preset) -> Result<()> {
         .join()
         .map_err(|_| anyhow::anyhow!("ALSA MIDI input thread panicked"))?;
     if queue_overflow > 0 {
-        eprintln!("Moj Sint MIDI queue overflow count: {queue_overflow}");
+        anyhow::bail!(
+            "MIDI queue overflow ({queue_overflow} lost events); instrument stopped to prevent stuck notes"
+        );
     }
     if jack_failed.load(Ordering::Acquire) {
         anyhow::bail!("JACK shut down while Moj Sint was active");
@@ -102,4 +104,55 @@ pub fn run(client_name: &str, preset: &Preset) -> Result<()> {
         anyhow::bail!("ALSA Sequencer MIDI input failed while Moj Sint was active");
     }
     Ok(())
+}
+
+fn enqueue_midi_event(
+    producer: &queue::Producer<ScheduledEvent>,
+    event: ScheduledEvent,
+    stop: &AtomicBool,
+) {
+    if !producer.push(event) {
+        // Once an event is lost we cannot trust note ownership. The host's
+        // normal shutdown closes only its own JACK client and silences it.
+        stop.store(true, Ordering::Release);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::Event;
+
+    #[test]
+    fn lost_release_on_full_queue_requests_host_shutdown_without_allocating() {
+        let (producer, _consumer) = channel();
+        let stop = AtomicBool::new(false);
+        let event = ScheduledEvent {
+            cycle: 1,
+            sample_offset: 0,
+            event: Event::NoteOn {
+                note: 60,
+                velocity: 0.8,
+            },
+        };
+        assert_no_alloc::assert_no_alloc(|| {
+            for _ in 0..queue::QUEUE_CAPACITY - 1 {
+                enqueue_midi_event(&producer, event, &stop);
+            }
+            assert!(!stop.load(Ordering::Acquire));
+            enqueue_midi_event(
+                &producer,
+                ScheduledEvent {
+                    event: Event::NoteOff { note: 60 },
+                    ..event
+                },
+                &stop,
+            );
+            assert!(
+                stop.load(Ordering::Acquire),
+                "lost MIDI must not leave a sounding host running"
+            );
+            assert_eq!(producer.overflow_count(), 1);
+        });
+    }
 }

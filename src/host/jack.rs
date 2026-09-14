@@ -289,25 +289,14 @@ unsafe extern "C" fn process_callback(frames: c_uint, argument: *mut c_void) -> 
     let left = unsafe { std::slice::from_raw_parts_mut(left, frames) };
     let right = unsafe { std::slice::from_raw_parts_mut(right, frames) };
     let cycle = state.cycle.fetch_add(1, Ordering::AcqRel) + 1;
-    let mut count = 0;
-    while let Some(scheduled) = state.pending.take().or_else(|| state.queue.pop()) {
-        if scheduled.cycle > cycle {
-            state.pending = Some(scheduled);
-            break;
-        }
-        if count == MAX_PERIOD_EVENTS {
-            state.callback_overflow.fetch_add(1, Ordering::Relaxed);
-            continue;
-        }
-        let offset = period_offset(scheduled, cycle, frames);
-        let mut insert = count;
-        while insert > 0 && state.events[insert - 1].sample_offset > offset {
-            state.events[insert] = state.events[insert - 1];
-            insert -= 1;
-        }
-        state.events[insert] = TimedEvent::new(offset, scheduled.event);
-        count += 1;
-    }
+    let count = collect_period_events(
+        &state.queue,
+        &mut state.pending,
+        &mut state.events,
+        &state.callback_overflow,
+        cycle,
+        frames,
+    );
     if state
         .engine
         .render_block(&state.events[..count], left, right)
@@ -321,6 +310,39 @@ unsafe extern "C" fn process_callback(frames: c_uint, argument: *mut c_void) -> 
     0
 }
 
+fn collect_period_events(
+    queue: &Consumer<ScheduledEvent>,
+    pending: &mut Option<ScheduledEvent>,
+    events: &mut [TimedEvent; MAX_PERIOD_EVENTS],
+    callback_overflow: &AtomicU64,
+    cycle: u64,
+    frames: usize,
+) -> usize {
+    let mut count = 0;
+    while let Some(scheduled) = pending.take().or_else(|| queue.pop()) {
+        if scheduled.cycle > cycle {
+            *pending = Some(scheduled);
+            break;
+        }
+        if count == MAX_PERIOD_EVENTS {
+            // Retain the first event beyond the budget, including note-off.
+            // Stop draining so callback work stays bounded under a producer flood.
+            callback_overflow.fetch_add(1, Ordering::Relaxed);
+            *pending = Some(scheduled);
+            break;
+        }
+        let offset = period_offset(scheduled, cycle, frames);
+        let mut insert = count;
+        while insert > 0 && events[insert - 1].sample_offset > offset {
+            events[insert] = events[insert - 1];
+            insert -= 1;
+        }
+        events[insert] = TimedEvent::new(offset, scheduled.event);
+        count += 1;
+    }
+    count
+}
+
 fn period_offset(scheduled: ScheduledEvent, current_cycle: u64, frames: usize) -> usize {
     if scheduled.cycle < current_cycle {
         0
@@ -332,6 +354,95 @@ fn period_offset(scheduled: ScheduledEvent, current_cycle: u64, frames: usize) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn period_budget_preserves_release_after_control_burst_without_allocating() {
+        for source in [
+            include_str!("../../presets/14-strange-oscillator.mojsint"),
+            include_str!("../../presets/15-swarm-warm-pad.mojsint"),
+        ] {
+            for release in [
+                Event::NoteOff { note: 60 },
+                Event::NoteOn {
+                    note: 60,
+                    velocity: 0.0,
+                },
+            ] {
+                let preset = Preset::parse(source).unwrap();
+                let mut engine = Engine::new(48_000.0, &preset).unwrap();
+                let (producer, consumer) = super::super::queue::channel();
+                let mut pending = None;
+                let mut events = [TimedEvent::new(0, Event::AllNotesOff); MAX_PERIOD_EVENTS];
+                let overflow = AtomicU64::new(0);
+                let mut left = [0.0; 64];
+                let mut right = [0.0; 64];
+                engine
+                    .render_block(
+                        &[TimedEvent::new(
+                            0,
+                            Event::NoteOn {
+                                note: 60,
+                                velocity: 0.8,
+                            },
+                        )],
+                        &mut left,
+                        &mut right,
+                    )
+                    .unwrap();
+                assert!(engine.active_voice_count() > 0);
+                for _ in 0..MAX_PERIOD_EVENTS {
+                    assert!(producer.push(ScheduledEvent {
+                        cycle: 1,
+                        sample_offset: 0,
+                        event: Event::ResetControllers
+                    }));
+                }
+                assert!(producer.push(ScheduledEvent {
+                    cycle: 1,
+                    sample_offset: 1,
+                    event: release
+                }));
+                assert_no_alloc::assert_no_alloc(|| {
+                    let count = collect_period_events(
+                        &consumer,
+                        &mut pending,
+                        &mut events,
+                        &overflow,
+                        1,
+                        64,
+                    );
+                    assert_eq!(count, MAX_PERIOD_EVENTS);
+                    engine
+                        .render_block(&events[..count], &mut left, &mut right)
+                        .unwrap();
+                    let count = collect_period_events(
+                        &consumer,
+                        &mut pending,
+                        &mut events,
+                        &overflow,
+                        2,
+                        64,
+                    );
+                    assert_eq!(count, 1, "release must survive the period limit");
+                    assert_eq!(events[0], TimedEvent::new(0, release));
+                    engine
+                        .render_block(&events[..count], &mut left, &mut right)
+                        .unwrap();
+                    for _ in 0..16_000 {
+                        engine.render_block(&[], &mut left, &mut right).unwrap();
+                        assert!(left.iter().chain(&right).all(|x| x.is_finite()));
+                        if engine.active_voice_count() == 0 {
+                            break;
+                        }
+                    }
+                    assert_eq!(engine.active_voice_count(), 0);
+                    engine.render_block(&[], &mut left, &mut right).unwrap();
+                    assert_eq!(left, [0.0; 64]);
+                    assert_eq!(right, [0.0; 64]);
+                });
+            }
+        }
+    }
 
     #[test]
     fn scheduled_event_is_fixed_size_copy_data() {

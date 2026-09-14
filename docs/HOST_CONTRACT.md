@@ -46,16 +46,22 @@ mono glide, and held-note priority. Strange Oscillator retains its intentionally
 quantized Register Machine source. No new surface slots or preset fields are used.
 CC 1 follows the [MIDI controller assignment](https://midi.org/midi-1-0-control-change-messages).
 
-It writes fixed-size events into a 1,024-slot SPSC queue. A full queue drops the
-new event, increments an atomic overflow counter, and never blocks. Queue and
-per-period overflow totals are reported only by non-real-time threads.
+It writes fixed-size events into a 1,024-slot SPSC queue. A full queue refuses
+the new event without blocking and requests host shutdown: losing a release
+makes continued note ownership unsafe. The normal shutdown closes only this
+instrument's JACK client, silences it, and reports the MIDI queue overflow.
+Reload the instrument after resolving the event flood. JACK and other clients
+remain running. Queue faults and per-period deferral counts are reported only
+by non-real-time threads.
 
 The ALSA thread calls JACK's non-process-thread
 `jack_frames_since_cycle_start` query, associates the resulting offset with the
 next callback cycle, and queues that schedule. The callback clamps current
 period offsets, applies late events at offset zero, retains one future event,
 orders the bounded per-period batch by offset, and passes it to
-`Engine::render_block`.
+`Engine::render_block`. After 256 events it retains the next event and stops
+draining, preserving releases and the remaining FIFO backlog for later periods
+instead of dropping them. Deferred events become late events at offset zero.
 
 Polyphonic allocation uses an idle voice first, then the oldest released voice
 (by note-on order), then the oldest held voice only when every voice is held.

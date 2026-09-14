@@ -1,11 +1,31 @@
 # Moj Sint workspace handoff
 
-Last updated: 2026-09-11, Europe/Zagreb.
+Last updated: 2026-09-14, Europe/Zagreb.
 
 This is the durable starting point for a fresh Codex session in
 `/home/shome/p/moj-sint`. Read this file before planning or changing the
 workspace. Update it at meaningful checkpoints so later sessions do not have
 to reconstruct decisions from chat history.
+
+## 2026-09-14 MIDI release loss under overload
+
+A Player stuck-note report with N00B off prompted inspection of the Moj host.
+Offline regressions reproduced two release-loss paths: events beyond the
+256-event callback budget were discarded, and a full MIDI queue could lose a
+release while leaving the host sounding. The callback now retains the next
+event and FIFO backlog for later periods and stops draining at its budget.
+A full queue requests normal host shutdown and reports an explicit MIDI
+overflow error after closing this instrument's JACK client. Other clients and
+JACK remain untouched. The host contract owns recovery details.
+
+Both new regressions failed before the fixes. Exact Rust 1.97.1 passed the
+locked check, formatting, eight host tests and ten focused engine tests.
+Strange Oscillator and Swarm releases reach finite silence in both MIDI release
+formats after a control burst, with allocation guarding. The normal full suite,
+historical tests, Clippy and release builds were outside the authorized focused
+pass. No live host, JACK, MIDI, audio or hardware test was started; release
+binaries remain unchanged. The user's incident is not conclusively attributed
+to overload without live event evidence.
 
 ## 2026-09-11 held bass voice protection
 
