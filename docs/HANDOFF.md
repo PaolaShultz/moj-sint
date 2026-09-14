@@ -27,6 +27,13 @@ pass. No live host, JACK, MIDI, audio or hardware test was started; release
 binaries remain unchanged. The user's incident is not conclusively attributed
 to overload without live event evidence.
 
+The owner subsequently authorized rebuilding all. Locked all-target/all-feature
+DEV and REL builds pass in both Moj and SHR on exact rustc 1.97.1. Both Moj host
+help checks and both SHR version/help checks pass; existing SHR warnings remain.
+No additional test suites or live audio/hardware checks were run. Running
+processes were preserved; normal exit/reopen selects the rebuilt checkout
+binaries containing the fixes.
+
 ## 2026-09-11 held bass voice protection
 
 Swarm Warm Pad exposed shared oldest-voice stealing that could cut a held bass
